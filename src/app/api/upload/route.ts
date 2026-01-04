@@ -1,0 +1,90 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createServerClient } from '@/lib/supabase/server'
+import { getPresignedUploadUrl, getAvatarPath, getBannerPath, getPostMediaPath } from '@/lib/storage/r2'
+
+// Get a presigned URL for direct upload to R2
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createServerClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { filename, type, postId } = await request.json()
+
+    if (!filename || !type) {
+      return NextResponse.json(
+        { error: 'Filename and type are required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime']
+    const ext = filename.split('.').pop()?.toLowerCase()
+    const mimeType = getMimeType(ext || '')
+
+    if (!allowedTypes.includes(mimeType)) {
+      return NextResponse.json(
+        { error: 'File type not allowed' },
+        { status: 400 }
+      )
+    }
+
+    // Determine folder based on upload type
+    let folder: string
+    switch (type) {
+      case 'avatar':
+        folder = getAvatarPath(user.id)
+        break
+      case 'banner':
+        folder = getBannerPath(user.id)
+        break
+      case 'post':
+        if (!postId) {
+          // Generate a temporary folder for new posts
+          folder = getPostMediaPath(user.id, `temp-${Date.now()}`)
+        } else {
+          folder = getPostMediaPath(user.id, postId)
+        }
+        break
+      case 'message':
+        folder = `messages/${user.id}`
+        break
+      default:
+        folder = `uploads/${user.id}`
+    }
+
+    // Get presigned URL
+    const { uploadUrl, key, publicUrl } = await getPresignedUploadUrl(filename, folder)
+
+    return NextResponse.json({
+      uploadUrl,
+      key,
+      publicUrl
+    })
+
+  } catch (error: any) {
+    console.error('Upload error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to generate upload URL' },
+      { status: 500 }
+    )
+  }
+}
+
+function getMimeType(ext: string): string {
+  const mimeTypes: Record<string, string> = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    mp4: 'video/mp4',
+    webm: 'video/webm',
+    mov: 'video/quicktime',
+  }
+  return mimeTypes[ext] || 'application/octet-stream'
+}
