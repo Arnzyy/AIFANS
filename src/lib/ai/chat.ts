@@ -259,3 +259,63 @@ export async function createChatCompletion(options: ChatCompletionOptions): Prom
     return getMockResponse(lastUserMessage?.content || '');
   }
 }
+
+// ===========================================
+// HELPER FUNCTIONS FOR API ROUTES
+// ===========================================
+
+// Extract user information from messages for memory/personalization
+export function extractUserInfo(message: string): Record<string, string> {
+  const info: Record<string, string> = {};
+  const lowerMessage = message.toLowerCase();
+
+  // Extract name patterns
+  const namePatterns = [
+    /my name is (\w+)/i,
+    /i'm (\w+)/i,
+    /call me (\w+)/i,
+    /i am (\w+)/i,
+  ];
+
+  for (const pattern of namePatterns) {
+    const match = message.match(pattern);
+    if (match && match[1] && match[1].length > 1 && match[1].length < 20) {
+      info.name = match[1];
+      break;
+    }
+  }
+
+  // Extract age if mentioned
+  const ageMatch = message.match(/i(?:'m| am) (\d{2}) (?:years old|yo)/i);
+  if (ageMatch && parseInt(ageMatch[1]) >= 18) {
+    info.age = ageMatch[1];
+  }
+
+  return info;
+}
+
+// Build conversation history with system prompt for API
+export function buildConversationHistory(
+  systemPrompt: string,
+  messages: { role: 'user' | 'assistant'; content: string }[],
+  context?: { userName?: string; userDetails?: Record<string, string> }
+): ChatMessage[] {
+  let fullSystemPrompt = systemPrompt;
+
+  // Add user context to system prompt
+  if (context?.userName) {
+    fullSystemPrompt += `\n\nThe user's name is ${context.userName}. Use their name occasionally to be personal.`;
+  }
+
+  if (context?.userDetails && Object.keys(context.userDetails).length > 0) {
+    fullSystemPrompt += `\n\nKnown details about the user: ${JSON.stringify(context.userDetails)}`;
+  }
+
+  // Build message array
+  const chatMessages: ChatMessage[] = [
+    { role: 'system', content: fullSystemPrompt },
+    ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+  ];
+
+  return chatMessages;
+}
