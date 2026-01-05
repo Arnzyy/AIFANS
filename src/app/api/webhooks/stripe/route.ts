@@ -94,7 +94,7 @@ async function createSubscription(session: Stripe.Checkout.Session) {
   }
 
   // Get subscription from Stripe
-  const stripeSubscription = await stripe.subscriptions.retrieve(
+  const stripeSubscription: Stripe.Subscription = await stripe.subscriptions.retrieve(
     session.subscription as string
   );
 
@@ -280,7 +280,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   }
 
   // Get the Stripe subscription for period info
-  const stripeSubscription = await stripe.subscriptions.retrieve(
+  const stripeSubscription: Stripe.Subscription = await stripe.subscriptions.retrieve(
     invoice.subscription as string
   );
 
