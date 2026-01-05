@@ -48,13 +48,18 @@ export function TipModal({ creator, onClose, onSuccess }: TipModalProps) {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to send tip');
+        throw new Error(data.error || 'Failed to start checkout');
+      }
+
+      // Redirect to Stripe Checkout
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
       }
 
       onSuccess?.();
     } catch (err: any) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -136,21 +141,18 @@ export function TipModal({ creator, onClose, onSuccess }: TipModalProps) {
           />
         </div>
 
-        {/* Dev notice */}
-        <div className="mb-4 p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-          <p className="text-xs text-yellow-400 text-center">
-            DEV MODE: No real payment
-          </p>
-        </div>
-
         {/* Send button */}
         <button
           onClick={handleTip}
           disabled={loading}
           className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
         >
-          {loading ? 'Sending...' : `Send £${parseFloat(amount || '0').toFixed(2)} Tip`}
+          {loading ? 'Redirecting to checkout...' : `Send £${parseFloat(amount || '0').toFixed(2)} Tip`}
         </button>
+
+        <p className="mt-3 text-xs text-gray-500 text-center">
+          Secure payment powered by Stripe
+        </p>
       </div>
     </div>
   );
