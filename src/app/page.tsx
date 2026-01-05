@@ -4,11 +4,11 @@ import { Bot, Sparkles, Shield, Gem } from 'lucide-react';
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-black flex flex-col">
+    <div className="min-h-screen bg-black flex flex-col overflow-x-hidden">
       {/* Main Content */}
       <div className="flex-1 flex flex-col lg:flex-row">
         {/* Left Side - Logo & Content Preview */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12 overflow-hidden">
           {/* Logo - Centered */}
           <div className="mb-10">
             <Image
@@ -22,12 +22,14 @@ export default function HomePage() {
           </div>
 
           {/* Content Grid - 5 across, taller cards */}
-          <div className="flex gap-3 overflow-x-auto pb-4 px-4 -mx-4 lg:overflow-visible lg:px-0 lg:mx-0 lg:justify-center scrollbar-hide">
-            <PreviewCard image="/preview/1.png" />
-            <PreviewCard image="/preview/2.png" />
-            <PreviewCard image="/preview/3.png" />
-            <PreviewCard image="/preview/4.png" />
-            <PreviewCard image="/preview/5.png" />
+          <div className="w-full max-w-full">
+            <div className="flex gap-3 overflow-x-auto pb-4 px-4 lg:overflow-visible lg:px-0 lg:justify-center scrollbar-hide">
+              <PreviewCard image="/preview/1.png" />
+              <PreviewCard image="/preview/2.png" />
+              <PreviewCard image="/preview/3.png" />
+              <PreviewCard image="/preview/4.png" />
+              <PreviewCard image="/preview/5.png" />
+            </div>
           </div>
         </div>
 
