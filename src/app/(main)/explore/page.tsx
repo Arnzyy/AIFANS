@@ -128,6 +128,11 @@ function CreatorCard({ creator }: { creator: Creator }) {
           className="w-full h-full object-cover"
         />
 
+        {/* AI Model label - always show */}
+        <div className="absolute top-2 left-2 px-2 py-1 rounded-full bg-purple-500/80 text-xs font-medium">
+          AI Model
+        </div>
+
         {/* AI Chat badge */}
         {creator.hasAiChat && (
           <div className="absolute top-2 right-2 px-2 py-1 rounded-full bg-black/60 text-xs flex items-center gap-1">

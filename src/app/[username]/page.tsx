@@ -85,11 +85,14 @@ export default function CreatorProfilePage({
 
         {/* Name & bio */}
         <div className="mb-6">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl md:text-3xl font-bold">{creator.displayName}</h1>
             {creator.isVerified && (
               <BadgeCheck className="w-6 h-6 text-purple-400" />
             )}
+            <span className="px-2 py-1 text-xs bg-purple-500/80 text-white rounded-full font-medium">
+              AI Model
+            </span>
             {creator.hasAiChat && (
               <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-400 rounded-full flex items-center gap-1">
                 <Bot className="w-3 h-3" />
@@ -105,6 +108,11 @@ export default function CreatorProfilePage({
               {creator.location}
             </div>
           )}
+
+          {/* Disclosure - required but subtle */}
+          <p className="text-xs text-gray-600 mt-2">
+            Fictional AI-generated persona
+          </p>
 
           <p className="mt-4 text-gray-300">{creator.bio}</p>
 

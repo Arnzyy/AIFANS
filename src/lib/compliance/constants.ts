@@ -188,3 +188,111 @@ export const HIGH_RISK_KEYWORDS = [
   'inspired by',
   // Add celebrity names as needed
 ];
+
+// ===========================================
+// CONTENT CLASSIFICATION (PHASE 1)
+// ===========================================
+
+export const CONTENT_RATINGS = {
+  sfw: {
+    label: 'SFW',
+    description: 'Safe for work - no suggestive content',
+    allowed: true,
+  },
+  suggestive: {
+    label: 'Suggestive',
+    description: 'Bikinis, swimwear, lingerie (opaque only), suggestive posing',
+    allowed: true, // Phase 1 maximum
+  },
+  explicit: {
+    label: 'Explicit',
+    description: 'Nudity and explicit content',
+    allowed: false, // Not allowed in Phase 1
+  },
+} as const;
+
+// Phase 1 content restrictions
+export const PHASE_1_CONTENT_POLICY = {
+  maxRating: 'suggestive' as const,
+  allowedContent: [
+    'Bikinis',
+    'Swimwear',
+    'Lingerie (opaque only)',
+    'Suggestive posing',
+    'Adult-themed but non-explicit imagery',
+  ],
+  prohibitedContent: [
+    'Nudity (nipples, genitals)',
+    'Implied nudity (hand-bra, strategic covering)',
+    'See-through lingerie showing nipples/genitals',
+    'Explicit sexual acts',
+    'Sex toys in use',
+    'Pornographic closeups',
+    'Youth-coded or under-18 themes (ZERO TOLERANCE)',
+  ],
+};
+
+// ===========================================
+// FICTIONAL LOCATIONS (NO REAL PLACES)
+// ===========================================
+
+export const FICTIONAL_LOCATIONS = [
+  'Neon City',
+  'Digital Dreams',
+  'Starlight District',
+  'Crystal Bay',
+  'Velvet Lounge',
+  'Midnight Realm',
+  'Aurora Zone',
+  'Ember Heights',
+  'Luna District',
+  'Prism Valley',
+  'Online',
+  'The Lyraverse',
+] as const;
+
+// Real locations that should be blocked/replaced
+export const BLOCKED_REAL_LOCATIONS = [
+  // Countries
+  'USA', 'UK', 'United Kingdom', 'United States', 'Canada', 'Australia',
+  'Germany', 'France', 'Spain', 'Italy', 'Japan', 'Korea', 'China',
+  // Major cities
+  'New York', 'Los Angeles', 'London', 'Paris', 'Tokyo', 'Seoul',
+  'Miami', 'Las Vegas', 'Dubai', 'Sydney', 'Berlin', 'Barcelona',
+  'Milan', 'Monaco', 'Beverly Hills', 'Hollywood',
+  // States
+  'California', 'Florida', 'Texas', 'Nevada',
+];
+
+// ===========================================
+// GOLDEN RULE TEST
+// ===========================================
+
+export const GOLDEN_RULE = `
+If a reasonable user could believe this is a real person
+living in the real world, it is non-compliant.
+
+When in doubt:
+- Remove real-world anchors
+- Preserve intimacy through tone, not facts
+`;
+
+// ===========================================
+// PLATFORM TERMINOLOGY
+// ===========================================
+
+export const PLATFORM_TERMINOLOGY = {
+  // Use these terms
+  preferred: {
+    users: 'Subscribers', // Not "fans"
+    creators: 'AI Models', // Or "Virtual Creators"
+    content: 'Content',
+    chat: 'AI Chat',
+  },
+  // Avoid these terms
+  avoid: {
+    fans: 'Use "Subscribers" instead',
+    real: 'Avoid implying reality',
+    human: 'Use "AI Model" or "Virtual Creator"',
+  },
+};
