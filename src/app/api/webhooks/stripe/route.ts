@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+async function handleCheckoutCompleted(session: any) {
   const metadata = session.metadata || {};
   const type = metadata.type;
 
@@ -85,7 +85,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 }
 
-async function createSubscription(session: Stripe.Checkout.Session) {
+async function createSubscription(session: any) {
   const { user_id, creator_id, tier_id, billing_period } = session.metadata || {};
 
   if (!user_id || !creator_id) {
@@ -180,7 +180,7 @@ async function createSubscription(session: Stripe.Checkout.Session) {
   console.log('Subscription created:', subscription.id);
 }
 
-async function createTipTransaction(session: Stripe.Checkout.Session) {
+async function createTipTransaction(session: any) {
   const { user_id, creator_id, message, original_amount_gbp } = session.metadata || {};
 
   if (!user_id || !creator_id) {
@@ -224,7 +224,7 @@ async function createTipTransaction(session: Stripe.Checkout.Session) {
   console.log('Tip transaction created');
 }
 
-async function createPPVPurchase(session: Stripe.Checkout.Session) {
+async function createPPVPurchase(session: any) {
   const { user_id, creator_id, post_id, original_price_gbp } = session.metadata || {};
 
   if (!user_id || !creator_id || !post_id) {
@@ -264,7 +264,7 @@ async function createPPVPurchase(session: Stripe.Checkout.Session) {
   console.log('PPV purchase created for post:', post_id);
 }
 
-async function handleInvoicePaid(invoice: Stripe.Invoice) {
+async function handleInvoicePaid(invoice: any) {
   // Handle subscription renewals
   if (!invoice.subscription) return;
 
@@ -314,7 +314,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   console.log('Subscription renewed:', subscription.id);
 }
 
-async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription) {
+async function handleSubscriptionUpdated(stripeSubscription: any) {
   const { data: subscription } = await supabase
     .from('subscriptions')
     .select('id')
@@ -350,7 +350,7 @@ async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription
   console.log('Subscription updated:', subscription.id, status);
 }
 
-async function handleSubscriptionDeleted(stripeSubscription: Stripe.Subscription) {
+async function handleSubscriptionDeleted(stripeSubscription: any) {
   const { data: subscription } = await supabase
     .from('subscriptions')
     .select('id, creator_id')
@@ -373,7 +373,7 @@ async function handleSubscriptionDeleted(stripeSubscription: Stripe.Subscription
   console.log('Subscription deleted/expired:', subscription.id);
 }
 
-async function handleChargeRefunded(charge: Stripe.Charge) {
+async function handleChargeRefunded(charge: any) {
   const paymentIntentId = charge.payment_intent as string;
 
   if (!paymentIntentId) return;
