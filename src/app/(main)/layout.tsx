@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Home, Compass, MessageCircle, Bookmark, User, Gem, Bell } from 'lucide-react';
 
 const navItems = [
-  { href: '/feed', label: 'Feed', icon: '🏠' },
-  { href: '/explore', label: 'Explore', icon: '🔍' },
-  { href: '/messages', label: 'Messages', icon: '💬' },
-  { href: '/bookmarks', label: 'Saved', icon: '🔖' },
-  { href: '/profile', label: 'Profile', icon: '👤' },
+  { href: '/feed', label: 'Feed', icon: Home },
+  { href: '/explore', label: 'Explore', icon: Compass },
+  { href: '/messages', label: 'Messages', icon: MessageCircle },
+  { href: '/bookmarks', label: 'Saved', icon: Bookmark },
+  { href: '/profile', label: 'Profile', icon: User },
 ];
 
 export default function MainLayout({
@@ -26,11 +27,12 @@ export default function MainLayout({
           <Link href="/" className="text-xl font-bold gradient-text">
             AIFans
           </Link>
-          
+
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-6">
             {navItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+              const Icon = item.icon;
               return (
                 <Link
                   key={item.href}
@@ -39,7 +41,7 @@ export default function MainLayout({
                     isActive ? 'text-white' : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  <span>{item.icon}</span>
+                  <Icon className="w-5 h-5" />
                   <span>{item.label}</span>
                 </Link>
               );
@@ -47,18 +49,18 @@ export default function MainLayout({
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link 
+            <Link
               href="/wallet"
               className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
             >
-              <span>💎</span>
+              <Gem className="w-4 h-4 text-purple-400" />
               <span className="text-sm">0 credits</span>
             </Link>
-            <Link 
+            <Link
               href="/notifications"
               className="relative p-2 rounded-lg hover:bg-white/5 transition-colors"
             >
-              <span>🔔</span>
+              <Bell className="w-5 h-5" />
             </Link>
           </div>
         </div>
@@ -69,6 +71,7 @@ export default function MainLayout({
         <div className="flex justify-around py-2">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
@@ -77,7 +80,7 @@ export default function MainLayout({
                   isActive ? 'text-purple-400' : 'text-gray-500'
                 }`}
               >
-                <span className="text-xl">{item.icon}</span>
+                <Icon className="w-5 h-5" />
                 <span className="text-xs">{item.label}</span>
               </Link>
             );

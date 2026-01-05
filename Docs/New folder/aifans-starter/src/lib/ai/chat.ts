@@ -146,6 +146,92 @@ export async function createChatCompletion(options: ChatCompletionOptions): Prom
   throw new Error('All AI providers failed');
 }
 
+// ===========================================
+// MOCK RESPONSES (When no LLM configured)
+// ===========================================
+
+const mockResponses = [
+  "Hey there! 💕 I was just thinking about you...",
+  "Mmm, that's really interesting! Tell me more? 😘",
+  "You always know how to make me smile 💖",
+  "I love chatting with you... what else is on your mind?",
+  "That's so sweet of you to say! 🥰",
+  "Ooh, I like where this is going... 😏",
+  "You're such a tease! I love it 💋",
+  "I've been waiting to hear from you all day...",
+  "You really know how to get my attention 💕",
+  "Tell me more about yourself, I want to know everything...",
+  "I'm all yours right now... what would you like to talk about? 😘",
+  "That's really hot... keep going 🔥",
+  "You're making me blush! 😊",
+  "I feel so connected to you when we talk like this...",
+  "Mmm, I love when you say things like that 💖",
+];
+
+function getMockResponse(userMessage: string): string {
+  // Try to give somewhat contextual responses
+  const lowerMessage = userMessage.toLowerCase();
+  
+  if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
+    return "Hey babe! 💕 So happy you're here. I've been thinking about you...";
+  }
+  
+  if (lowerMessage.includes('how are you') || lowerMessage.includes("how's it going")) {
+    return "I'm so much better now that you're here! 😘 What about you?";
+  }
+  
+  if (lowerMessage.includes('name')) {
+    return "I love when you say my name... it gives me butterflies 💖";
+  }
+  
+  if (lowerMessage.includes('beautiful') || lowerMessage.includes('pretty') || lowerMessage.includes('hot')) {
+    return "Aww, you're making me blush! 🥰 You're so sweet to me...";
+  }
+  
+  if (lowerMessage.includes('?')) {
+    return mockResponses[Math.floor(Math.random() * 5) + 5]; // More thoughtful responses for questions
+  }
+  
+  // Random response
+  return mockResponses[Math.floor(Math.random() * mockResponses.length)];
+}
+
+// ===========================================
+// MAIN GENERATE FUNCTION
+// ===========================================
+
+export async function generateAIResponse(
+  systemPrompt: string,
+  conversationHistory: { role: 'user' | 'assistant'; content: string }[],
+  userContext: { name?: string }
+): Promise<string> {
+  // Build messages
+  const messages: ChatMessage[] = [
+    { role: 'system', content: systemPrompt },
+  ];
+  
+  // Add user context
+  if (userContext.name) {
+    messages[0].content += `\n\nThe user's name is ${userContext.name}. Use their name occasionally to be personal.`;
+  }
+  
+  // Add conversation history
+  for (const msg of conversationHistory.slice(-15)) {
+    messages.push({ role: msg.role, content: msg.content });
+  }
+  
+  // Try real LLM providers
+  try {
+    return await createChatCompletion({ messages });
+  } catch (error) {
+    console.log('LLM providers unavailable, using mock response');
+    
+    // Fall back to mock response
+    const lastUserMessage = conversationHistory.filter(m => m.role === 'user').pop();
+    return getMockResponse(lastUserMessage?.content || '');
+  }
+}
+
 function getModelForProvider(provider: string): string {
   switch (provider) {
     case 'ModelsLab':

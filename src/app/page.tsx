@@ -1,6 +1,11 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { Bot, MessageSquare, DollarSign, Lock, Globe, BarChart3 } from 'lucide-react';
 
 export default function HomePage() {
+  // Redirect to explore by default
+  redirect('/explore');
+
   return (
     <div className="min-h-screen bg-black">
       {/* Header */}
@@ -10,8 +15,8 @@ export default function HomePage() {
             AIFans
           </Link>
           <nav className="flex items-center gap-4">
-            <Link 
-              href="/explore" 
+            <Link
+              href="/explore"
               className="text-gray-400 hover:text-white transition-colors"
             >
               Explore
@@ -68,32 +73,32 @@ export default function HomePage() {
           </h2>
           <div className="grid md:grid-cols-3 gap-8">
             <FeatureCard
-              icon="🤖"
+              icon={<Bot className="w-8 h-8 text-purple-400" />}
               title="AI-First Platform"
               description="Built specifically for AI-generated content creators. No restrictions on synthetic media."
             />
             <FeatureCard
-              icon="💬"
+              icon={<MessageSquare className="w-8 h-8 text-blue-400" />}
               title="AI Chat"
               description="Chat with AI personalities. Creators can build custom AI companions for their subscribers."
             />
             <FeatureCard
-              icon="💰"
+              icon={<DollarSign className="w-8 h-8 text-green-400" />}
               title="Creator Economy"
               description="Keep 80% of your earnings. Multiple monetization options including subscriptions, PPV, and tips."
             />
             <FeatureCard
-              icon="🔒"
+              icon={<Lock className="w-8 h-8 text-yellow-400" />}
               title="Privacy First"
               description="Discrete billing, secure payments, and complete anonymity for fans and creators."
             />
             <FeatureCard
-              icon="🌍"
+              icon={<Globe className="w-8 h-8 text-cyan-400" />}
               title="Global Reach"
               description="Accept payments from fans worldwide. Support for multiple currencies."
             />
             <FeatureCard
-              icon="📊"
+              icon={<BarChart3 className="w-8 h-8 text-pink-400" />}
               title="Analytics"
               description="Deep insights into your audience, earnings, and content performance."
             />
@@ -142,18 +147,18 @@ export default function HomePage() {
   );
 }
 
-function FeatureCard({ 
-  icon, 
-  title, 
-  description 
-}: { 
-  icon: string; 
-  title: string; 
+function FeatureCard({
+  icon,
+  title,
+  description
+}: {
+  icon: React.ReactNode;
+  title: string;
   description: string;
 }) {
   return (
     <div className="p-6 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-colors">
-      <div className="text-4xl mb-4">{icon}</div>
+      <div className="mb-4">{icon}</div>
       <h3 className="text-xl font-semibold mb-2">{title}</h3>
       <p className="text-gray-400">{description}</p>
     </div>

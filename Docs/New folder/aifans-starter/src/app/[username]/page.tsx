@@ -2,6 +2,7 @@ import { createServerClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { AI_CHAT_DISCLOSURE } from '@/lib/compliance/constants';
+import { ProfileActions, TierSubscribeButton, PostGridItem } from '@/components/profile/ProfileClient';
 
 export default async function CreatorProfilePage({
   params,
@@ -61,6 +62,22 @@ export default async function CreatorProfilePage({
     .order('created_at', { ascending: false })
     .limit(12);
 
+  const creatorData = {
+    id: creator.id,
+    username: creator.username,
+    display_name: creator.display_name,
+    avatar_url: creator.avatar_url,
+  };
+
+  const tiersData = (tiers || []).map(t => ({
+    id: t.id,
+    name: t.name,
+    description: t.description || '',
+    price: t.price,
+    duration_months: t.duration_months,
+    is_featured: t.is_featured,
+  }));
+
   return (
     <div className="min-h-screen bg-black">
       {/* Header */}
@@ -103,26 +120,12 @@ export default async function CreatorProfilePage({
             )}
           </div>
 
-          {/* Action buttons - desktop */}
-          <div className="hidden md:flex absolute right-0 bottom-0 gap-3">
-            {isSubscribed ? (
-              <>
-                <Link
-                  href={`/messages/${creator.username}`}
-                  className="px-6 py-2.5 rounded-lg bg-white/10 font-medium hover:bg-white/20 transition-colors"
-                >
-                  Message
-                </Link>
-                <button className="px-6 py-2.5 rounded-lg border border-purple-500 text-purple-400 font-medium hover:bg-purple-500/10 transition-colors">
-                  Subscribed ✓
-                </button>
-              </>
-            ) : (
-              <button className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity">
-                Subscribe
-              </button>
-            )}
-          </div>
+          {/* Action buttons */}
+          <ProfileActions 
+            creator={creatorData}
+            tiers={tiersData}
+            isSubscribed={isSubscribed}
+          />
         </div>
 
         {/* Name & bio */}
@@ -162,27 +165,6 @@ export default async function CreatorProfilePage({
           </div>
         </div>
 
-        {/* Mobile action buttons */}
-        <div className="md:hidden flex gap-3 mb-6">
-          {isSubscribed ? (
-            <>
-              <Link
-                href={`/messages/${creator.username}`}
-                className="flex-1 py-3 rounded-lg bg-white/10 font-medium text-center hover:bg-white/20 transition-colors"
-              >
-                Message
-              </Link>
-              <button className="flex-1 py-3 rounded-lg border border-purple-500 text-purple-400 font-medium hover:bg-purple-500/10 transition-colors">
-                Subscribed ✓
-              </button>
-            </>
-          ) : (
-            <button className="w-full py-3 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity">
-              Subscribe
-            </button>
-          )}
-        </div>
-
         {/* AI Chat CTA */}
         {creatorProfile?.ai_chat_enabled && (
           <div className="mb-6 p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20">
@@ -205,11 +187,11 @@ export default async function CreatorProfilePage({
         )}
 
         {/* Subscription Tiers */}
-        {!isSubscribed && tiers && tiers.length > 0 && (
+        {!isSubscribed && tiersData.length > 0 && (
           <div className="mb-8">
             <h2 className="text-lg font-semibold mb-4">Subscription Plans</h2>
             <div className="grid md:grid-cols-3 gap-4">
-              {tiers.map((tier) => (
+              {tiersData.map((tier) => (
                 <div
                   key={tier.id}
                   className={`p-4 rounded-xl border ${
@@ -231,9 +213,11 @@ export default async function CreatorProfilePage({
                   {tier.description && (
                     <p className="text-sm text-gray-400 mt-2">{tier.description}</p>
                   )}
-                  <button className="w-full mt-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-sm font-medium hover:opacity-90 transition-opacity">
-                    Subscribe
-                  </button>
+                  <TierSubscribeButton 
+                    creator={creatorData}
+                    tier={tier}
+                    allTiers={tiersData}
+                  />
                 </div>
               ))}
             </div>
@@ -247,40 +231,12 @@ export default async function CreatorProfilePage({
           {posts && posts.length > 0 ? (
             <div className="grid grid-cols-3 gap-1 md:gap-2">
               {posts.map((post) => (
-                <div
+                <PostGridItem
                   key={post.id}
-                  className="relative aspect-square bg-white/5 overflow-hidden group cursor-pointer"
-                >
-                  {post.media_url ? (
-                    <img 
-                      src={post.media_url} 
-                      alt="" 
-                      className={`w-full h-full object-cover ${
-                        post.is_ppv && !isSubscribed ? 'blur-xl' : ''
-                      }`}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-4xl">
-                      📝
-                    </div>
-                  )}
-                  
-                  {/* PPV overlay */}
-                  {post.is_ppv && !isSubscribed && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                      <div className="text-center">
-                        <span className="text-2xl">🔒</span>
-                        <p className="text-xs mt-1">£{((post.ppv_price || 0) / 100).toFixed(2)}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Hover overlay */}
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
-                    <span className="text-sm">❤️ {post.likes_count || 0}</span>
-                    <span className="text-sm">💬 {post.comments_count || 0}</span>
-                  </div>
-                </div>
+                  post={post}
+                  isSubscribed={isSubscribed}
+                  creatorId={creator.id}
+                />
               ))}
             </div>
           ) : (

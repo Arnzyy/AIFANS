@@ -4,9 +4,11 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
+import { useToast } from '@/components/shared/Toast';
 
 export default function NewPostPage() {
   const router = useRouter();
+  const { addToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [content, setContent] = useState('');
@@ -17,12 +19,12 @@ export default function NewPostPage() {
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
     if (selectedFiles.length + files.length > 10) {
-      setError('Maximum 10 files per post');
+      addToast('error', 'Maximum 10 files per post');
       return;
     }
 
@@ -31,7 +33,6 @@ export default function NewPostPage() {
     
     setFiles(prev => [...prev, ...selectedFiles]);
     setPreviews(prev => [...prev, ...newPreviews]);
-    setError('');
   };
 
   const removeFile = (index: number) => {
@@ -44,17 +45,17 @@ export default function NewPostPage() {
     e.preventDefault();
     
     if (!content.trim() && files.length === 0) {
-      setError('Add some content or media to your post');
+      addToast('error', 'Add some content or media to your post');
       return;
     }
 
     if (isPPV && (!ppvPrice || parseFloat(ppvPrice) < 1)) {
-      setError('PPV price must be at least £1');
+      addToast('error', 'PPV price must be at least £1');
       return;
     }
 
     setLoading(true);
-    setError('');
+    setUploadProgress(0);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -63,8 +64,11 @@ export default function NewPostPage() {
       // Upload files first
       const mediaUrls: string[] = [];
       
-      for (const file of files) {
-        const fileName = `${user.id}/${Date.now()}-${file.name}`;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+        
         const { error: uploadError } = await supabase.storage
           .from('posts')
           .upload(fileName, file);
@@ -76,6 +80,7 @@ export default function NewPostPage() {
           .getPublicUrl(fileName);
 
         mediaUrls.push(publicUrl);
+        setUploadProgress(Math.round(((i + 1) / files.length) * 100));
       }
 
       // Create post
@@ -92,10 +97,11 @@ export default function NewPostPage() {
 
       if (postError) throw postError;
 
+      addToast('success', 'Post created successfully!');
       router.push('/dashboard/posts');
       router.refresh();
     } catch (err: any) {
-      setError(err.message || 'Failed to create post');
+      addToast('error', err.message || 'Failed to create post');
     } finally {
       setLoading(false);
     }
@@ -115,18 +121,13 @@ export default function NewPostPage() {
             disabled={loading || (!content.trim() && files.length === 0)}
             className="px-4 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Posting...' : isScheduled ? 'Schedule' : 'Post'}
+            {loading ? (uploadProgress > 0 ? `${uploadProgress}%` : 'Posting...') : isScheduled ? 'Schedule' : 'Post'}
           </button>
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-              {error}
-            </div>
-          )}
 
           {/* Content */}
           <div>
