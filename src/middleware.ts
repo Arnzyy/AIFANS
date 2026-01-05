@@ -81,7 +81,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protected pages - redirect to login if not authenticated
-  const protectedPaths = ['/feed', '/messages', '/dashboard', '/settings'];
+  const protectedPaths = ['/feed', '/messages', '/dashboard', '/settings', '/profile', '/bookmarks', '/wallet', '/notifications'];
   const isProtectedPath = protectedPaths.some(path => pathname.startsWith(path));
   
   if (isProtectedPath && !user) {
