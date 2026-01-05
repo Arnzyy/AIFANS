@@ -80,7 +80,7 @@ export default function ConversationPage() {
       }
       setCurrentUser(user);
 
-      // Fetch the other user
+      // Fetch the other user from profiles
       const { data: userData } = await supabase
         .from('profiles')
         .select('id, username, display_name, avatar_url')
@@ -88,7 +88,15 @@ export default function ConversationPage() {
         .single();
 
       if (!userData) {
-        router.push('/messages');
+        // User not found in database - may be a mock creator
+        // Show a message instead of redirecting
+        setOtherUser({
+          id: 'mock-' + username,
+          username: username.toLowerCase(),
+          display_name: username,
+          avatar_url: null,
+        });
+        setLoading(false);
         return;
       }
       setOtherUser(userData);
@@ -233,7 +241,18 @@ export default function ConversationPage() {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-2xl mx-auto space-y-4">
-          {messages.length === 0 ? (
+          {otherUser?.id.startsWith('mock-') ? (
+            <div className="text-center py-12">
+              <div className="text-5xl mb-4">💬</div>
+              <h3 className="text-xl font-semibold mb-2">Messaging coming soon</h3>
+              <p className="text-gray-400 mb-4">
+                Direct messaging with {otherUser.display_name} will be available soon.
+              </p>
+              <p className="text-sm text-gray-500">
+                In the meantime, try AI Chat if available!
+              </p>
+            </div>
+          ) : messages.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500">No messages yet. Say hello!</p>
             </div>
@@ -268,26 +287,28 @@ export default function ConversationPage() {
         </div>
       </div>
 
-      {/* Input */}
-      <div className="border-t border-white/10 p-4 bg-black">
-        <form onSubmit={sendMessage} className="max-w-2xl mx-auto flex gap-3">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors"
-            disabled={sending}
-          />
-          <button
-            type="submit"
-            disabled={!newMessage.trim() || sending}
-            className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {sending ? '...' : 'Send'}
-          </button>
-        </form>
-      </div>
+      {/* Input - only show for real users */}
+      {!otherUser?.id.startsWith('mock-') && (
+        <div className="border-t border-white/10 p-4 bg-black">
+          <form onSubmit={sendMessage} className="max-w-2xl mx-auto flex gap-3">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type a message..."
+              className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors"
+              disabled={sending}
+            />
+            <button
+              type="submit"
+              disabled={!newMessage.trim() || sending}
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sending ? '...' : 'Send'}
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

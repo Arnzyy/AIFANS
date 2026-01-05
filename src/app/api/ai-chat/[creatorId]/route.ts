@@ -1,6 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { buildSystemPrompt, generateAIResponse } from '@/lib/ai/chat';
+import { generateAIResponse, AIPersonality } from '@/lib/ai/chat';
 
 // GET /api/ai-chat/[creatorId] - Get AI chat session
 export async function GET(
@@ -140,13 +140,11 @@ export async function POST(
     content: m.content,
   }));
 
-  // Generate AI response
-  const systemPrompt = buildSystemPrompt(personality as any);
-
+  // Generate AI response using Anthropic Claude
   let aiResponse: string;
   try {
     aiResponse = await generateAIResponse(
-      systemPrompt,
+      personality as AIPersonality,
       conversationHistory,
       {
         name: userProfile?.display_name || userProfile?.username || 'User',

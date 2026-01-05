@@ -137,8 +137,8 @@ function CreatorCard({ creator }: { creator: Creator }) {
           className="w-full h-full object-cover"
         />
 
-        {/* Model type label - Lyra Original or Creator Model */}
-        <div className={`absolute top-2 left-2 px-2 py-1 rounded-full text-xs font-medium ${
+        {/* Model type label - positioned at bottom-left above info */}
+        <div className={`absolute bottom-20 md:bottom-24 left-2 px-2 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-medium ${
           isLyraOriginal
             ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
             : 'bg-purple-500/80 text-white'
@@ -146,26 +146,26 @@ function CreatorCard({ creator }: { creator: Creator }) {
           {modelTypeInfo.label}
         </div>
 
-        {/* Right side badges */}
-        <div className="absolute top-2 right-2 flex flex-col gap-1">
+        {/* Right side badges - positioned at bottom-right above info */}
+        <div className="absolute bottom-20 md:bottom-24 right-2 flex flex-col gap-0.5 md:gap-1 items-end">
           {/* AI Chat badge */}
           {creator.hasAiChat && (
-            <div className="px-2 py-1 rounded-full bg-black/60 text-xs flex items-center gap-1">
-              <Bot className="w-3 h-3 text-purple-400" />
-              <span>AI Chat</span>
+            <div className="px-1.5 md:px-2 py-0.5 md:py-1 rounded-full bg-black/70 text-[10px] md:text-xs flex items-center gap-0.5 md:gap-1">
+              <Bot className="w-2.5 h-2.5 md:w-3 md:h-3 text-purple-400" />
+              <span>AI</span>
             </div>
           )}
           {/* New badge */}
           {creator.isNew && (
-            <div className="px-2 py-1 rounded-full bg-green-500/80 text-xs font-medium">
+            <div className="px-1.5 md:px-2 py-0.5 md:py-1 rounded-full bg-green-500/80 text-[10px] md:text-xs font-medium">
               New
             </div>
           )}
           {/* Featured badge */}
           {creator.isFeatured && isLyraOriginal && (
-            <div className="px-2 py-1 rounded-full bg-amber-500/80 text-xs font-medium flex items-center gap-1">
-              <Star className="w-3 h-3" />
-              Featured
+            <div className="px-1.5 md:px-2 py-0.5 md:py-1 rounded-full bg-amber-500/80 text-[10px] md:text-xs font-medium flex items-center gap-0.5">
+              <Star className="w-2.5 h-2.5 md:w-3 md:h-3" />
+              <span className="hidden md:inline">Featured</span>
             </div>
           )}
         </div>

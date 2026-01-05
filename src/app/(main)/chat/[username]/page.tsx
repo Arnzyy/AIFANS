@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 import { AI_CHAT_DISCLOSURE } from '@/lib/compliance/constants';
+import { getCreatorByUsername } from '@/lib/data/creators';
 import { formatDistanceToNow } from 'date-fns';
 
 interface Message {
@@ -60,7 +61,7 @@ export default function AIChatPage() {
       }
       setCurrentUser(user);
 
-      // Fetch the creator
+      // Try to fetch the creator from database first
       const { data: creatorData } = await supabase
         .from('profiles')
         .select(`
@@ -76,14 +77,33 @@ export default function AIChatPage() {
         ? creatorData.creator_profiles[0]
         : creatorData?.creator_profiles;
 
-      if (!creatorData || !creatorProfiles?.ai_chat_enabled) {
-        router.push(`/${username}`);
-        return;
+      if (creatorData && creatorProfiles?.ai_chat_enabled) {
+        // Real creator from database
+        setCreator({
+          ...creatorData,
+          creator_profiles: creatorProfiles,
+        } as Creator);
+      } else {
+        // Try mock creators
+        const mockCreator = getCreatorByUsername(username.toLowerCase());
+        if (!mockCreator || !mockCreator.hasAiChat) {
+          router.push(`/${username}`);
+          return;
+        }
+        // Use mock creator data
+        setCreator({
+          id: mockCreator.id,
+          username: mockCreator.username,
+          display_name: mockCreator.displayName,
+          avatar_url: mockCreator.avatar,
+          creator_profiles: {
+            ai_chat_enabled: true,
+            bio: mockCreator.bio,
+          },
+        } as Creator);
+        setLoading(false);
+        return; // Skip conversation creation for mock creators
       }
-      setCreator({
-        ...creatorData,
-        creator_profiles: creatorProfiles,
-      } as Creator);
 
       // Find or create AI chat conversation
       const { data: existingConv } = await supabase
@@ -159,38 +179,75 @@ export default function AIChatPage() {
     setMessages(prev => [...prev, tempUserMsg]);
 
     try {
-      // Call AI chat API
-      const response = await fetch('/api/ai-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          creatorId: creator.id,
-          message: messageContent,
-          conversationId
-        })
-      });
+      // Check if this is a mock creator (ID doesn't look like UUID)
+      const isMockCreator = !creator.id.includes('-') || creator.id.length < 30;
 
-      const data = await response.json();
+      if (isMockCreator) {
+        // For mock creators, call the mock AI endpoint
+        const response = await fetch('/api/ai-chat/mock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            creatorUsername: creator.username,
+            creatorName: creator.display_name,
+            message: messageContent,
+            conversationHistory: messages.slice(-10).map(m => ({
+              role: m.sender_id === currentUser.id ? 'user' : 'assistant',
+              content: m.content
+            }))
+          })
+        });
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send message');
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to send message');
+        }
+
+        // Add AI response
+        const aiMsg: Message = {
+          id: `ai-${Date.now()}`,
+          content: data.response,
+          sender_id: creator.id,
+          receiver_id: currentUser.id,
+          created_at: new Date().toISOString(),
+          is_ai_generated: true
+        };
+        setMessages(prev => [...prev, aiMsg]);
+      } else {
+        // Call real AI chat API for database creators
+        const response = await fetch('/api/ai-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            creatorId: creator.id,
+            message: messageContent,
+            conversationId
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to send message');
+        }
+
+        // Update conversation ID if new
+        if (data.conversationId && !conversationId) {
+          setConversationId(data.conversationId);
+        }
+
+        // Add AI response
+        const aiMsg: Message = {
+          id: `ai-${Date.now()}`,
+          content: data.response,
+          sender_id: creator.id,
+          receiver_id: currentUser.id,
+          created_at: new Date().toISOString(),
+          is_ai_generated: true
+        };
+        setMessages(prev => [...prev, aiMsg]);
       }
-
-      // Update conversation ID if new
-      if (data.conversationId && !conversationId) {
-        setConversationId(data.conversationId);
-      }
-
-      // Add AI response
-      const aiMsg: Message = {
-        id: `ai-${Date.now()}`,
-        content: data.response,
-        sender_id: creator.id,
-        receiver_id: currentUser.id,
-        created_at: new Date().toISOString(),
-        is_ai_generated: true
-      };
-      setMessages(prev => [...prev, aiMsg]);
 
     } catch (error: any) {
       console.error('Error sending message:', error);

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowLeft } from 'lucide-react';
 
 export default function AuthLayout({
@@ -17,8 +18,14 @@ export default function AuthLayout({
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <Link href="/" className="text-2xl font-bold gradient-text">
-          LYRA
+        <Link href="/" className="flex items-center">
+          <Image
+            src="/logo.png"
+            alt="LYRA"
+            width={120}
+            height={40}
+            className="h-8 w-auto"
+          />
         </Link>
       </header>
       
