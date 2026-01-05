@@ -60,7 +60,7 @@ export default async function ExplorePage({
 
       {/* Become a Creator CTA */}
       <Link
-        href="/register?creator=true"
+        href="/become-creator"
         className="mb-6 flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 hover:border-purple-500/40 transition-all group"
       >
         <div className="flex items-center gap-3">
