@@ -94,9 +94,9 @@ async function createSubscription(session: Stripe.Checkout.Session) {
   }
 
   // Get subscription from Stripe
-  const stripeSubscription: Stripe.Subscription = await stripe.subscriptions.retrieve(
+  const stripeSubscription = await stripe.subscriptions.retrieve(
     session.subscription as string
-  );
+  ) as any;
 
   // Calculate period dates
   const currentPeriodStart = new Date(stripeSubscription.current_period_start * 1000);
@@ -280,9 +280,9 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   }
 
   // Get the Stripe subscription for period info
-  const stripeSubscription: Stripe.Subscription = await stripe.subscriptions.retrieve(
+  const stripeSubscription = await stripe.subscriptions.retrieve(
     invoice.subscription as string
-  );
+  ) as any;
 
   // Update subscription period
   await supabase
