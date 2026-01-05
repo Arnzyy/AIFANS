@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { buildSystemPrompt, createChatCompletion, buildConversationHistory, extractUserInfo } from '@/lib/ai/chat'
-import { AIPersonality } from '@/types'
+import { buildSystemPrompt, createChatCompletion, buildConversationHistory, extractUserInfo, AIPersonality } from '@/lib/ai/chat'
 
 export async function POST(request: NextRequest) {
   try {
