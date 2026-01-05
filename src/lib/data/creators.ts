@@ -1,0 +1,331 @@
+// Mock creator data for demo purposes
+export interface Creator {
+  id: string;
+  username: string;
+  displayName: string;
+  age: number;
+  avatar: string;
+  banner?: string;
+  bio: string;
+  location: string;
+  subscriberCount: number;
+  postCount: number;
+  subscriptionPrice: number; // in cents
+  isVerified: boolean;
+  hasAiChat: boolean;
+  tags: string[];
+}
+
+export const mockCreators: Creator[] = [
+  {
+    id: '1',
+    username: 'luna_dark',
+    displayName: 'Luna',
+    age: 23,
+    avatar: '/creators/luna.png',
+    bio: 'Dark aesthetic queen. Into fashion, music & late night chats. Let me be your midnight muse.',
+    location: 'Los Angeles, CA',
+    subscriberCount: 12400,
+    postCount: 247,
+    subscriptionPrice: 999,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['dark aesthetic', 'fashion', 'goth'],
+  },
+  {
+    id: '2',
+    username: 'sofia_gold',
+    displayName: 'Sofia',
+    age: 25,
+    avatar: '/creators/sofia.png',
+    bio: 'Living my best life, one sunset at a time. VIP access to my glamorous world.',
+    location: 'Miami, FL',
+    subscriberCount: 34200,
+    postCount: 512,
+    subscriptionPrice: 1499,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['glamour', 'lifestyle', 'party'],
+  },
+  {
+    id: '3',
+    username: 'aria_sweetheart',
+    displayName: 'Aria',
+    age: 21,
+    avatar: '/creators/aria.png',
+    bio: 'Your sweet girl next door. Love picnics, sunny days & making you smile.',
+    location: 'Austin, TX',
+    subscriberCount: 8900,
+    postCount: 156,
+    subscriptionPrice: 799,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['natural', 'sweet', 'girl next door'],
+  },
+  {
+    id: '4',
+    username: 'maya_beach',
+    displayName: 'Maya',
+    age: 24,
+    avatar: '/creators/maya.png',
+    bio: 'Pool parties & good vibes only. Subscribe for exclusive poolside content.',
+    location: 'Las Vegas, NV',
+    subscriberCount: 28700,
+    postCount: 389,
+    subscriptionPrice: 1299,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['bikini', 'pool', 'party'],
+  },
+  {
+    id: '5',
+    username: 'valentina_city',
+    displayName: 'Valentina',
+    age: 22,
+    avatar: '/creators/valentina.png',
+    bio: 'NYC street style. Bold, confident & unapologetic. Come explore the city with me.',
+    location: 'New York, NY',
+    subscriberCount: 19300,
+    postCount: 278,
+    subscriptionPrice: 1199,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['street style', 'urban', 'edgy'],
+  },
+  {
+    id: '6',
+    username: 'raven_noir',
+    displayName: 'Raven',
+    age: 26,
+    avatar: '/creators/raven.png',
+    bio: 'Embracing the darkness. Alternative model & night owl. Join my dark fantasy.',
+    location: 'Portland, OR',
+    subscriberCount: 15600,
+    postCount: 203,
+    subscriptionPrice: 1099,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['goth', 'alternative', 'dark'],
+  },
+  {
+    id: '7',
+    username: 'yuki_tokyo',
+    displayName: 'Yuki',
+    age: 20,
+    avatar: '/creators/yuki.png',
+    bio: 'Tokyo dreams. Kawaii meets sophisticated. Exclusive content from Japan.',
+    location: 'Tokyo, Japan',
+    subscriberCount: 42100,
+    postCount: 634,
+    subscriptionPrice: 1599,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['asian', 'kawaii', 'japanese'],
+  },
+  {
+    id: '8',
+    username: 'chloe_belle',
+    displayName: 'Chloe',
+    age: 22,
+    avatar: '/creators/chloe.png',
+    bio: 'French charm with a playful twist. Wine, fashion & romantic evenings.',
+    location: 'Paris, France',
+    subscriberCount: 11200,
+    postCount: 167,
+    subscriptionPrice: 899,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['french', 'elegant', 'blonde'],
+  },
+  {
+    id: '9',
+    username: 'jisoo_seoul',
+    displayName: 'Jisoo',
+    age: 23,
+    avatar: '/creators/jisoo.png',
+    bio: 'K-beauty princess. Fashion, dance & exclusive behind-the-scenes content.',
+    location: 'Seoul, Korea',
+    subscriberCount: 56800,
+    postCount: 723,
+    subscriptionPrice: 1799,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['kpop', 'korean', 'dance'],
+  },
+  {
+    id: '10',
+    username: 'captain_skye',
+    displayName: 'Captain Skye',
+    age: 28,
+    avatar: '/creators/captain.png',
+    bio: 'First class only. Flight attendant by day, your fantasy by night. Mile high club VIP.',
+    location: 'Dubai, UAE',
+    subscriberCount: 31400,
+    postCount: 412,
+    subscriptionPrice: 1499,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['roleplay', 'flight attendant', 'luxury'],
+  },
+  {
+    id: '11',
+    username: 'scarlett_flame',
+    displayName: 'Scarlett',
+    age: 27,
+    avatar: '/creators/scarlett.png',
+    bio: 'Fiery redhead with a taste for elegance. Golden hour is my favorite time.',
+    location: 'London, UK',
+    subscriberCount: 22900,
+    postCount: 298,
+    subscriptionPrice: 1299,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['redhead', 'elegant', 'classy'],
+  },
+  {
+    id: '12',
+    username: 'diana_luxe',
+    displayName: 'Diana',
+    age: 25,
+    avatar: '/creators/diana.png',
+    bio: 'Luxury lifestyle & exclusive experiences. Your high-end fantasy awaits.',
+    location: 'Monaco',
+    subscriberCount: 18700,
+    postCount: 234,
+    subscriptionPrice: 2499,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['luxury', 'bondage', 'exclusive'],
+  },
+  {
+    id: '13',
+    username: 'victoria_vip',
+    displayName: 'Victoria',
+    age: 29,
+    avatar: '/creators/victoria.png',
+    bio: 'Sophisticated & successful. Business by day, pleasure by night. Exclusive VIP content.',
+    location: 'Beverly Hills, CA',
+    subscriberCount: 27300,
+    postCount: 345,
+    subscriptionPrice: 1999,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['milf', 'sophisticated', 'business'],
+  },
+  {
+    id: '14',
+    username: 'emma_nordic',
+    displayName: 'Emma',
+    age: 24,
+    avatar: '/creators/emma.png',
+    bio: 'Scandinavian beauty. Love nature, hot springs & cozy nights. Natural content only.',
+    location: 'Iceland',
+    subscriberCount: 14200,
+    postCount: 189,
+    subscriptionPrice: 999,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['natural', 'nordic', 'blonde'],
+  },
+  {
+    id: '15',
+    username: 'zoe_alt',
+    displayName: 'Zoe',
+    age: 21,
+    avatar: '/creators/zoe.png',
+    bio: 'Alt girl vibes. Music, art & self-expression. Let me show you my world.',
+    location: 'Seattle, WA',
+    subscriberCount: 9800,
+    postCount: 145,
+    subscriptionPrice: 799,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['alt', 'emo', 'artistic'],
+  },
+  {
+    id: '16',
+    username: 'bella_sunny',
+    displayName: 'Bella',
+    age: 23,
+    avatar: '/creators/bella.png',
+    bio: 'Sunshine & smiles. Your happy place is just a subscription away.',
+    location: 'Barcelona, Spain',
+    subscriberCount: 16500,
+    postCount: 267,
+    subscriptionPrice: 899,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['latina', 'sunny', 'natural'],
+  },
+  {
+    id: '17',
+    username: 'heidi_alpine',
+    displayName: 'Heidi',
+    age: 26,
+    avatar: '/creators/heidi.png',
+    bio: 'Bavarian beauty. Traditional with a twist. Oktoberfest every day.',
+    location: 'Munich, Germany',
+    subscriberCount: 13100,
+    postCount: 178,
+    subscriptionPrice: 1099,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['german', 'blonde', 'traditional'],
+  },
+  {
+    id: '18',
+    username: 'mia_fresh',
+    displayName: 'Mia',
+    age: 18,
+    avatar: '/creators/mia.png',
+    bio: 'Just turned 18! Fresh, fun & ready to share my journey with you.',
+    location: 'San Diego, CA',
+    subscriberCount: 8400,
+    postCount: 89,
+    subscriptionPrice: 699,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['teen', 'fresh', 'new'],
+  },
+  {
+    id: '19',
+    username: 'grace_elegant',
+    displayName: 'Grace',
+    age: 24,
+    avatar: '/creators/grace.png',
+    bio: 'Elegance is an attitude. Boudoir photography & intimate moments.',
+    location: 'Milan, Italy',
+    subscriberCount: 21800,
+    postCount: 312,
+    subscriptionPrice: 1399,
+    isVerified: true,
+    hasAiChat: true,
+    tags: ['elegant', 'boudoir', 'classy'],
+  },
+];
+
+// Helper function to get featured creators
+export const getFeaturedCreators = () => mockCreators.slice(0, 6);
+
+// Helper function to get trending creators
+export const getTrendingCreators = () =>
+  [...mockCreators].sort((a, b) => b.subscriberCount - a.subscriberCount).slice(0, 10);
+
+// Helper function to get new creators
+export const getNewCreators = () => mockCreators.slice(-5);
+
+// Helper function to search creators
+export const searchCreators = (query: string) => {
+  const lowerQuery = query.toLowerCase();
+  return mockCreators.filter(
+    (creator) =>
+      creator.displayName.toLowerCase().includes(lowerQuery) ||
+      creator.username.toLowerCase().includes(lowerQuery) ||
+      creator.bio.toLowerCase().includes(lowerQuery) ||
+      creator.tags.some((tag) => tag.toLowerCase().includes(lowerQuery))
+  );
+};
+
+// Helper to get creator by username
+export const getCreatorByUsername = (username: string) =>
+  mockCreators.find((c) => c.username === username);

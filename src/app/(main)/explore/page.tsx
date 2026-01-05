@@ -1,32 +1,28 @@
-import { createServerClient } from '@/lib/supabase/server';
 import Link from 'next/link';
-import { Search, Sparkles, Clock, TrendingUp, Bot, Gift, User, Plus, ArrowRight } from 'lucide-react';
+import { Search, Sparkles, Clock, TrendingUp, Bot, Gift, Plus, ArrowRight, BadgeCheck } from 'lucide-react';
+import { mockCreators, searchCreators, type Creator } from '@/lib/data/creators';
 
-export default async function ExplorePage({
+export default function ExplorePage({
   searchParams,
 }: {
   searchParams: { q?: string; category?: string };
 }) {
-  const supabase = await createServerClient();
   const searchQuery = searchParams.q || '';
   const category = searchParams.category || '';
 
-  // Fetch creators with their profiles
-  let query = supabase
-    .from('profiles')
-    .select(`
-      *,
-      creator_profiles!inner(*)
-    `)
-    .eq('role', 'creator')
-    .order('created_at', { ascending: false });
+  // Filter creators based on search and category
+  let creators = searchQuery ? searchCreators(searchQuery) : [...mockCreators];
 
-  // Search filter
-  if (searchQuery) {
-    query = query.or(`display_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`);
+  // Apply category filters
+  if (category === 'new') {
+    creators = creators.slice(-6);
+  } else if (category === 'popular') {
+    creators = [...creators].sort((a, b) => b.subscriberCount - a.subscriberCount);
+  } else if (category === 'ai-chat') {
+    creators = creators.filter((c) => c.hasAiChat);
+  } else if (category === 'free') {
+    creators = creators.filter((c) => c.subscriptionPrice < 500);
   }
-
-  const { data: creators } = await query.limit(24);
 
   const categories = [
     { id: '', label: 'All', icon: Sparkles },
@@ -97,7 +93,7 @@ export default async function ExplorePage({
       </div>
 
       {/* Creators Grid */}
-      {creators && creators.length > 0 ? (
+      {creators.length > 0 ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {creators.map((creator) => (
             <CreatorCard key={creator.id} creator={creator} />
@@ -114,90 +110,57 @@ export default async function ExplorePage({
           </p>
         </div>
       )}
-
-      {/* Load more */}
-      {creators && creators.length >= 24 && (
-        <div className="text-center mt-8">
-          <button className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-            Load More
-          </button>
-        </div>
-      )}
     </div>
   );
 }
 
-function CreatorCard({ creator }: { creator: any }) {
-  const creatorProfile = creator.creator_profiles;
-
+function CreatorCard({ creator }: { creator: Creator }) {
   return (
     <Link
       href={`/${creator.username}`}
       className="group block rounded-xl overflow-hidden bg-white/5 border border-white/10 hover:border-purple-500/50 transition-all hover:scale-[1.02]"
     >
-      {/* Banner */}
-      <div className="relative aspect-[3/2] bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-        {creatorProfile?.banner_url && (
-          <img
-            src={creatorProfile.banner_url}
-            alt=""
-            className="w-full h-full object-cover"
-          />
-        )}
-
-        {/* Avatar */}
-        <div className="absolute -bottom-8 left-4">
-          <div className="w-16 h-16 rounded-full border-4 border-black bg-white/10 overflow-hidden">
-            {creator.avatar_url ? (
-              <img
-                src={creator.avatar_url}
-                alt={creator.display_name || creator.username}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <User className="w-8 h-8 text-gray-400" />
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Avatar as main image */}
+      <div className="relative aspect-[3/4] bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+        <img
+          src={creator.avatar}
+          alt={creator.displayName}
+          className="w-full h-full object-cover"
+        />
 
         {/* AI Chat badge */}
-        {creatorProfile?.ai_chat_enabled && (
+        {creator.hasAiChat && (
           <div className="absolute top-2 right-2 px-2 py-1 rounded-full bg-black/60 text-xs flex items-center gap-1">
-            <Bot className="w-3 h-3" />
+            <Bot className="w-3 h-3 text-purple-400" />
             <span>AI Chat</span>
           </div>
         )}
-      </div>
 
-      {/* Info */}
-      <div className="pt-10 pb-4 px-4">
-        <h3 className="font-semibold truncate group-hover:text-purple-400 transition-colors">
-          {creator.display_name || creator.username}
-        </h3>
-        <p className="text-sm text-gray-500">@{creator.username}</p>
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
-        {creatorProfile?.bio && (
-          <p className="text-sm text-gray-400 mt-2 line-clamp-2">
-            {creatorProfile.bio}
-          </p>
-        )}
+        {/* Info overlay */}
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          <div className="flex items-center gap-1">
+            <h3 className="font-semibold truncate group-hover:text-purple-400 transition-colors">
+              {creator.displayName}
+            </h3>
+            {creator.isVerified && (
+              <BadgeCheck className="w-4 h-4 text-purple-400 flex-shrink-0" />
+            )}
+          </div>
+          <p className="text-sm text-gray-400">@{creator.username}</p>
 
-        <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
-          <span>{creatorProfile?.subscriber_count || 0} fans</span>
-          <span>•</span>
-          <span>{creatorProfile?.post_count || 0} posts</span>
-        </div>
-
-        {/* Price */}
-        <div className="mt-3 pt-3 border-t border-white/10">
-          <span className="text-sm">
-            {creatorProfile?.subscription_price
-              ? `£${(creatorProfile.subscription_price / 100).toFixed(2)}/mo`
-              : 'Free'
-            }
-          </span>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-xs text-gray-400">
+              {creator.subscriberCount.toLocaleString()} fans
+            </span>
+            <span className="text-sm font-medium text-purple-400">
+              {creator.subscriptionPrice > 0
+                ? `$${(creator.subscriptionPrice / 100).toFixed(2)}/mo`
+                : 'Free'}
+            </span>
+          </div>
         </div>
       </div>
     </Link>
