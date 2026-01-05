@@ -111,17 +111,17 @@ function getMockResponse(userMessage: string): string {
 
 export interface AIPersonality {
   name: string;
-  age?: number;
-  backstory?: string;
-  location?: string;
-  personality_traits?: string[];
-  interests?: string[];
-  turn_ons?: string[];
-  turn_offs?: string[];
-  speaking_style?: string;
-  emoji_usage?: 'none' | 'minimal' | 'moderate' | 'heavy';
-  response_length?: 'short' | 'medium' | 'long';
-  custom_system_prompt?: string;
+  age?: number | null;
+  backstory?: string | null;
+  location?: string | null;
+  personality_traits?: string[] | null;
+  interests?: string[] | null;
+  turn_ons?: string[] | null;
+  turn_offs?: string[] | null;
+  speaking_style?: string | null;
+  emoji_usage?: 'none' | 'minimal' | 'moderate' | 'heavy' | null;
+  response_length?: 'short' | 'medium' | 'long' | null;
+  custom_system_prompt?: string | null;
 }
 
 export function buildSystemPrompt(personality: AIPersonality): string {
