@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Bot, BadgeCheck, MapPin, Heart, MessageCircle, Lock, Grid3X3, Play, Star } from 'lucide-react';
 import { getCreatorByUsername, type Creator } from '@/lib/data/creators';
 import { AI_CHAT_DISCLOSURE, MODEL_TYPES, CATEGORY_DISCLAIMER } from '@/lib/compliance/constants';
@@ -39,19 +38,6 @@ export default function CreatorProfilePage({
 
   return (
     <div className="min-h-screen bg-black">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
-        <div className="max-w-4xl mx-auto flex items-center justify-between px-4 h-16">
-          <Link href="/explore" className="text-gray-400 hover:text-white transition-colors">
-            ← Back
-          </Link>
-          <Link href="/">
-            <Image src="/logo.png" alt="LYRA" width={80} height={28} />
-          </Link>
-          <div className="w-16" />
-        </div>
-      </header>
-
       {/* Banner - using avatar with blur as banner */}
       <div className="relative h-48 md:h-64 bg-gradient-to-br from-purple-500/30 to-pink-500/30 overflow-hidden">
         <img

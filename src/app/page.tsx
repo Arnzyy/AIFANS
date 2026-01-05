@@ -4,63 +4,63 @@ import { Bot, Sparkles, Shield, Gem } from 'lucide-react';
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-black flex flex-col overflow-x-hidden">
+    <div className="min-h-screen lg:h-screen bg-black flex flex-col overflow-x-hidden">
       {/* Main Content */}
-      <div className="flex-1 flex flex-col lg:flex-row">
+      <div className="flex-1 flex flex-col lg:flex-row lg:min-h-0">
         {/* Left Side - Logo & Content Preview */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12 overflow-hidden">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-8 overflow-hidden">
           {/* Logo - Centered */}
-          <div className="mb-10">
+          <div className="mb-6 lg:mb-4">
             <Image
               src="/logo.png"
               alt="LYRA"
               width={280}
               height={100}
-              className="mx-auto"
+              className="mx-auto lg:w-[200px] xl:w-[240px]"
               priority
             />
           </div>
 
-          {/* Content Grid - 5 across, taller cards */}
+          {/* Content Grid - 5 across, responsive sizing */}
           <div className="w-full max-w-full">
-            <div className="flex gap-3 overflow-x-auto pb-4 px-4 lg:overflow-visible lg:px-0 lg:justify-center scrollbar-hide">
-              <PreviewCard image="/preview/1.png" />
-              <PreviewCard image="/preview/2.png" />
-              <PreviewCard image="/preview/3.png" />
-              <PreviewCard image="/preview/4.png" />
-              <PreviewCard image="/preview/5.png" />
+            <div className="flex gap-2 lg:gap-3 overflow-x-auto pb-4 px-4 lg:overflow-visible lg:px-0 lg:justify-center scrollbar-hide">
+              <PreviewCard image="/preview/1.png" username="luna_dark" />
+              <PreviewCard image="/preview/2.png" username="chloe_belle" />
+              <PreviewCard image="/preview/3.png" username="aria_sweetheart" />
+              <PreviewCard image="/preview/4.png" username="mia_fresh" />
+              <PreviewCard image="/preview/5.png" username="nova_night" />
             </div>
           </div>
         </div>
 
         {/* Right Side - Auth */}
-        <div className="w-full lg:w-[420px] flex flex-col justify-center p-6 lg:p-12 border-t lg:border-t-0 lg:border-l border-white/10">
+        <div className="w-full lg:w-[380px] xl:w-[420px] flex flex-col justify-center p-6 lg:p-6 xl:p-8 border-t lg:border-t-0 lg:border-l border-white/10 lg:overflow-y-auto">
           <div className="max-w-sm mx-auto w-full">
             {/* Why LYRA - Top */}
-            <div className="hidden lg:block pb-6 mb-6 border-b border-white/10">
-              <h3 className="text-sm font-semibold text-gray-400 mb-4">WHY LYRA?</h3>
-              <div className="space-y-3 text-sm text-gray-500">
-                <div className="flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-purple-400" />
+            <div className="hidden lg:block pb-4 mb-4 border-b border-white/10">
+              <h3 className="text-sm font-semibold text-gray-400 mb-3">WHY LYRA?</h3>
+              <div className="space-y-2 text-xs text-gray-500">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-md bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-3 h-3 text-purple-400" />
                   </span>
                   <span>AI-powered chat companions</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-lg bg-pink-500/20 flex items-center justify-center">
-                    <Sparkles className="w-4 h-4 text-pink-400" />
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-md bg-pink-500/20 flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-3 h-3 text-pink-400" />
                   </span>
                   <span>Exclusive AI-generated content</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                    <Shield className="w-4 h-4 text-blue-400" />
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-md bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                    <Shield className="w-3 h-3 text-blue-400" />
                   </span>
                   <span>Private & secure platform</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
-                    <Gem className="w-4 h-4 text-green-400" />
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-md bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                    <Gem className="w-3 h-3 text-green-400" />
                   </span>
                   <span>Support AI creators directly</span>
                 </div>
@@ -68,23 +68,23 @@ export default function HomePage() {
             </div>
 
             {/* Auth Buttons */}
-            <div className="space-y-3 mb-6">
+            <div className="space-y-2 lg:space-y-2 mb-4">
               <Link
                 href="/register"
-                className="block w-full py-3.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 rounded-lg text-center font-semibold transition-opacity"
+                className="block w-full py-3 lg:py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 rounded-lg text-center font-semibold transition-opacity"
               >
                 Sign up
               </Link>
               <Link
                 href="/login"
-                className="block w-full py-3.5 border border-purple-500 text-purple-400 rounded-lg text-center font-semibold hover:bg-purple-500/10 transition-colors"
+                className="block w-full py-3 lg:py-2.5 border border-purple-500 text-purple-400 rounded-lg text-center font-semibold hover:bg-purple-500/10 transition-colors"
               >
                 Login
               </Link>
             </div>
 
             {/* Terms */}
-            <p className="text-center text-sm text-gray-400 mb-8">
+            <p className="text-center text-xs lg:text-xs text-gray-400 mb-4 lg:mb-4">
               By joining, you agree to our{' '}
               <Link href="/terms" className="text-purple-400 hover:underline">Terms & Conditions</Link>
               {' '}and{' '}
@@ -93,15 +93,15 @@ export default function HomePage() {
             </p>
 
             {/* Social Login */}
-            <div className="space-y-3 mb-8">
-              <button className="w-full py-3 bg-black border border-white/20 hover:bg-white/10 rounded-lg font-medium flex items-center justify-center gap-3 transition-colors">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <div className="space-y-2 mb-4 lg:mb-4">
+              <button className="w-full py-2.5 lg:py-2 bg-black border border-white/20 hover:bg-white/10 rounded-lg font-medium flex items-center justify-center gap-3 transition-colors text-sm">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                 </svg>
                 Sign in with X
               </button>
-              <button className="w-full py-3 bg-white text-black hover:bg-gray-100 rounded-lg font-medium flex items-center justify-center gap-3 transition-colors">
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <button className="w-full py-2.5 lg:py-2 bg-white text-black hover:bg-gray-100 rounded-lg font-medium flex items-center justify-center gap-3 transition-colors text-sm">
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
@@ -109,8 +109,8 @@ export default function HomePage() {
                 </svg>
                 Sign in with Google
               </button>
-              <button className="w-full py-3 bg-[#9146FF] hover:bg-[#7c3aed] rounded-lg font-medium flex items-center justify-center gap-3 transition-colors">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <button className="w-full py-2.5 lg:py-2 bg-[#9146FF] hover:bg-[#7c3aed] rounded-lg font-medium flex items-center justify-center gap-3 transition-colors text-sm">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
                 </svg>
                 Sign in with Twitch
@@ -118,8 +118,8 @@ export default function HomePage() {
             </div>
 
             {/* Become a Creator */}
-            <div className="pt-6 border-t border-white/10 text-center">
-              <p className="text-gray-400 text-sm mb-2">Want to earn money?</p>
+            <div className="pt-4 border-t border-white/10 text-center">
+              <p className="text-gray-400 text-xs mb-1">Want to earn money?</p>
               <Link
                 href="/become-creator"
                 className="text-purple-400 hover:text-purple-300 font-medium"
@@ -132,12 +132,12 @@ export default function HomePage() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 py-4 px-6">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-gray-500 text-sm">
+      <footer className="border-t border-white/10 py-3 lg:py-2 px-6 flex-shrink-0">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 lg:gap-4">
+          <p className="text-gray-500 text-xs lg:text-sm">
             © 2025 LYRA
           </p>
-          <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+          <nav className="flex flex-wrap items-center justify-center gap-x-4 lg:gap-x-6 gap-y-1 text-xs lg:text-sm">
             <Link href="/explore" className="text-gray-400 hover:text-white transition-colors">
               Explore LYRA
             </Link>
@@ -164,12 +164,17 @@ export default function HomePage() {
 }
 
 function PreviewCard({
-  image
+  image,
+  username
 }: {
   image: string;
+  username: string;
 }) {
   return (
-    <div className="w-[160px] sm:w-[180px] lg:w-[220px] aspect-[2/3] rounded-xl relative overflow-hidden group cursor-pointer hover:scale-105 transition-transform border border-white/10 flex-shrink-0">
+    <Link
+      href={`/${username}`}
+      className="w-[calc(33vw-16px)] sm:w-[200px] lg:w-[160px] xl:w-[180px] 2xl:w-[200px] aspect-[2/3] rounded-xl relative overflow-hidden group cursor-pointer hover:scale-105 transition-transform border border-white/10 flex-shrink-0"
+    >
       <img
         src={image}
         alt=""
@@ -177,6 +182,6 @@ function PreviewCard({
       />
       {/* Shimmer effect */}
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-    </div>
+    </Link>
   );
 }

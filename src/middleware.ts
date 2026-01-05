@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Countries blocked due to regulations
-const BLOCKED_COUNTRIES = [
-  'GB', // United Kingdom
+// UK removed - no nudity in Phase 1, so OSA not applicable
+const BLOCKED_COUNTRIES: string[] = [
+  // Add countries here if needed in the future
 ];
 
 // Bypass token for demos
