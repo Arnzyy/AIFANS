@@ -1,9 +1,21 @@
 import Stripe from 'stripe';
 
-// Server-side Stripe client
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-12-15.clover',
-  typescript: true,
+// Lazy-initialized Stripe client to avoid build-time errors
+let stripeInstance: Stripe | null = null;
+
+export const stripe = new Proxy({} as Stripe, {
+  get(_, prop) {
+    if (!stripeInstance) {
+      if (!process.env.STRIPE_SECRET_KEY) {
+        throw new Error('STRIPE_SECRET_KEY is not configured');
+      }
+      stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY, {
+        apiVersion: '2025-12-15.clover',
+        typescript: true,
+      });
+    }
+    return (stripeInstance as any)[prop];
+  },
 });
 
 // Platform commission rate (20%)
