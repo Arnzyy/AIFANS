@@ -1,6 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server';
 import Link from 'next/link';
-import { Search, Sparkles, Clock, TrendingUp, Bot, Gift, User } from 'lucide-react';
+import { Search, Sparkles, Clock, TrendingUp, Bot, Gift, User, Plus, ArrowRight } from 'lucide-react';
 
 export default async function ExplorePage({
   searchParams,
@@ -57,6 +57,23 @@ export default async function ExplorePage({
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
         </form>
       </div>
+
+      {/* Become a Creator CTA */}
+      <Link
+        href="/register?creator=true"
+        className="mb-6 flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 hover:border-purple-500/40 transition-all group"
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-purple-500/20">
+            <Plus className="w-5 h-5 text-purple-400" />
+          </div>
+          <div>
+            <h3 className="font-semibold">Become a Creator</h3>
+            <p className="text-sm text-gray-400">Share your AI content and start earning</p>
+          </div>
+        </div>
+        <ArrowRight className="w-5 h-5 text-gray-500 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
+      </Link>
 
       {/* Categories */}
       <div className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">

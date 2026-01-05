@@ -1,6 +1,8 @@
 import { createServerClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { Settings, Wallet, BarChart3, Rocket, LogOut, User } from 'lucide-react';
+import { LogoutButton } from '@/components/auth/LogoutButton';
 
 export default async function ProfilePage() {
   const supabase = await createServerClient();
@@ -36,7 +38,7 @@ export default async function ProfilePage() {
 
   // Fetch likes count
   const { count: likesCount } = await supabase
-    .from('likes')
+    .from('post_likes')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', user.id);
 
@@ -136,13 +138,15 @@ export default async function ProfilePage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid md:grid-cols-3 gap-4 mb-8">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Link
           href="/settings"
           className="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <span className="text-2xl">⚙️</span>
+            <div className="p-2 rounded-lg bg-white/10">
+              <Settings className="w-5 h-5 text-gray-400" />
+            </div>
             <div>
               <p className="font-medium">Settings</p>
               <p className="text-sm text-gray-500">Manage your account</p>
@@ -155,7 +159,9 @@ export default async function ProfilePage() {
           className="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <span className="text-2xl">💳</span>
+            <div className="p-2 rounded-lg bg-white/10">
+              <Wallet className="w-5 h-5 text-green-400" />
+            </div>
             <div>
               <p className="font-medium">Wallet</p>
               <p className="text-sm text-gray-500">Add funds & history</p>
@@ -169,7 +175,9 @@ export default async function ProfilePage() {
             className="p-4 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 hover:border-purple-500/50 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <span className="text-2xl">📊</span>
+              <div className="p-2 rounded-lg bg-purple-500/20">
+                <BarChart3 className="w-5 h-5 text-purple-400" />
+              </div>
               <div>
                 <p className="font-medium">Creator Dashboard</p>
                 <p className="text-sm text-gray-400">Manage your content</p>
@@ -182,7 +190,9 @@ export default async function ProfilePage() {
             className="p-4 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 hover:border-purple-500/50 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <span className="text-2xl">🚀</span>
+              <div className="p-2 rounded-lg bg-purple-500/20">
+                <Rocket className="w-5 h-5 text-purple-400" />
+              </div>
               <div>
                 <p className="font-medium">Become a Creator</p>
                 <p className="text-sm text-gray-400">Start earning today</p>
@@ -190,6 +200,8 @@ export default async function ProfilePage() {
             </div>
           </Link>
         )}
+
+        <LogoutButton />
       </div>
 
       {/* Subscriptions (for fans) */}
