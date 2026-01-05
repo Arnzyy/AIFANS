@@ -2,7 +2,8 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 // Countries to block (e.g., UK for Online Safety Act compliance)
-const BLOCKED_COUNTRIES = process.env.BLOCKED_COUNTRIES?.split(',') || ['GB', 'UK'];
+// Set BLOCKED_COUNTRIES env var to override, or set to empty string to disable
+const BLOCKED_COUNTRIES = process.env.BLOCKED_COUNTRIES?.split(',').filter(Boolean) || [];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -12,21 +13,31 @@ export async function middleware(request: NextRequest) {
   });
 
   // ===========================================
-  // GEO-BLOCKING
+  // GEO-BLOCKING (disabled by default, enable via BLOCKED_COUNTRIES env var)
   // ===========================================
-  const country = request.geo?.country || request.headers.get('cf-ipcountry');
-  
-  if (country && BLOCKED_COUNTRIES.includes(country.toUpperCase())) {
-    // Return a blocked page or redirect
-    return NextResponse.rewrite(new URL('/blocked', request.url));
+  if (BLOCKED_COUNTRIES.length > 0) {
+    const country = request.geo?.country || request.headers.get('cf-ipcountry');
+
+    if (country && BLOCKED_COUNTRIES.includes(country.toUpperCase())) {
+      // Return a blocked page or redirect
+      return NextResponse.rewrite(new URL('/blocked', request.url));
+    }
   }
 
   // ===========================================
   // SUPABASE AUTH
   // ===========================================
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // Skip auth if Supabase is not configured
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return response;
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         get(name: string) {
