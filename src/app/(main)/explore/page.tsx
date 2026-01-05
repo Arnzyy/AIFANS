@@ -137,34 +137,34 @@ function CreatorCard({ creator }: { creator: Creator }) {
           className="w-full h-full object-cover"
         />
 
-        {/* Model type label - positioned at bottom-left above info */}
-        <div className={`absolute bottom-20 md:bottom-24 left-2 px-2 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-medium ${
+        {/* Model type label - top-left corner */}
+        <div className={`absolute top-2 left-2 px-2 py-1 rounded-full text-[10px] md:text-xs font-medium shadow-lg ${
           isLyraOriginal
             ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
-            : 'bg-purple-500/80 text-white'
+            : 'bg-black/80 backdrop-blur-sm text-white border border-white/20'
         }`}>
           {modelTypeInfo.label}
         </div>
 
-        {/* Right side badges - positioned at bottom-right above info */}
-        <div className="absolute bottom-20 md:bottom-24 right-2 flex flex-col gap-0.5 md:gap-1 items-end">
+        {/* Right side badges - top-right corner */}
+        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
           {/* AI Chat badge */}
           {creator.hasAiChat && (
-            <div className="px-1.5 md:px-2 py-0.5 md:py-1 rounded-full bg-black/70 text-[10px] md:text-xs flex items-center gap-0.5 md:gap-1">
-              <Bot className="w-2.5 h-2.5 md:w-3 md:h-3 text-purple-400" />
+            <div className="px-2 py-1 rounded-full bg-black/80 backdrop-blur-sm text-[10px] md:text-xs flex items-center gap-1 shadow-lg border border-white/20">
+              <Bot className="w-3 h-3 text-purple-400" />
               <span>AI</span>
             </div>
           )}
           {/* New badge */}
           {creator.isNew && (
-            <div className="px-1.5 md:px-2 py-0.5 md:py-1 rounded-full bg-green-500/80 text-[10px] md:text-xs font-medium">
+            <div className="px-2 py-1 rounded-full bg-green-500 text-[10px] md:text-xs font-medium shadow-lg">
               New
             </div>
           )}
           {/* Featured badge */}
           {creator.isFeatured && isLyraOriginal && (
-            <div className="px-1.5 md:px-2 py-0.5 md:py-1 rounded-full bg-amber-500/80 text-[10px] md:text-xs font-medium flex items-center gap-0.5">
-              <Star className="w-2.5 h-2.5 md:w-3 md:h-3" />
+            <div className="px-2 py-1 rounded-full bg-amber-500 text-[10px] md:text-xs font-medium flex items-center gap-1 shadow-lg">
+              <Star className="w-3 h-3" />
               <span className="hidden md:inline">Featured</span>
             </div>
           )}
