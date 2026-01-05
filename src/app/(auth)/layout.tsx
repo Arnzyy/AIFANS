@@ -10,7 +10,7 @@ export default function AuthLayout({
       {/* Header */}
       <header className="p-4">
         <Link href="/" className="text-2xl font-bold gradient-text">
-          AIFans
+          LYRA
         </Link>
       </header>
       

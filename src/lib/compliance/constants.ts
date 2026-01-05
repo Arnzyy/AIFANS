@@ -5,7 +5,7 @@
 // These values are NON-EDITABLE by creators
 // They form the legal foundation of the platform
 
-export const PLATFORM_NAME = 'AIFans';
+export const PLATFORM_NAME = 'LYRA';
 
 // ===========================================
 // CREATOR DECLARATION REQUIREMENTS

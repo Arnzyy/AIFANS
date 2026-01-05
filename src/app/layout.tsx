@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'AIFans - AI Model Subscription Platform',
+  title: 'LYRA - AI Model Subscription Platform',
   description: 'Subscribe to your favorite AI influencers and models',
 };
 

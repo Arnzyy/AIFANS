@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Home, Compass, MessageCircle, Bookmark, User, Gem, Bell } from 'lucide-react';
 
@@ -24,8 +25,8 @@ export default function MainLayout({
       {/* Top navbar */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 h-16">
-          <Link href="/" className="text-xl font-bold gradient-text">
-            AIFans
+          <Link href="/">
+            <Image src="/logo.png" alt="LYRA" width={100} height={35} />
           </Link>
 
           {/* Desktop nav */}

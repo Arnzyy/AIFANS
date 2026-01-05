@@ -26,7 +26,7 @@ export default function DashboardLayout({
       <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
         <div className="flex items-center justify-between px-4 h-16">
           <Link href="/" className="text-xl font-bold gradient-text">
-            AIFans
+            LYRA
           </Link>
           
           <div className="flex items-center gap-4">

@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { Bot, Play, EyeOff } from 'lucide-react';
+import Image from 'next/image';
+import { Play, EyeOff } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -9,8 +10,8 @@ export default function HomePage() {
       <div className="flex-1 p-6 lg:p-12 flex flex-col justify-center">
         {/* Logo for mobile */}
         <div className="lg:hidden text-center mb-8">
-          <Link href="/" className="text-4xl font-bold gradient-text">
-            AIFans
+          <Link href="/">
+            <Image src="/logo.png" alt="LYRA" width={150} height={50} className="mx-auto" />
           </Link>
         </div>
 
@@ -39,10 +40,7 @@ export default function HomePage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-block">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-              <Bot className="w-10 h-10 text-white" />
-            </div>
-            <h1 className="text-4xl font-bold gradient-text">AIFans</h1>
+            <Image src="/logo.png" alt="LYRA" width={200} height={70} className="mx-auto" />
           </Link>
         </div>
 
@@ -123,7 +121,7 @@ export default function HomePage() {
       <footer className="border-t border-white/10 py-4 px-6">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-gray-500 text-sm">
-            © 2025 AIFans. All rights reserved.
+            © 2025 LYRA. All rights reserved.
           </p>
           <nav className="flex items-center gap-6 text-sm">
             <Link href="/terms" className="text-gray-500 hover:text-white transition-colors">

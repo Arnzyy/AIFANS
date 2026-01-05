@@ -70,7 +70,7 @@ export default async function CreatorProfilePage({
             ← Back
           </Link>
           <Link href="/" className="text-xl font-bold gradient-text">
-            AIFans
+            LYRA
           </Link>
           <div className="w-16" /> {/* Spacer */}
         </div>

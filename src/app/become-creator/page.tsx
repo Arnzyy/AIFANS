@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Bot, MessageSquare, DollarSign, Lock, Globe, BarChart3, Sparkles, Users, Zap, ArrowRight } from 'lucide-react';
 
 export default function BecomeCreatorPage() {
@@ -7,8 +8,8 @@ export default function BecomeCreatorPage() {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg border-b border-white/10">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold gradient-text">
-            AIFans
+          <Link href="/">
+            <Image src="/logo.png" alt="LYRA" width={100} height={35} />
           </Link>
           <nav className="flex items-center gap-4">
             <Link
@@ -90,7 +91,7 @@ export default function BecomeCreatorPage() {
       <section className="py-20 px-4">
         <div className="container mx-auto">
           <h2 className="text-3xl font-bold text-center mb-4">
-            Why Creators Choose AIFans
+            Why Creators Choose LYRA
           </h2>
           <p className="text-gray-400 text-center mb-12 max-w-2xl mx-auto">
             Everything you need to build and monetize your AI content empire
@@ -165,7 +166,7 @@ export default function BecomeCreatorPage() {
               Ready to Start Earning?
             </h2>
             <p className="text-gray-400 mb-8">
-              Join thousands of AI creators already earning on AIFans.
+              Join thousands of AI creators already earning on LYRA.
               Set up takes less than 5 minutes.
             </p>
             <Link
@@ -183,7 +184,7 @@ export default function BecomeCreatorPage() {
       <footer className="py-8 px-4 border-t border-white/10">
         <div className="container mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-gray-500">
-            © 2025 AIFans. All rights reserved.
+            © 2025 LYRA. All rights reserved.
           </p>
           <nav className="flex gap-6">
             <Link href="/terms" className="text-gray-500 hover:text-white transition-colors">
