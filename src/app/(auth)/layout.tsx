@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 
 export default function AuthLayout({
   children,
@@ -8,7 +9,14 @@ export default function AuthLayout({
   return (
     <div className="min-h-screen bg-black flex flex-col">
       {/* Header */}
-      <header className="p-4">
+      <header className="p-4 flex items-center gap-4">
+        <Link
+          href="/"
+          className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+          aria-label="Go back"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Link>
         <Link href="/" className="text-2xl font-bold gradient-text">
           LYRA
         </Link>

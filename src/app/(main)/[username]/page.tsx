@@ -1,8 +1,13 @@
+'use client';
+
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { Bot, BadgeCheck, MapPin, Heart, MessageCircle, Lock, Grid3X3, Play, Star } from 'lucide-react';
 import { getCreatorByUsername, type Creator } from '@/lib/data/creators';
 import { AI_CHAT_DISCLOSURE, MODEL_TYPES, CATEGORY_DISCLAIMER } from '@/lib/compliance/constants';
+import { SubscribeModal } from '@/components/shared/SubscribeModal';
 
 // Generate mock posts for each creator
 function generateMockPosts(creator: Creator) {
@@ -27,6 +32,8 @@ export default function CreatorProfilePage({
 }) {
   const username = params.username.toLowerCase();
   const creator = getCreatorByUsername(username);
+  const router = useRouter();
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
 
   if (!creator) {
     notFound();
@@ -35,6 +42,22 @@ export default function CreatorProfilePage({
   const posts = generateMockPosts(creator);
   const modelTypeInfo = MODEL_TYPES[creator.modelType];
   const isLyraOriginal = creator.modelType === 'lyra_original';
+
+  // Create mock tiers for the subscribe modal
+  const mockTiers = [
+    {
+      id: 'tier-1',
+      name: 'Fan',
+      description: 'Access to all posts and messages',
+      price: creator.subscriptionPrice,
+      duration_months: 1,
+      is_featured: true,
+    }
+  ];
+
+  const handleMessage = () => {
+    router.push(`/messages/${creator.username}`);
+  };
 
   return (
     <div className="min-h-screen bg-black">
@@ -62,10 +85,16 @@ export default function CreatorProfilePage({
 
           {/* Action buttons - desktop */}
           <div className="hidden md:flex absolute right-0 bottom-0 gap-3">
-            <button className="px-6 py-2.5 rounded-lg bg-white/10 font-medium hover:bg-white/20 transition-colors">
+            <button
+              onClick={handleMessage}
+              className="px-6 py-2.5 rounded-lg bg-white/10 font-medium hover:bg-white/20 transition-colors"
+            >
               Message
             </button>
-            <button className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity">
+            <button
+              onClick={() => setShowSubscribeModal(true)}
+              className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity"
+            >
               Subscribe - ${(creator.subscriptionPrice / 100).toFixed(2)}/mo
             </button>
           </div>
@@ -150,10 +179,16 @@ export default function CreatorProfilePage({
 
         {/* Mobile action buttons */}
         <div className="md:hidden flex gap-3 mb-6">
-          <button className="flex-1 py-3 rounded-lg bg-white/10 font-medium text-center hover:bg-white/20 transition-colors">
+          <button
+            onClick={handleMessage}
+            className="flex-1 py-3 rounded-lg bg-white/10 font-medium text-center hover:bg-white/20 transition-colors"
+          >
             Message
           </button>
-          <button className="flex-1 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity">
+          <button
+            onClick={() => setShowSubscribeModal(true)}
+            className="flex-1 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity"
+          >
             Subscribe
           </button>
         </div>
@@ -190,7 +225,10 @@ export default function CreatorProfilePage({
               <span className="text-3xl font-bold">${(creator.subscriptionPrice / 100).toFixed(2)}</span>
               <span className="text-gray-500">/month</span>
             </div>
-            <button className="px-8 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 font-semibold hover:opacity-90 transition-opacity">
+            <button
+              onClick={() => setShowSubscribeModal(true)}
+              className="px-8 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 font-semibold hover:opacity-90 transition-opacity"
+            >
               Subscribe Now
             </button>
           </div>
@@ -247,6 +285,24 @@ export default function CreatorProfilePage({
           </div>
         </div>
       </div>
+
+      {/* Subscribe Modal */}
+      {showSubscribeModal && (
+        <SubscribeModal
+          creator={{
+            id: creator.id,
+            username: creator.username,
+            display_name: creator.displayName,
+            avatar_url: creator.avatar,
+          }}
+          tiers={mockTiers}
+          onClose={() => setShowSubscribeModal(false)}
+          onSuccess={() => {
+            setShowSubscribeModal(false);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

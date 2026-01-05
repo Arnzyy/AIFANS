@@ -1,8 +1,32 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { Bot, Sparkles, Shield, Gem } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 export default function HomePage() {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to center the middle card on mobile
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (container && window.innerWidth < 1024) {
+      // Wait for images to potentially load
+      setTimeout(() => {
+        const cards = container.children;
+        if (cards.length >= 3) {
+          const middleCard = cards[2] as HTMLElement; // 3rd card (index 2)
+          const containerWidth = container.offsetWidth;
+          const cardLeft = middleCard.offsetLeft;
+          const cardWidth = middleCard.offsetWidth;
+          // Center the card
+          container.scrollLeft = cardLeft - (containerWidth / 2) + (cardWidth / 2);
+        }
+      }, 100);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen lg:h-screen bg-black flex flex-col overflow-x-hidden">
       {/* Main Content */}
@@ -23,7 +47,10 @@ export default function HomePage() {
 
           {/* Content Grid - 5 across, responsive sizing */}
           <div className="w-full max-w-full">
-            <div className="flex gap-2 lg:gap-3 overflow-x-auto pb-4 px-4 lg:overflow-visible lg:px-0 lg:justify-center scrollbar-hide">
+            <div
+              ref={scrollContainerRef}
+              className="flex gap-3 lg:gap-3 overflow-x-auto pb-4 px-4 lg:overflow-visible lg:px-0 lg:justify-center scrollbar-hide snap-x snap-mandatory"
+            >
               <PreviewCard image="/preview/1.png" username="luna_dark" />
               <PreviewCard image="/preview/2.png" username="chloe_belle" />
               <PreviewCard image="/preview/3.png" username="aria_sweetheart" />
@@ -173,7 +200,7 @@ function PreviewCard({
   return (
     <Link
       href={`/${username}`}
-      className="w-[calc(33vw-16px)] sm:w-[200px] lg:w-[160px] xl:w-[180px] 2xl:w-[200px] aspect-[2/3] rounded-xl relative overflow-hidden group cursor-pointer hover:scale-105 transition-transform border border-white/10 flex-shrink-0"
+      className="w-[55vw] sm:w-[200px] lg:w-[160px] xl:w-[180px] 2xl:w-[200px] aspect-[2/3] rounded-xl relative overflow-hidden group cursor-pointer hover:scale-105 transition-transform border border-white/10 flex-shrink-0 snap-center"
     >
       <img
         src={image}
