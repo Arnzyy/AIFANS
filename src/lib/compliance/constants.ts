@@ -296,3 +296,257 @@ export const PLATFORM_TERMINOLOGY = {
     human: 'Use "AI Model" or "Virtual Creator"',
   },
 };
+
+// ===========================================
+// HYBRID MODEL STRUCTURE
+// ===========================================
+
+export const MODEL_TYPES = {
+  lyra_original: {
+    id: 'lyra_original',
+    label: 'Lyra Original',
+    description: 'Fully owned and operated by Lyra',
+    badgeColor: 'bg-gradient-to-r from-purple-500 to-pink-500',
+  },
+  creator_model: {
+    id: 'creator_model',
+    label: 'Creator Model',
+    description: 'Created and managed by third-party creators',
+    badgeColor: 'bg-purple-500/80',
+  },
+} as const;
+
+export type ModelType = keyof typeof MODEL_TYPES;
+
+// ===========================================
+// APPROVED CATEGORY SYSTEM
+// ===========================================
+
+// Categories are descriptive browse tags for fictional AI personas
+// They describe visual presentation or communication style
+// They do NOT assert real-world identity or ethnicity
+
+export const CATEGORY_DISCLAIMER =
+  'Tags describe the visual style or persona presentation of fictional AI models.';
+
+export const APPROVED_CATEGORIES = {
+  // A) Hair & Appearance
+  hair: {
+    label: 'Hair & Appearance',
+    tags: [
+      'Blonde',
+      'Brunette',
+      'Redhead',
+      'Dark Hair',
+      'Light Hair',
+      'Long Hair',
+      'Short Hair',
+      'Wavy Hair',
+      'Straight Hair',
+    ],
+  },
+
+  // B) Body / Look (neutral, non-fetishised)
+  bodyType: {
+    label: 'Body Type',
+    tags: [
+      'Petite',
+      'Curvy',
+      'Athletic',
+      'Slim',
+      'Tall',
+      'Fit',
+    ],
+  },
+
+  // C) Skin Tone / Visual Style (descriptive, not biological)
+  skinTone: {
+    label: 'Skin Tone',
+    tags: [
+      'Fair Skin',
+      'Olive Skin',
+      'Tan Skin',
+      'Deep Skin',
+    ],
+  },
+
+  // D) Cultural / Visual Presentation (use "-inspired" or "look" framing)
+  culturalPresentation: {
+    label: 'Visual Style',
+    tags: [
+      'Latina-Inspired',
+      'East Asian Look',
+      'South Asian Look',
+      'Mediterranean Look',
+      'Mixed Look',
+      'Exotic Look',
+    ],
+  },
+
+  // E) Vibe / Personality (communication style, not behaviour)
+  vibe: {
+    label: 'Vibe & Personality',
+    tags: [
+      'Sweet',
+      'Flirty',
+      'Confident',
+      'Playful',
+      'Teasing',
+      'Mysterious',
+      'Bold',
+      'Soft',
+      'Dominant',
+      'Submissive',
+    ],
+  },
+
+  // F) Style / Aesthetic
+  style: {
+    label: 'Style & Aesthetic',
+    tags: [
+      'Lingerie',
+      'Swimwear',
+      'Casual',
+      'Glam',
+      'Sporty',
+      'Minimal',
+      'Luxury',
+      'Night-Out',
+      'Alternative',
+      'Elegant',
+      'Artistic',
+    ],
+  },
+
+  // G) Platform-Controlled Tags (NOT creator-editable)
+  platform: {
+    label: 'Platform Tags',
+    tags: [
+      'Lyra Original',
+      'Creator Model',
+      'AI Chat Available',
+      'New',
+      'Featured',
+    ],
+    systemOnly: true, // Creators cannot add these
+  },
+} as const;
+
+// Flatten all approved tags for validation
+export const ALL_APPROVED_TAGS = Object.values(APPROVED_CATEGORIES)
+  .flatMap(category => category.tags);
+
+// ===========================================
+// BLOCKED TAGS (ZERO TOLERANCE)
+// ===========================================
+
+export const BLOCKED_TAGS = [
+  // Age-coded terms
+  'teen',
+  'teen-looking',
+  'young',
+  'barely legal',
+  'schoolgirl',
+  'virgin',
+  'pure',
+  'innocent',
+  'loli',
+  'jailbait',
+  'underage',
+  'minor',
+  'child',
+  'kid',
+  'youth',
+  'juvenile',
+
+  // Racial slurs (examples - expand as needed)
+  // [Intentionally not listing slurs here]
+
+  // Sexual acts as categories
+  'bdsm',
+  'fetish',
+  'kink',
+  'xxx',
+  'porn',
+  'sex',
+  'nude',
+  'naked',
+
+  // Real nationality tied to behaviour
+  'authentic',
+  'real',
+  'genuine',
+  'actual',
+
+  // Other problematic terms
+  'tiny',
+  'little',
+  'baby',
+  'daddy',
+  'mommy',
+  'incest',
+  'taboo',
+];
+
+// Patterns to block (regex)
+export const BLOCKED_TAG_PATTERNS = [
+  /\bteen/i,
+  /\byoung/i,
+  /\bunder\s*\d+/i,
+  /\b\d+\s*y\.?o\.?/i, // Age patterns like "18 yo"
+  /\bschool/i,
+  /\bvirgin/i,
+  /\binnocen/i,
+];
+
+// ===========================================
+// TAG VALIDATION HELPERS
+// ===========================================
+
+export const isTagApproved = (tag: string): boolean => {
+  const normalizedTag = tag.trim();
+  return ALL_APPROVED_TAGS.some(
+    approved => approved.toLowerCase() === normalizedTag.toLowerCase()
+  );
+};
+
+export const isTagBlocked = (tag: string): boolean => {
+  const normalizedTag = tag.toLowerCase().trim();
+
+  // Check explicit blocked list
+  if (BLOCKED_TAGS.some(blocked => normalizedTag.includes(blocked))) {
+    return true;
+  }
+
+  // Check patterns
+  if (BLOCKED_TAG_PATTERNS.some(pattern => pattern.test(normalizedTag))) {
+    return true;
+  }
+
+  return false;
+};
+
+export const validateTag = (tag: string): { valid: boolean; reason?: string } => {
+  if (isTagBlocked(tag)) {
+    return { valid: false, reason: 'This tag is not allowed on the platform' };
+  }
+
+  if (!isTagApproved(tag)) {
+    return { valid: false, reason: 'Only approved tags from the category list are allowed' };
+  }
+
+  return { valid: true };
+};
+
+// ===========================================
+// CATEGORY GOLDEN RULE
+// ===========================================
+
+export const CATEGORY_GOLDEN_RULE = `
+If a category could make a reasonable user believe the model is a real person
+with a real ethnicity, age, or background, it must be rejected.
+
+When in doubt:
+- Use "-inspired" or "look" framing
+- Or remove the tag entirely
+`;

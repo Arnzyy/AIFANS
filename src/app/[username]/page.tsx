@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Bot, BadgeCheck, MapPin, Heart, MessageCircle, Lock, Grid3X3, Play } from 'lucide-react';
+import { Bot, BadgeCheck, MapPin, Heart, MessageCircle, Lock, Grid3X3, Play, Star } from 'lucide-react';
 import { getCreatorByUsername, type Creator } from '@/lib/data/creators';
-import { AI_CHAT_DISCLOSURE } from '@/lib/compliance/constants';
+import { AI_CHAT_DISCLOSURE, MODEL_TYPES, CATEGORY_DISCLAIMER } from '@/lib/compliance/constants';
 
 // Generate mock posts for each creator
 function generateMockPosts(creator: Creator) {
@@ -34,6 +34,8 @@ export default function CreatorProfilePage({
   }
 
   const posts = generateMockPosts(creator);
+  const modelTypeInfo = MODEL_TYPES[creator.modelType];
+  const isLyraOriginal = creator.modelType === 'lyra_original';
 
   return (
     <div className="min-h-screen bg-black">
@@ -90,13 +92,29 @@ export default function CreatorProfilePage({
             {creator.isVerified && (
               <BadgeCheck className="w-6 h-6 text-purple-400" />
             )}
-            <span className="px-2 py-1 text-xs bg-purple-500/80 text-white rounded-full font-medium">
-              AI Model
+            {/* Model type badge - Lyra Original or Creator Model */}
+            <span className={`px-2 py-1 text-xs text-white rounded-full font-medium flex items-center gap-1 ${
+              isLyraOriginal
+                ? 'bg-gradient-to-r from-purple-500 to-pink-500'
+                : 'bg-purple-500/80'
+            }`}>
+              {isLyraOriginal && <Star className="w-3 h-3" />}
+              {modelTypeInfo.label}
             </span>
             {creator.hasAiChat && (
               <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-400 rounded-full flex items-center gap-1">
                 <Bot className="w-3 h-3" />
                 AI Chat
+              </span>
+            )}
+            {creator.isNew && (
+              <span className="px-2 py-1 text-xs bg-green-500/80 text-white rounded-full font-medium">
+                New
+              </span>
+            )}
+            {creator.isFeatured && isLyraOriginal && (
+              <span className="px-2 py-1 text-xs bg-amber-500/80 text-white rounded-full font-medium">
+                Featured
               </span>
             )}
           </div>
@@ -116,16 +134,19 @@ export default function CreatorProfilePage({
 
           <p className="mt-4 text-gray-300">{creator.bio}</p>
 
-          {/* Tags */}
-          <div className="flex flex-wrap gap-2 mt-3">
-            {creator.tags.map((tag) => (
-              <span
-                key={tag}
-                className="px-3 py-1 text-xs bg-white/5 text-gray-400 rounded-full"
-              >
-                #{tag}
-              </span>
-            ))}
+          {/* Tags with disclaimer */}
+          <div className="mt-3">
+            <div className="flex flex-wrap gap-2">
+              {creator.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="px-3 py-1 text-xs bg-white/5 text-gray-400 rounded-full"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs text-gray-600 mt-2">{CATEGORY_DISCLAIMER}</p>
           </div>
 
           {/* Stats */}

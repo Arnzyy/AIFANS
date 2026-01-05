@@ -31,11 +31,15 @@ export interface Creator {
   subscriptionPrice: number; // in cents
   isVerified: boolean;
   hasAiChat: boolean;
-  tags: string[];
+  tags: string[]; // Must use APPROVED_CATEGORIES tags only
   contentRating: 'sfw' | 'suggestive'; // Phase 1: max = suggestive
+  modelType: 'lyra_original' | 'creator_model'; // Hybrid model structure
+  isFeatured?: boolean;
+  isNew?: boolean;
 }
 
 export const mockCreators: Creator[] = [
+  // === LYRA ORIGINALS (Platform-owned models) ===
   {
     id: '1',
     username: 'luna_dark',
@@ -49,8 +53,10 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 999,
     isVerified: true,
     hasAiChat: true,
-    tags: ['dark aesthetic', 'fashion', 'alternative'],
+    tags: ['Dark Hair', 'Alternative', 'Mysterious', 'Confident'],
     contentRating: 'suggestive',
+    modelType: 'lyra_original',
+    isFeatured: true,
   },
   {
     id: '2',
@@ -65,8 +71,10 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 1499,
     isVerified: true,
     hasAiChat: true,
-    tags: ['glamour', 'lifestyle', 'party'],
+    tags: ['Brunette', 'Glam', 'Luxury', 'Flirty', 'Tan Skin'],
     contentRating: 'suggestive',
+    modelType: 'lyra_original',
+    isFeatured: true,
   },
   {
     id: '3',
@@ -81,8 +89,10 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 799,
     isVerified: true,
     hasAiChat: true,
-    tags: ['natural', 'sweet', 'wholesome'],
+    tags: ['Brunette', 'Sweet', 'Soft', 'Casual', 'Petite'],
     contentRating: 'suggestive',
+    modelType: 'lyra_original',
+    isFeatured: true,
   },
   {
     id: '4',
@@ -97,8 +107,10 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 1299,
     isVerified: true,
     hasAiChat: true,
-    tags: ['swimwear', 'pool', 'party'],
+    tags: ['Swimwear', 'Athletic', 'Playful', 'Tan Skin', 'Long Hair'],
     contentRating: 'suggestive',
+    modelType: 'lyra_original',
+    isFeatured: true,
   },
   {
     id: '5',
@@ -113,8 +125,10 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 1199,
     isVerified: true,
     hasAiChat: true,
-    tags: ['street style', 'urban', 'edgy'],
+    tags: ['Latina-Inspired', 'Bold', 'Confident', 'Casual', 'Curvy'],
     contentRating: 'suggestive',
+    modelType: 'lyra_original',
+    isFeatured: true,
   },
   {
     id: '6',
@@ -129,9 +143,13 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 1099,
     isVerified: true,
     hasAiChat: true,
-    tags: ['alternative', 'dark', 'artistic'],
+    tags: ['Dark Hair', 'Alternative', 'Artistic', 'Mysterious', 'Fair Skin'],
     contentRating: 'suggestive',
+    modelType: 'lyra_original',
+    isFeatured: true,
   },
+
+  // === CREATOR MODELS (Third-party managed) ===
   {
     id: '7',
     username: 'yuki_sakura',
@@ -145,8 +163,9 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 1599,
     isVerified: true,
     hasAiChat: true,
-    tags: ['kawaii', 'cute', 'playful'],
+    tags: ['East Asian Look', 'Playful', 'Sweet', 'Minimal', 'Petite'],
     contentRating: 'suggestive',
+    modelType: 'creator_model',
   },
   {
     id: '8',
@@ -161,8 +180,9 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 899,
     isVerified: true,
     hasAiChat: true,
-    tags: ['elegant', 'blonde', 'romantic'],
+    tags: ['Blonde', 'Elegant', 'Flirty', 'Glam', 'Slim'],
     contentRating: 'suggestive',
+    modelType: 'creator_model',
   },
   {
     id: '9',
@@ -177,8 +197,9 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 1799,
     isVerified: true,
     hasAiChat: true,
-    tags: ['dance', 'fashion', 'star'],
+    tags: ['East Asian Look', 'Glam', 'Confident', 'Luxury', 'Long Hair'],
     contentRating: 'suggestive',
+    modelType: 'creator_model',
   },
   {
     id: '10',
@@ -193,8 +214,9 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 1499,
     isVerified: true,
     hasAiChat: true,
-    tags: ['roleplay', 'fantasy', 'luxury'],
+    tags: ['Blonde', 'Luxury', 'Teasing', 'Confident', 'Tall'],
     contentRating: 'suggestive',
+    modelType: 'creator_model',
   },
   {
     id: '11',
@@ -209,8 +231,9 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 1299,
     isVerified: true,
     hasAiChat: true,
-    tags: ['redhead', 'elegant', 'classy'],
+    tags: ['Redhead', 'Elegant', 'Confident', 'Fair Skin', 'Wavy Hair'],
     contentRating: 'suggestive',
+    modelType: 'creator_model',
   },
   {
     id: '12',
@@ -225,8 +248,9 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 2499,
     isVerified: true,
     hasAiChat: true,
-    tags: ['luxury', 'lingerie', 'exclusive'],
+    tags: ['Brunette', 'Luxury', 'Lingerie', 'Elegant', 'Slim'],
     contentRating: 'suggestive',
+    modelType: 'creator_model',
   },
   {
     id: '13',
@@ -241,8 +265,9 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 1999,
     isVerified: true,
     hasAiChat: true,
-    tags: ['sophisticated', 'mature', 'elegant'],
+    tags: ['Dark Hair', 'Elegant', 'Mysterious', 'Dominant', 'Tall'],
     contentRating: 'suggestive',
+    modelType: 'creator_model',
   },
   {
     id: '14',
@@ -257,8 +282,9 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 999,
     isVerified: true,
     hasAiChat: true,
-    tags: ['natural', 'blonde', 'cozy'],
+    tags: ['Blonde', 'Soft', 'Casual', 'Fair Skin', 'Long Hair'],
     contentRating: 'suggestive',
+    modelType: 'creator_model',
   },
   {
     id: '15',
@@ -273,8 +299,10 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 799,
     isVerified: true,
     hasAiChat: true,
-    tags: ['alt', 'artistic', 'creative'],
+    tags: ['Dark Hair', 'Alternative', 'Artistic', 'Bold', 'Petite'],
     contentRating: 'suggestive',
+    modelType: 'creator_model',
+    isNew: true,
   },
   {
     id: '16',
@@ -289,8 +317,9 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 899,
     isVerified: true,
     hasAiChat: true,
-    tags: ['sunny', 'natural', 'cheerful'],
+    tags: ['Brunette', 'Sweet', 'Playful', 'Casual', 'Athletic'],
     contentRating: 'suggestive',
+    modelType: 'creator_model',
   },
   {
     id: '17',
@@ -305,8 +334,9 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 1099,
     isVerified: true,
     hasAiChat: true,
-    tags: ['blonde', 'traditional', 'cheerful'],
+    tags: ['Blonde', 'Sweet', 'Curvy', 'Fair Skin', 'Wavy Hair'],
     contentRating: 'suggestive',
+    modelType: 'creator_model',
   },
   {
     id: '18',
@@ -321,8 +351,10 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 699,
     isVerified: true,
     hasAiChat: true,
-    tags: ['fresh', 'new', 'playful'],
+    tags: ['Brunette', 'Playful', 'Casual', 'Petite', 'Short Hair'],
     contentRating: 'suggestive',
+    modelType: 'creator_model',
+    isNew: true,
   },
   {
     id: '19',
@@ -337,8 +369,9 @@ export const mockCreators: Creator[] = [
     subscriptionPrice: 1399,
     isVerified: true,
     hasAiChat: true,
-    tags: ['elegant', 'boudoir', 'classy'],
+    tags: ['Brunette', 'Elegant', 'Lingerie', 'Teasing', 'Slim'],
     contentRating: 'suggestive',
+    modelType: 'creator_model',
   },
 ];
 

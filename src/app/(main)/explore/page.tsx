@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { Search, Sparkles, Clock, TrendingUp, Bot, Gift, Plus, ArrowRight, BadgeCheck } from 'lucide-react';
+import { Search, Sparkles, Clock, TrendingUp, Bot, Gift, Plus, ArrowRight, BadgeCheck, Star } from 'lucide-react';
 import { mockCreators, searchCreators, type Creator } from '@/lib/data/creators';
+import { MODEL_TYPES, CATEGORY_DISCLAIMER } from '@/lib/compliance/constants';
 
 export default function ExplorePage({
   searchParams,
@@ -15,17 +16,22 @@ export default function ExplorePage({
 
   // Apply category filters
   if (category === 'new') {
-    creators = creators.slice(-6);
+    creators = creators.filter((c) => c.isNew);
   } else if (category === 'popular') {
     creators = [...creators].sort((a, b) => b.subscriberCount - a.subscriberCount);
   } else if (category === 'ai-chat') {
     creators = creators.filter((c) => c.hasAiChat);
   } else if (category === 'free') {
     creators = creators.filter((c) => c.subscriptionPrice < 500);
+  } else if (category === 'lyra-originals') {
+    creators = creators.filter((c) => c.modelType === 'lyra_original');
+  } else if (category === 'featured') {
+    creators = creators.filter((c) => c.isFeatured);
   }
 
   const categories = [
     { id: '', label: 'All', icon: Sparkles },
+    { id: 'lyra-originals', label: 'Lyra Originals', icon: Star },
     { id: 'new', label: 'New', icon: Clock },
     { id: 'popular', label: 'Popular', icon: TrendingUp },
     { id: 'ai-chat', label: 'AI Chat', icon: Bot },
@@ -115,6 +121,9 @@ export default function ExplorePage({
 }
 
 function CreatorCard({ creator }: { creator: Creator }) {
+  const modelTypeInfo = MODEL_TYPES[creator.modelType];
+  const isLyraOriginal = creator.modelType === 'lyra_original';
+
   return (
     <Link
       href={`/${creator.username}`}
@@ -128,18 +137,38 @@ function CreatorCard({ creator }: { creator: Creator }) {
           className="w-full h-full object-cover"
         />
 
-        {/* AI Model label - always show */}
-        <div className="absolute top-2 left-2 px-2 py-1 rounded-full bg-purple-500/80 text-xs font-medium">
-          AI Model
+        {/* Model type label - Lyra Original or Creator Model */}
+        <div className={`absolute top-2 left-2 px-2 py-1 rounded-full text-xs font-medium ${
+          isLyraOriginal
+            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+            : 'bg-purple-500/80 text-white'
+        }`}>
+          {modelTypeInfo.label}
         </div>
 
-        {/* AI Chat badge */}
-        {creator.hasAiChat && (
-          <div className="absolute top-2 right-2 px-2 py-1 rounded-full bg-black/60 text-xs flex items-center gap-1">
-            <Bot className="w-3 h-3 text-purple-400" />
-            <span>AI Chat</span>
-          </div>
-        )}
+        {/* Right side badges */}
+        <div className="absolute top-2 right-2 flex flex-col gap-1">
+          {/* AI Chat badge */}
+          {creator.hasAiChat && (
+            <div className="px-2 py-1 rounded-full bg-black/60 text-xs flex items-center gap-1">
+              <Bot className="w-3 h-3 text-purple-400" />
+              <span>AI Chat</span>
+            </div>
+          )}
+          {/* New badge */}
+          {creator.isNew && (
+            <div className="px-2 py-1 rounded-full bg-green-500/80 text-xs font-medium">
+              New
+            </div>
+          )}
+          {/* Featured badge */}
+          {creator.isFeatured && isLyraOriginal && (
+            <div className="px-2 py-1 rounded-full bg-amber-500/80 text-xs font-medium flex items-center gap-1">
+              <Star className="w-3 h-3" />
+              Featured
+            </div>
+          )}
+        </div>
 
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
@@ -158,7 +187,7 @@ function CreatorCard({ creator }: { creator: Creator }) {
 
           <div className="flex items-center justify-between mt-2">
             <span className="text-xs text-gray-400">
-              {creator.subscriberCount.toLocaleString()} fans
+              {creator.subscriberCount.toLocaleString()} subscribers
             </span>
             <span className="text-sm font-medium text-purple-400">
               {creator.subscriptionPrice > 0
