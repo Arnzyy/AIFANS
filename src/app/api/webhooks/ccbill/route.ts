@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
 // CCBill Webhook handler
 // This handles subscription events from CCBill
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service role for webhooks
-)
+// Lazy-initialize Supabase client to avoid build-time env var issues
+let supabase: SupabaseClient | null = null
+
+function getSupabase(): SupabaseClient {
+  if (!supabase) {
+    supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service role for webhooks
+    )
+  }
+  return supabase
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -132,7 +140,7 @@ async function handleNewSubscription(data: {
   let durationMonths = 1
 
   if (data.tierId) {
-    const { data: tierData } = await supabase
+    const { data: tierData } = await getSupabase()
       .from('subscription_tiers')
       .select('*')
       .eq('id', data.tierId)
@@ -146,7 +154,7 @@ async function handleNewSubscription(data: {
   expiresAt.setMonth(expiresAt.getMonth() + durationMonths)
 
   // Create subscription
-  const { data: subscription, error } = await supabase
+  const { data: subscription, error } = await getSupabase()
     .from('subscriptions')
     .insert({
       subscriber_id: data.userId,
@@ -167,7 +175,7 @@ async function handleNewSubscription(data: {
 
   // Record transaction
   if (tier) {
-    await supabase.from('transactions').insert({
+    await getSupabase().from('transactions').insert({
       user_id: data.userId,
       creator_id: data.creatorId,
       type: 'subscription',
@@ -178,14 +186,14 @@ async function handleNewSubscription(data: {
   }
 
   // Increment subscriber count
-  await supabase.rpc('increment_subscriber_count', { p_creator_id: data.creatorId })
+  await getSupabase().rpc('increment_subscriber_count', { p_creator_id: data.creatorId })
 
   console.log('New subscription created:', subscription.id)
 }
 
 async function handleRenewal(ccbillSubscriptionId: string) {
   // Find subscription by CCBill ID
-  const { data: subscription } = await supabase
+  const { data: subscription } = await getSupabase()
     .from('subscriptions')
     .select('*, tier:subscription_tiers(*)')
     .eq('ccbill_subscription_id', ccbillSubscriptionId)
@@ -201,7 +209,7 @@ async function handleRenewal(ccbillSubscriptionId: string) {
   const newExpiresAt = new Date(subscription.expires_at)
   newExpiresAt.setMonth(newExpiresAt.getMonth() + durationMonths)
 
-  await supabase
+  await getSupabase()
     .from('subscriptions')
     .update({
       expires_at: newExpiresAt.toISOString(),
@@ -211,7 +219,7 @@ async function handleRenewal(ccbillSubscriptionId: string) {
 
   // Record transaction
   if (subscription.tier) {
-    await supabase.from('transactions').insert({
+    await getSupabase().from('transactions').insert({
       user_id: subscription.subscriber_id,
       creator_id: subscription.creator_id,
       type: 'subscription',
@@ -224,7 +232,7 @@ async function handleRenewal(ccbillSubscriptionId: string) {
 }
 
 async function handleCancellation(ccbillSubscriptionId: string) {
-  const { data: subscription } = await supabase
+  const { data: subscription } = await getSupabase()
     .from('subscriptions')
     .select('id')
     .eq('ccbill_subscription_id', ccbillSubscriptionId)
@@ -232,7 +240,7 @@ async function handleCancellation(ccbillSubscriptionId: string) {
 
   if (!subscription) return
 
-  await supabase
+  await getSupabase()
     .from('subscriptions')
     .update({
       auto_renew: false,
@@ -244,7 +252,7 @@ async function handleCancellation(ccbillSubscriptionId: string) {
 }
 
 async function handleChargeback(ccbillSubscriptionId: string, userId: string) {
-  const { data: subscription } = await supabase
+  const { data: subscription } = await getSupabase()
     .from('subscriptions')
     .select('id, creator_id')
     .eq('ccbill_subscription_id', ccbillSubscriptionId)
@@ -253,7 +261,7 @@ async function handleChargeback(ccbillSubscriptionId: string, userId: string) {
   if (!subscription) return
 
   // Immediately revoke access
-  await supabase
+  await getSupabase()
     .from('subscriptions')
     .update({
       status: 'revoked',
@@ -261,22 +269,17 @@ async function handleChargeback(ccbillSubscriptionId: string, userId: string) {
     })
     .eq('id', subscription.id)
 
-  // Flag user account for review
-  await supabase
-    .from('profiles')
-    .update({
-      flags: supabase.sql`array_append(COALESCE(flags, '{}'), 'chargeback')`
-    })
-    .eq('id', userId)
+  // Flag user account for review using RPC
+  await getSupabase().rpc('add_user_flag', { p_user_id: userId, p_flag: 'chargeback' })
 
   // Decrement subscriber count
-  await supabase.rpc('decrement_subscriber_count', { p_creator_id: subscription.creator_id })
+  await getSupabase().rpc('decrement_subscriber_count', { p_creator_id: subscription.creator_id })
 
   console.log('Chargeback handled for subscription:', subscription.id)
 }
 
 async function handleRefund(transactionId: string) {
-  await supabase
+  await getSupabase()
     .from('transactions')
     .update({ status: 'refunded' })
     .eq('ccbill_transaction_id', transactionId)
@@ -285,7 +288,7 @@ async function handleRefund(transactionId: string) {
 }
 
 async function handleExpiration(ccbillSubscriptionId: string) {
-  const { data: subscription } = await supabase
+  const { data: subscription } = await getSupabase()
     .from('subscriptions')
     .select('id, creator_id')
     .eq('ccbill_subscription_id', ccbillSubscriptionId)
@@ -293,13 +296,13 @@ async function handleExpiration(ccbillSubscriptionId: string) {
 
   if (!subscription) return
 
-  await supabase
+  await getSupabase()
     .from('subscriptions')
     .update({ status: 'expired' })
     .eq('id', subscription.id)
 
   // Decrement subscriber count
-  await supabase.rpc('decrement_subscriber_count', { p_creator_id: subscription.creator_id })
+  await getSupabase().rpc('decrement_subscriber_count', { p_creator_id: subscription.creator_id })
 
   console.log('Subscription expired:', subscription.id)
 }

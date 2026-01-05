@@ -71,11 +71,19 @@ export default function AIChatPage() {
         .eq('role', 'creator')
         .single();
 
-      if (!creatorData || !creatorData.creator_profiles?.ai_chat_enabled) {
+      // Handle creator_profiles which may be array or object from Supabase
+      const creatorProfiles = Array.isArray(creatorData?.creator_profiles)
+        ? creatorData.creator_profiles[0]
+        : creatorData?.creator_profiles;
+
+      if (!creatorData || !creatorProfiles?.ai_chat_enabled) {
         router.push(`/${username}`);
         return;
       }
-      setCreator(creatorData as Creator);
+      setCreator({
+        ...creatorData,
+        creator_profiles: creatorProfiles,
+      } as Creator);
 
       // Find or create AI chat conversation
       const { data: existingConv } = await supabase

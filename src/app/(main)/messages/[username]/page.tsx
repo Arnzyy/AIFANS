@@ -59,8 +59,8 @@ export default function ConversationPage() {
           table: 'messages',
           filter: `conversation_id=eq.${conversationId}`
         },
-        (payload) => {
-          const newMsg = payload.new as Message;
+        (payload: { new: Record<string, unknown> }) => {
+          const newMsg = payload.new as unknown as Message;
           setMessages(prev => [...prev, newMsg]);
         }
       )

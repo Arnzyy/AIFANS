@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
       .eq('id', convId)
 
     // Update memory
-    if (Object.keys(extractedInfo).length > 0) {
+    if (extractedInfo && Object.keys(extractedInfo).length > 0) {
       await supabase.from('ai_chat_memory').upsert({
         user_id: user.id,
         creator_id: creatorId,

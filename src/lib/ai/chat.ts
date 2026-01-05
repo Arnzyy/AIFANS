@@ -208,7 +208,7 @@ export function buildConversationHistory(
 // Extract user info from messages for memory
 export function extractUserInfo(message: string): Partial<MemoryContext['userDetails']> {
   const info: Record<string, string> = {};
-  
+
   // Simple pattern matching for common info
   const nameMatch = message.match(/(?:my name is|i'm|i am|call me)\s+(\w+)/i);
   if (nameMatch) {
@@ -226,4 +226,34 @@ export function extractUserInfo(message: string): Partial<MemoryContext['userDet
   }
 
   return info;
+}
+
+// ===========================================
+// MAIN AI RESPONSE GENERATOR
+// ===========================================
+
+export async function generateAIResponse(
+  systemPrompt: string,
+  conversationHistory: { role: 'user' | 'assistant'; content: string }[],
+  userContext: { name?: string; [key: string]: string | undefined }
+): Promise<string> {
+  // Build memory context from user info
+  const memory: MemoryContext = {
+    userName: userContext.name,
+    userDetails: Object.fromEntries(
+      Object.entries(userContext).filter(([k, v]) => k !== 'name' && v)
+    ) as Record<string, string>,
+  };
+
+  // Build full message history with context
+  const messages = buildConversationHistory(systemPrompt, conversationHistory, memory);
+
+  // Call the LLM
+  const response = await createChatCompletion({
+    messages,
+    temperature: 0.9,
+    maxTokens: 500,
+  });
+
+  return response;
 }
