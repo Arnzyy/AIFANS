@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 import { AGE_VERIFICATION_TEXT } from '@/lib/compliance/constants';
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isCreator = searchParams.get('creator') === 'true';
@@ -227,5 +227,17 @@ export default function RegisterPage() {
         </p>
       )}
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full" />
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }

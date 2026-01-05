@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 
-export default function WalletPage() {
+function WalletContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const showAddFunds = searchParams.get('add') === 'true';
@@ -230,5 +230,17 @@ export default function WalletPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function WalletPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="animate-spin w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full" />
+      </div>
+    }>
+      <WalletContent />
+    </Suspense>
   );
 }
