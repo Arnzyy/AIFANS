@@ -277,18 +277,18 @@ export default function AIChatPage() {
     <div className="flex flex-col h-screen bg-black">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
-        <div className="flex items-center gap-4 px-4 h-16">
+        <div className="flex items-center gap-3 px-3 md:px-4 h-14 md:h-16">
           <Link
             href={`/${username}`}
-            className="p-2 -ml-2 text-gray-400 hover:text-white transition-colors"
+            className="p-1.5 md:p-2 -ml-1 text-gray-400 hover:text-white transition-colors text-sm md:text-base"
           >
-            ← Back
+            ←
           </Link>
 
           {creator && (
-            <Link href={`/${creator.username}`} className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-10 h-10 rounded-full bg-white/10 overflow-hidden">
+            <Link href={`/${creator.username}`} className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+              <div className="relative flex-shrink-0">
+                <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/10 overflow-hidden">
                   {creator.avatar_url ? (
                     <img
                       src={creator.avatar_url}
@@ -296,23 +296,23 @@ export default function AIChatPage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-lg">
+                    <div className="w-full h-full flex items-center justify-center text-base md:text-lg">
                       {(creator.display_name || creator.username).charAt(0).toUpperCase()}
                     </div>
                   )}
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center text-xs">
+                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 md:w-5 md:h-5 bg-purple-500 rounded-full flex items-center justify-center text-[10px] md:text-xs">
                   AI
                 </div>
               </div>
-              <div>
-                <p className="font-medium flex items-center gap-2">
-                  {creator.display_name || creator.username}
-                  <span className="text-xs px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded">
-                    AI Chat
+              <div className="min-w-0 flex-1">
+                <p className="font-medium flex items-center gap-1.5 md:gap-2 text-sm md:text-base truncate">
+                  <span className="truncate">{creator.display_name || creator.username}</span>
+                  <span className="text-[10px] md:text-xs px-1 md:px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded flex-shrink-0">
+                    AI
                   </span>
                 </p>
-                <p className="text-xs text-gray-500">@{creator.username}</p>
+                <p className="text-[10px] md:text-xs text-gray-500 truncate">@{creator.username}</p>
               </div>
             </Link>
           )}
@@ -321,36 +321,36 @@ export default function AIChatPage() {
 
       {/* AI Disclosure Banner */}
       {showDisclosure && (
-        <div className="px-4 py-3 bg-purple-500/10 border-b border-purple-500/20">
-          <p className="text-sm text-center text-purple-200">
+        <div className="px-3 md:px-4 py-2 md:py-3 bg-purple-500/10 border-b border-purple-500/20">
+          <p className="text-xs md:text-sm text-center text-purple-200">
             {AI_CHAT_DISCLOSURE.medium}
           </p>
         </div>
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
         <div className="max-w-2xl mx-auto space-y-4">
           {messages.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-5xl mb-4">
+            <div className="text-center py-6 md:py-12">
+              <div className="mb-3 md:mb-4">
                 {creator?.avatar_url ? (
                   <img
                     src={creator.avatar_url}
                     alt=""
-                    className="w-20 h-20 rounded-full mx-auto object-cover"
+                    className="w-16 h-16 md:w-20 md:h-20 rounded-full mx-auto object-cover"
                   />
                 ) : (
-                  <div className="w-20 h-20 rounded-full mx-auto bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-3xl">
+                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-full mx-auto bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-2xl md:text-3xl">
                     {(creator?.display_name || creator?.username || '?').charAt(0).toUpperCase()}
                   </div>
                 )}
               </div>
-              <h3 className="text-xl font-semibold mb-2">
+              <h3 className="text-lg md:text-xl font-semibold mb-1 md:mb-2">
                 Chat with {creator?.display_name || creator?.username}
               </h3>
-              <p className="text-gray-400 max-w-sm mx-auto">
-                Start a conversation! This is an AI-powered chat that&apos;s available 24/7.
+              <p className="text-sm md:text-base text-gray-400 max-w-sm mx-auto px-4">
+                Start a conversation! AI-powered chat available 24/7.
               </p>
             </div>
           ) : (
@@ -416,25 +416,25 @@ export default function AIChatPage() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-white/10 p-4 bg-black">
-        <form onSubmit={sendMessage} className="max-w-2xl mx-auto flex gap-3">
+      <div className="border-t border-white/10 p-3 md:p-4 bg-black">
+        <form onSubmit={sendMessage} className="max-w-2xl mx-auto flex gap-2 md:gap-3">
           <input
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Type a message..."
-            className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors"
+            className="flex-1 px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors text-sm md:text-base"
             disabled={sending}
           />
           <button
             type="submit"
             disabled={!newMessage.trim() || sending}
-            className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
           >
             {sending ? '...' : 'Send'}
           </button>
         </form>
-        <p className="text-center text-xs text-gray-500 mt-2">
+        <p className="text-center text-[10px] md:text-xs text-gray-500 mt-1.5 md:mt-2">
           AI responses may not reflect the creator&apos;s actual views
         </p>
       </div>
