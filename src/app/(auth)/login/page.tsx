@@ -39,17 +39,16 @@ function LoginForm() {
         .eq('user_id', data.user.id)
         .single();
 
+      // Force a full page reload to ensure session is synced
       // Redirect creators to dashboard, regular users to feed
       if (creatorProfile) {
-        router.push('/dashboard');
+        window.location.href = '/dashboard';
       } else {
-        router.push(redirect);
+        window.location.href = redirect;
       }
     } else {
-      router.push(redirect);
+      window.location.href = redirect;
     }
-
-    router.refresh();
   };
 
   return (
