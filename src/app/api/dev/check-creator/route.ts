@@ -51,14 +51,21 @@ export async function POST() {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  // Update profile to creator
+  // Create/update profile with creator role
   const { error: profileError } = await supabase
     .from('profiles')
-    .update({ role: 'creator' })
-    .eq('id', user.id);
+    .upsert({
+      id: user.id,
+      email: user.email,
+      username: user.email?.split('@')[0] || 'creator',
+      display_name: user.email?.split('@')[0] || 'Creator',
+      role: 'creator',
+    }, {
+      onConflict: 'id',
+    });
 
   if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 500 });
+    return NextResponse.json({ error: `Profile error: ${profileError.message}` }, { status: 500 });
   }
 
   // Create creator profile if doesn't exist
@@ -72,8 +79,15 @@ export async function POST() {
     });
 
   if (creatorError) {
-    return NextResponse.json({ error: creatorError.message }, { status: 500 });
+    return NextResponse.json({ error: `Creator profile error: ${creatorError.message}` }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, message: 'Creator account created/updated' });
+  return NextResponse.json({
+    success: true,
+    message: 'Profile and creator account created successfully',
+    user: {
+      id: user.id,
+      email: user.email,
+    },
+  });
 }
