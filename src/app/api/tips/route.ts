@@ -1,108 +1,83 @@
+// ===========================================
+// TIP API (TOKEN-BASED)
+// Send tips using token wallet
+// ===========================================
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { stripe, toCents } from '@/lib/stripe';
-import { getCurrency, convertCurrency } from '@/lib/stripe/currency';
+import { sendTip, getTokenConfig } from '@/lib/tokens/token-service';
 
-// POST /api/tips - Create Stripe Checkout for tip
+// POST - Send a tip using tokens
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { creator_id, amount, message } = await request.json();
+    const body = await request.json();
+    const { creator_id, amount_tokens, thread_id, chat_mode } = body;
 
-    // Amount is expected in pence/cents
-    if (!creator_id || !amount || amount < 100) {
+    // Validation
+    if (!creator_id) {
+      return NextResponse.json({ error: 'Creator ID required' }, { status: 400 });
+    }
+
+    if (!amount_tokens || amount_tokens <= 0) {
+      return NextResponse.json({ error: 'Invalid tip amount' }, { status: 400 });
+    }
+
+    // Prevent self-tipping
+    if (creator_id === user.id) {
+      return NextResponse.json({ error: 'Cannot tip yourself' }, { status: 400 });
+    }
+
+    const result = await sendTip(
+      supabase,
+      user.id,
+      creator_id,
+      amount_tokens,
+      thread_id,
+      chat_mode || 'nsfw'
+    );
+
+    if (!result.success) {
       return NextResponse.json(
-        { error: 'Creator ID and amount (min £1/$1) required' },
+        { error: result.error_message || 'Tip failed' },
         { status: 400 }
       );
     }
 
-    // Verify creator exists
-    const { data: creator } = await supabase
-      .from('profiles')
-      .select('id, username, display_name')
-      .eq('id', creator_id)
-      .eq('role', 'creator')
-      .single();
-
-    if (!creator) {
-      return NextResponse.json({ error: 'Creator not found' }, { status: 404 });
-    }
-
-    // Detect currency from request geo
-    const country = request.geo?.country;
-    const currency = getCurrency(country);
-
-    // Convert amount if needed (amount comes in as base currency - GBP)
-    const convertedAmount = convertCurrency(amount, 'gbp', currency);
-
-    // Get or create Stripe customer
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('stripe_customer_id, email')
-      .eq('id', user.id)
-      .single();
-
-    let stripeCustomerId = profile?.stripe_customer_id;
-
-    if (!stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        email: profile?.email || user.email,
-        metadata: { supabase_user_id: user.id },
-      });
-      stripeCustomerId = customer.id;
-
-      await supabase
-        .from('profiles')
-        .update({ stripe_customer_id: stripeCustomerId })
-        .eq('id', user.id);
-    }
-
-    // Create Stripe Checkout Session for one-time payment
-    const session = await stripe.checkout.sessions.create({
-      customer: stripeCustomerId,
-      mode: 'payment',
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: currency,
-            product_data: {
-              name: `Tip to ${creator.display_name || creator.username}`,
-              description: message || 'Tip',
-            },
-            unit_amount: convertedAmount,
-          },
-          quantity: 1,
-        },
-      ],
-      metadata: {
-        user_id: user.id,
-        creator_id: creator_id,
-        type: 'tip',
-        message: message || '',
-        original_amount_gbp: amount.toString(),
-      },
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}&type=tip`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/cancel`,
+    return NextResponse.json({
+      success: true,
+      tip_id: result.tip_id,
+      new_balance: result.new_balance,
     });
+  } catch (error) {
+    console.error('Tip error:', error);
+    return NextResponse.json({ error: 'Tip failed' }, { status: 500 });
+  }
+}
+
+// GET - Get tip presets and config
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = await createServerClient();
+
+    const config = await getTokenConfig(supabase);
 
     return NextResponse.json({
-      checkoutUrl: session.url,
-      sessionId: session.id,
+      presets: config.tip_presets_tokens,
+      min_tokens: config.min_tip_tokens,
+      max_tokens: config.max_tip_tokens,
+      tokens_per_gbp: config.tokens_per_gbp_100,
     });
-
-  } catch (error: any) {
-    console.error('Tip checkout error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to create tip checkout' },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error('Get tip config error:', error);
+    return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }

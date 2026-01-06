@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase/client';
 import { AI_CHAT_DISCLOSURE } from '@/lib/compliance/constants';
 import { getCreatorByUsername } from '@/lib/data/creators';
 import { formatDistanceToNow } from 'date-fns';
+import { TipButton } from '@/components/tokens/TipButton';
 
 interface Message {
   id: string;
@@ -315,6 +316,17 @@ export default function AIChatPage() {
                 <p className="text-[10px] md:text-xs text-gray-500 truncate">@{creator.username}</p>
               </div>
             </Link>
+          )}
+
+          {/* Tip Button */}
+          {creator && (
+            <TipButton
+              creatorId={creator.id}
+              creatorName={creator.display_name || creator.username}
+              threadId={conversationId || undefined}
+              chatMode="nsfw"
+              variant="icon"
+            />
           )}
         </div>
       </header>
