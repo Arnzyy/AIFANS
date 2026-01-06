@@ -274,7 +274,7 @@ export default function AIChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-black overflow-hidden">
+    <div className="flex flex-col h-screen max-h-screen bg-black overflow-hidden">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
         <div className="flex items-center gap-3 px-3 md:px-4 h-14 md:h-16">
@@ -416,7 +416,7 @@ export default function AIChatPage() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-white/10 p-3 md:p-4 bg-black">
+      <div className="sticky bottom-0 border-t border-white/10 p-3 md:p-4 bg-black flex-shrink-0">
         <form onSubmit={sendMessage} className="max-w-2xl mx-auto flex gap-2 md:gap-3">
           <input
             type="text"
