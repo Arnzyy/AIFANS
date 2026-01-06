@@ -1,4 +1,245 @@
-# LYRA Dashboard - Hybrid Creator/Fan Platform
+# LYRA - AI Influencer Subscription Platform
+
+## Complete Creator Marketplace for AI Personas
+
+LYRA is a full-featured creator marketplace platform built with Next.js 14, Supabase, and Stripe. It enables creators to build, monetize, and manage AI personas through subscriptions, tips, and pay-per-view content.
+
+---
+
+## 🚀 Features
+
+### Creator Onboarding & Verification
+- **5-Step Onboarding Wizard**: Account type → Identity → Stripe Connect → Declarations → Submit
+- **Stripe Connect Integration**: Full KYC and payout setup via Stripe Express
+- **Compliance Declarations**: Immutable audit log of creator agreements
+- **Admin Approval Queue**: Manual vetting before creators can publish
+
+### AI Model/Persona Management  
+- **Model Creation Wizard**: Name, age, visuals, persona, monetization settings
+- **Tag System**: Primary categories + secondary tags for discovery
+- **Multi-Model Support**: Configurable limits per creator (anti-spam)
+- **Model Approval Flow**: Admin review before public listing
+
+### Content & Monetization
+- **Content Library**: Upload images/videos with visibility controls
+- **Visibility Tiers**: Public Preview (SFW) → Subscribers → PPV
+- **PPV System**: Create pay-per-view content packs from library
+- **Subscription Pricing**: Per-model monthly subscriptions
+
+### Token Wallet & Tipping
+- **Token Packs**: Buy tokens via Stripe (250 tokens = £1)
+- **Tip System**: Send tips with acknowledgements
+- **Creator Earnings**: 80/20 split with 14-day hold period
+- **Transaction History**: Full ledger for users and creators
+
+### Chat System
+- **SFW Companion Mode**: Friendly, supportive AI conversations
+- **NSFW Intimate Mode**: Adult content with age verification
+- **Chat Mode Configuration**: Creators control available modes
+- **Persona Customization**: Traits, interests, style preferences
+
+### Admin Panel
+- **Creator Approvals Queue**: Review KYC, declarations, Stripe status
+- **Model Approvals Queue**: Safety checks, content review
+- **Content Reports**: User report handling
+- **Strike System**: Warnings, strikes, suspensions
+- **Audit Logging**: Immutable records for all actions
+
+---
+
+## 📁 Project Structure
+
+```
+lyra-dashboard/
+├── app/
+│   ├── (fan)/              # Fan-facing pages
+│   │   ├── browse/         # Discover models
+│   │   ├── subscriptions/  # My subscriptions
+│   │   ├── wallet/         # Token wallet
+│   │   └── notifications/  # Notifications
+│   │
+│   ├── admin/              # Admin panel
+│   │
+│   ├── dashboard/          # Creator dashboard
+│   │   ├── ai-chat/        # Chat testing
+│   │   ├── chat-modes/     # Configure chat modes
+│   │   ├── content/        # Content library
+│   │   ├── earnings/       # Earnings overview
+│   │   ├── messages/       # Fan messages
+│   │   ├── models/         # Manage AI models
+│   │   ├── onboarding/     # Creator onboarding
+│   │   ├── payouts/        # Payouts & earnings
+│   │   ├── posts/          # Create posts
+│   │   ├── ppv/            # PPV management
+│   │   ├── settings/       # Account settings
+│   │   └── subscribers/    # Subscriber list
+│   │
+│   └── api/                # API routes
+│       ├── admin/          # Admin endpoints
+│       ├── creator/        # Creator endpoints
+│       ├── ppv/            # PPV endpoints
+│       ├── tags/           # Tag system
+│       ├── tips/           # Tipping
+│       ├── tokens/         # Token purchases
+│       ├── wallet/         # Wallet operations
+│       └── webhooks/       # Stripe webhooks
+│
+├── components/
+│   ├── admin/              # Admin components
+│   ├── chat/               # Chat UI components
+│   ├── creators/           # Creator dashboard components
+│   ├── layout/             # Layout components
+│   ├── tags/               # Tag selector
+│   └── tokens/             # Wallet components
+│
+└── lib/
+    ├── creators/           # Creator business logic
+    ├── sfw-chat/           # SFW chat system
+    ├── tags/               # Tag system
+    └── tokens/             # Token/wallet system
+```
+
+---
+
+## 🗄️ Database Schema
+
+### Core Tables
+- `creators` - Legal entity, KYC, Stripe Connect
+- `creator_declarations` - Compliance records (immutable)
+- `creator_models` - AI personas
+- `model_tags` - Model ↔ Tag relationships
+- `tags` - Controlled vocabulary
+- `blocked_tag_terms` - Safety filter
+
+### Content
+- `content_items` - Media uploads
+- `posts` - Content groupings
+- `ppv_offers` - Pay-per-view packs
+- `ppv_entitlements` - User purchases
+
+### Monetization
+- `model_subscriptions` - Active subscriptions
+- `token_wallets` - User balances
+- `token_transactions` - Transaction ledger
+- `tips` - Tip records
+- `creator_earnings` - Earnings ledger
+- `creator_payouts` - Payout history
+
+### Moderation
+- `content_reports` - User reports
+- `creator_strikes` - Warnings/strikes
+- `audit_log` - All admin actions
+- `user_roles` - Admin permissions
+
+---
+
+## 🔧 Setup
+
+### 1. Install Dependencies
+```bash
+npm install
+```
+
+### 2. Environment Variables
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Stripe
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# AI (Claude)
+ANTHROPIC_API_KEY=
+```
+
+### 3. Run Database Migrations
+Execute SQL files in order:
+1. `lib/creators/database-schema.sql`
+2. `lib/tags/database-schema.sql`
+3. `lib/tokens/database-schema.sql`
+4. `lib/sfw-chat/database-schema.sql`
+
+### 4. Start Development Server
+```bash
+npm run dev
+```
+
+---
+
+## 🎯 Key Flows
+
+### Creator Journey
+1. Sign up → Complete onboarding wizard
+2. Connect Stripe → Accept declarations
+3. Submit for admin review
+4. Once approved → Create AI model
+5. Upload content → Set pricing
+6. Model approved → Go live
+
+### Fan Journey
+1. Browse models → View profiles
+2. Subscribe to model → Access content
+3. Buy tokens → Send tips
+4. Unlock PPV content
+5. Chat with AI persona
+
+### Admin Flow
+1. Review pending creators
+2. Check KYC/Stripe status
+3. Approve/reject applications
+4. Review model submissions
+5. Handle content reports
+6. Issue strikes if needed
+
+---
+
+## 📋 API Endpoints
+
+### Creator
+- `GET/PUT /api/creator/onboarding` - Onboarding status
+- `POST /api/creator/stripe-connect` - Start Stripe onboarding
+- `GET/POST /api/creator/models` - Model CRUD
+- `GET /api/creator/stats` - Dashboard stats
+
+### Admin
+- `GET /api/admin/stats` - Queue counts
+- `GET /api/admin/creators` - Pending creators
+- `POST /api/admin/creators/[id]/approve` - Approve creator
+- `GET /api/admin/models` - Pending models
+
+### Tokens
+- `GET /api/wallet` - Get balance
+- `POST /api/tokens/checkout` - Buy tokens
+- `POST /api/tips/send` - Send tip
+
+### PPV
+- `GET/POST /api/creator/ppv` - PPV management
+- `POST /api/ppv/[id]/purchase` - Buy PPV
+
+---
+
+## 🛡️ Safety Features
+
+- **Age Verification**: 18+ requirement for creators and NSFW content
+- **Blocked Terms Filter**: Auto-reject youth-coded, incest, violence terms
+- **No Real Person Likeness**: Declaration required
+- **Celebrity Impersonation Check**: Automated name detection
+- **Content Review**: Manual approval for all models
+- **Strike System**: Progressive enforcement
+- **Audit Logging**: Full trail for disputes
+
+---
+
+## 📄 License
+
+Proprietary - All rights reserved - Hybrid Creator/Fan Platform
 
 A complete Next.js dashboard for LYRA featuring a hybrid layout that supports both fan and creator modes (like OnlyFans), plus dual chat modes (NSFW and SFW/Companion).
 
