@@ -150,7 +150,7 @@ export function TipModal({
         <div className="bg-gradient-to-r from-pink-500/20 to-red-500/20 p-6">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            className="absolute top-4 right-4 p-2 rounded-lg bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -253,32 +253,35 @@ export function TipModal({
               {/* Error */}
               {error && <p className="text-sm text-red-400 mb-4 text-center">{error}</p>}
 
-              {/* Send Button */}
-              <button
-                onClick={handleSendTip}
-                disabled={loading || amount <= 0 || !canAfford}
-                className={`w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition ${
-                  canAfford && amount > 0
-                    ? 'bg-gradient-to-r from-pink-500 to-red-500 hover:opacity-90'
-                    : 'bg-white/10 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <Heart className="w-5 h-5" />
-                    {!canAfford && amount > 0
-                      ? 'Insufficient Balance'
-                      : `Send ${amount > 0 ? amount.toLocaleString() : ''} Tokens`}
-                  </>
-                )}
-              </button>
-
-              {/* Info */}
-              <p className="mt-4 text-xs text-gray-500 text-center">
-                Platform takes 30% fee. Creator receives 70% of tip amount.
-              </p>
+              {/* Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={onClose}
+                  className="flex-1 py-3 rounded-lg font-medium bg-white/10 hover:bg-white/20 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSendTip}
+                  disabled={loading || amount <= 0 || !canAfford}
+                  className={`flex-1 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition ${
+                    canAfford && amount > 0
+                      ? 'bg-gradient-to-r from-pink-500 to-red-500 hover:opacity-90'
+                      : 'bg-white/10 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {loading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Heart className="w-5 h-5" />
+                      {!canAfford && amount > 0
+                        ? 'Need Tokens'
+                        : `Send ${amount > 0 ? amount.toLocaleString() : ''}`}
+                    </>
+                  )}
+                </button>
+              </div>
             </>
           )}
         </div>

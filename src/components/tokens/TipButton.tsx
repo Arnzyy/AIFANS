@@ -62,10 +62,10 @@ export function TipButton({
       <>
         <button
           onClick={handleClick}
-          className={`p-2 rounded-lg hover:bg-pink-500/20 transition ${className}`}
+          className={`p-2.5 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 transition ${className}`}
           title="Send a tip"
         >
-          <Heart className="w-5 h-5 text-pink-400" />
+          <Heart className="w-5 h-5 text-pink-400 fill-pink-400" />
         </button>
 
         <TipModal

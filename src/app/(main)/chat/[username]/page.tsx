@@ -427,28 +427,62 @@ export default function AIChatPage() {
         </div>
       </div>
 
-      {/* Input */}
-      <div className="sticky bottom-0 border-t border-white/10 p-3 md:p-4 bg-black flex-shrink-0">
-        <form onSubmit={sendMessage} className="max-w-2xl mx-auto flex gap-2 md:gap-3">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors text-base"
-            disabled={sending}
-          />
-          <button
-            type="submit"
-            disabled={!newMessage.trim() || sending}
-            className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
-          >
-            {sending ? '...' : 'Send'}
-          </button>
-        </form>
-        <p className="text-center text-[10px] md:text-xs text-gray-500 mt-1.5 md:mt-2">
-          AI responses may not reflect the creator&apos;s actual views
-        </p>
+      {/* Input Area with Tip Bar */}
+      <div className="sticky bottom-0 border-t border-white/10 bg-black flex-shrink-0">
+        {/* Quick Tip Bar - Chaturbate Style */}
+        {creator && (
+          <div className="px-3 md:px-4 py-2 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border-b border-white/5">
+            <div className="max-w-2xl mx-auto flex items-center gap-2 overflow-x-auto">
+              <span className="text-xs text-pink-400 font-medium whitespace-nowrap">Quick Tip:</span>
+              {[50, 100, 250, 500, 1000].map((amount) => (
+                <button
+                  key={amount}
+                  onClick={() => {
+                    // Quick tip functionality
+                    const tipButton = document.querySelector('[data-tip-button]') as HTMLButtonElement;
+                    if (tipButton) tipButton.click();
+                  }}
+                  className="px-3 py-1.5 bg-pink-500/20 hover:bg-pink-500/40 rounded-lg text-pink-300 text-sm font-medium transition whitespace-nowrap flex items-center gap-1"
+                >
+                  <span className="text-yellow-400">🪙</span>
+                  {amount}
+                </button>
+              ))}
+              <TipButton
+                creatorId={creator.id}
+                creatorName={creator.display_name || creator.username}
+                threadId={conversationId || undefined}
+                chatMode="nsfw"
+                variant="small"
+                className="ml-auto"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Message Input */}
+        <div className="p-3 md:p-4">
+          <form onSubmit={sendMessage} className="max-w-2xl mx-auto flex gap-2 md:gap-3">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type a message..."
+              className="flex-1 px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors text-base"
+              disabled={sending}
+            />
+            <button
+              type="submit"
+              disabled={!newMessage.trim() || sending}
+              className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
+            >
+              {sending ? '...' : 'Send'}
+            </button>
+          </form>
+          <p className="text-center text-[10px] md:text-xs text-gray-500 mt-1.5 md:mt-2">
+            AI responses may not reflect the creator&apos;s actual views
+          </p>
+        </div>
       </div>
     </div>
   );
