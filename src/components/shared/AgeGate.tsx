@@ -31,7 +31,11 @@ export function AgeGate({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-zinc-900 rounded-2xl p-8 text-center">
         <div className="mb-6">
-          <h1 className="text-4xl font-bold gradient-text">LYRA</h1>
+          <img
+            src="/logo.png"
+            alt="LYRA"
+            className="h-16 mx-auto mb-2"
+          />
           <p className="text-gray-500 mt-2">Premium AI Creators</p>
         </div>
 
