@@ -103,10 +103,106 @@ export async function getTokenPacks(
     .from('token_packs')
     .select('*')
     .eq('is_active', true)
-    .order('sort_order', { ascending: true });
+    .order('sort_order', { ascending: true});
 
   if (error) throw error;
   return data || [];
+}
+
+/**
+ * Get single token pack by SKU
+ */
+export async function getTokenPack(
+  supabase: SupabaseClient,
+  sku: string
+): Promise<TokenPack | null> {
+  const { data, error } = await supabase
+    .from('token_packs')
+    .select('*')
+    .eq('sku', sku)
+    .eq('is_active', true)
+    .single();
+
+  if (error) return null;
+  return data;
+}
+
+// ===========================================
+// STRIPE CHECKOUT
+// ===========================================
+
+/**
+ * Create Stripe checkout session for token purchase
+ */
+export async function createTokenCheckout(
+  supabase: SupabaseClient,
+  userId: string,
+  packSku: string,
+  successUrl: string,
+  cancelUrl: string
+): Promise<{ checkout_url: string; session_id: string }> {
+  const Stripe = require('stripe');
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+  // Get pack details
+  const pack = await getTokenPack(supabase, packSku);
+  if (!pack) {
+    throw new Error('Token pack not found');
+  }
+
+  // Create purchase record (PENDING)
+  const { data: purchase, error: purchaseError } = await supabase
+    .from('token_pack_purchases')
+    .insert({
+      user_id: userId,
+      pack_sku: packSku,
+      tokens_awarded: pack.tokens,
+      currency: pack.currency,
+      amount_paid_minor: pack.price_minor,
+      status: 'PENDING',
+    })
+    .select()
+    .single();
+
+  if (purchaseError) throw purchaseError;
+
+  // Create Stripe checkout session
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price_data: {
+          currency: pack.currency.toLowerCase(),
+          product_data: {
+            name: pack.name,
+            description: pack.description || `${pack.tokens} tokens`,
+          },
+          unit_amount: pack.price_minor,
+        },
+        quantity: 1,
+      },
+    ],
+    metadata: {
+      purchase_id: purchase.id,
+      user_id: userId,
+      pack_sku: packSku,
+      tokens: pack.tokens.toString(),
+    },
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+  });
+
+  // Update purchase with session ID
+  await supabase
+    .from('token_pack_purchases')
+    .update({ stripe_checkout_session_id: session.id })
+    .eq('id', purchase.id);
+
+  return {
+    checkout_url: session.url!,
+    session_id: session.id,
+  };
 }
 
 // ===========================================
