@@ -11,7 +11,7 @@ interface TipButtonProps {
   chatMode?: 'nsfw' | 'sfw';
   variant?: 'icon' | 'button' | 'small' | 'custom';
   className?: string;
-  onTipSent?: (newBalance: number) => void;
+  onTipSent?: (amount: number, newBalance: number) => void;
 }
 
 export function TipButton({
@@ -47,9 +47,12 @@ export function TipButton({
     setShowTipModal(true);
   };
 
-  const handleSuccess = (newBalance: number) => {
+  const [lastTipAmount, setLastTipAmount] = useState<number>(0);
+
+  const handleSuccess = (newBalance: number, amount: number) => {
     setBalance(newBalance);
-    onTipSent?.(newBalance);
+    setLastTipAmount(amount);
+    onTipSent?.(amount, newBalance);
   };
 
   const handleInsufficientBalance = () => {

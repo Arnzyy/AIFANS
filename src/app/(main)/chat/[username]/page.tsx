@@ -266,6 +266,33 @@ export default function AIChatPage() {
     }
   };
 
+  // Handle tip sent - add AI acknowledgement
+  const handleTipSent = (amount: number, newBalance: number) => {
+    if (!creator) return;
+
+    // Add AI thank you message
+    const thankYouMessages = [
+      `Omg thank you so much for the ${amount} tokens babe! 💕 You're amazing!`,
+      `Wow ${amount} tokens?! You're so generous! Thank you sweetie 😘`,
+      `Aww thank you for the tip! ${amount} tokens means so much to me 💖`,
+      `You just made my day! Thank you for ${amount} tokens! 🥰`,
+      `Such a sweetheart! Thanks for the ${amount} token tip! 💋`,
+    ];
+
+    const randomMessage = thankYouMessages[Math.floor(Math.random() * thankYouMessages.length)];
+
+    const tipAckMsg: Message = {
+      id: `tip-ack-${Date.now()}`,
+      content: randomMessage,
+      sender_id: creator.id,
+      receiver_id: currentUser?.id || '',
+      created_at: new Date().toISOString(),
+      is_ai_generated: true
+    };
+
+    setMessages(prev => [...prev, tipAckMsg]);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -318,14 +345,15 @@ export default function AIChatPage() {
             </Link>
           )}
 
-          {/* Tip Button */}
-          {creator && (
+          {/* Tip Button - only for real creators */}
+          {creator && creator.id.includes('-') && creator.id.length >= 30 && (
             <TipButton
               creatorId={creator.id}
               creatorName={creator.display_name || creator.username}
               threadId={conversationId || undefined}
               chatMode="nsfw"
               variant="icon"
+              onTipSent={handleTipSent}
             />
           )}
         </div>
@@ -429,8 +457,8 @@ export default function AIChatPage() {
 
       {/* Input Area with Tip Bar */}
       <div className="sticky bottom-0 border-t border-white/10 bg-black flex-shrink-0">
-        {/* Quick Tip Bar - Chaturbate Style */}
-        {creator && (
+        {/* Quick Tip Bar - Chaturbate Style (only for real creators, not mock) */}
+        {creator && creator.id.includes('-') && creator.id.length >= 30 && (
           <div className="px-3 md:px-4 py-2 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border-b border-white/5">
             <div className="max-w-2xl mx-auto flex items-center gap-2 overflow-x-auto">
               <span className="text-xs text-pink-400 font-medium whitespace-nowrap">Quick Tip:</span>
@@ -455,6 +483,7 @@ export default function AIChatPage() {
                 chatMode="nsfw"
                 variant="custom"
                 className="ml-auto"
+                onTipSent={handleTipSent}
               />
             </div>
           </div>

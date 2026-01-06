@@ -12,7 +12,7 @@ interface TipModalProps {
   threadId?: string;
   chatMode?: 'nsfw' | 'sfw';
   currentBalance: number;
-  onSuccess?: (newBalance: number) => void;
+  onSuccess?: (newBalance: number, amount: number) => void;
   onInsufficientBalance?: () => void;
 }
 
@@ -123,7 +123,7 @@ export function TipModal({
       }
 
       setSuccess(true);
-      onSuccess?.(data.new_balance);
+      onSuccess?.(data.new_balance, amount);
 
       // Close after short delay
       setTimeout(() => {
