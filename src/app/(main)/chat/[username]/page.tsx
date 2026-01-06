@@ -438,7 +438,7 @@ export default function AIChatPage() {
                 <button
                   key={amount}
                   onClick={() => {
-                    // Quick tip functionality
+                    // Quick tip functionality - will open modal with preset
                     const tipButton = document.querySelector('[data-tip-button]') as HTMLButtonElement;
                     if (tipButton) tipButton.click();
                   }}
@@ -453,7 +453,7 @@ export default function AIChatPage() {
                 creatorName={creator.display_name || creator.username}
                 threadId={conversationId || undefined}
                 chatMode="nsfw"
-                variant="small"
+                variant="custom"
                 className="ml-auto"
               />
             </div>

@@ -9,7 +9,7 @@ interface TipButtonProps {
   creatorName: string;
   threadId?: string;
   chatMode?: 'nsfw' | 'sfw';
-  variant?: 'icon' | 'button' | 'small';
+  variant?: 'icon' | 'button' | 'small' | 'custom';
   className?: string;
   onTipSent?: (newBalance: number) => void;
 }
@@ -92,6 +92,32 @@ export function TipButton({
         >
           <Heart className="w-4 h-4 text-pink-400" />
           <span className="text-sm text-pink-400 font-medium">Tip</span>
+        </button>
+
+        <TipModal
+          isOpen={showTipModal}
+          onClose={() => setShowTipModal(false)}
+          creatorId={creatorId}
+          creatorName={creatorName}
+          threadId={threadId}
+          chatMode={chatMode}
+          currentBalance={balance}
+          onSuccess={handleSuccess}
+          onInsufficientBalance={handleInsufficientBalance}
+        />
+      </>
+    );
+  }
+
+  if (variant === 'custom') {
+    return (
+      <>
+        <button
+          onClick={handleClick}
+          data-tip-button
+          className={`px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/40 rounded-lg flex items-center gap-1.5 transition ${className}`}
+        >
+          <span className="text-sm text-purple-300 font-medium">Custom</span>
         </button>
 
         <TipModal
