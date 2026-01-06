@@ -45,7 +45,7 @@ export default async function MessagesPage() {
             return (
               <Link
                 key={conv.id}
-                href={`/messages/${otherUser.username}`}
+                href={`/chat/${otherUser.username}`}
                 className={`flex items-center gap-4 p-4 rounded-xl border transition-colors ${
                   isUnread
                     ? 'bg-purple-500/10 border-purple-500/30'

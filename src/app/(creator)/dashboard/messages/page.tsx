@@ -57,7 +57,7 @@ export default async function MessagesPage() {
             return (
               <Link
                 key={conversation.id}
-                href={`/messages/${otherProfile?.username || otherUserId}`}
+                href={`/chat/${otherProfile?.username || otherUserId}`}
                 className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-colors"
               >
                 <div className="w-12 h-12 rounded-full bg-white/10 flex-shrink-0" />
