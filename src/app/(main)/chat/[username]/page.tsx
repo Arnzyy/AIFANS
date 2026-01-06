@@ -274,7 +274,7 @@ export default function AIChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-black">
+    <div className="flex flex-col h-[100dvh] bg-black overflow-hidden">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
         <div className="flex items-center gap-3 px-3 md:px-4 h-14 md:h-16">
