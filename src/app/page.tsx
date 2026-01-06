@@ -53,7 +53,7 @@ export default function HomePage() {
             >
               <PreviewCard image="/preview/1.png" username="luna_dark" />
               <PreviewCard image="/preview/2.png" username="chloe_belle" />
-              <PreviewCard image="/preview/3.png" username="aria_sweetheart" />
+              <PreviewCard image="/preview/3.png" username="yuki_rose" />
               <PreviewCard image="/preview/4.png" username="mia_fresh" />
               <PreviewCard image="/preview/5.png" username="nova_night" />
             </div>
