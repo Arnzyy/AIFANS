@@ -3,6 +3,10 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
+import { LogOut } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: '📊' },
@@ -20,6 +24,15 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
+  const [loading, setLoading] = useState(false);
+
+  const handleLogout = async () => {
+    setLoading(true);
+    await supabase.auth.signOut();
+    window.location.href = '/login';
+  };
 
   return (
     <div className="min-h-screen bg-black">
@@ -29,15 +42,22 @@ export default function DashboardLayout({
           <Link href="/">
             <Image src="/logo.png" alt="LYRA" width={100} height={35} />
           </Link>
-          
+
           <div className="flex items-center gap-4">
-            <Link 
+            <Link
               href="/posts/new"
               className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
             >
               + New Post
             </Link>
-            <Link href="/profile" className="w-8 h-8 rounded-full bg-white/10" />
+            <button
+              onClick={handleLogout}
+              disabled={loading}
+              className="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
+              title="Logout"
+            >
+              <LogOut className="w-5 h-5 text-gray-400 hover:text-red-400" />
+            </button>
           </div>
         </div>
       </header>
@@ -66,14 +86,22 @@ export default function DashboardLayout({
               );
             })}
           </nav>
-          
-          <div className="p-4 border-t border-white/10">
-            <Link 
+
+          <div className="p-4 border-t border-white/10 space-y-3">
+            <Link
               href="/profile"
-              className="text-sm text-gray-400 hover:text-white transition-colors"
+              className="block text-sm text-gray-400 hover:text-white transition-colors"
             >
               View Public Profile →
             </Link>
+            <button
+              onClick={handleLogout}
+              disabled={loading}
+              className="w-full flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>{loading ? 'Logging out...' : 'Logout'}</span>
+            </button>
           </div>
         </aside>
 
