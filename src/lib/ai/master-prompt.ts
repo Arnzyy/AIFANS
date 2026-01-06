@@ -143,13 +143,13 @@ export const MEMORY_RULES = {
     'running_jokes',       // Harmless callbacks
     'subscription_status', // Purchase state
   ],
-
+  
   // What can be stored CAUTIOUSLY (as neutral fact, not vulnerability)
   cautious: [
     'mentioned_work',      // "User mentioned work" not "User is stressed about work"
     'mentioned_hobby',     // Neutral topic reference
   ],
-
+  
   // What must NEVER be stored
   forbidden: [
     'emotional_vulnerability',  // Loneliness, depression, trauma
@@ -178,7 +178,7 @@ export const FORBIDDEN_PATTERNS = [
   /don't leave me/i,
   /i was so lonely/i,
   /counting the (hours|minutes|days)/i,
-
+  
   // Real-world anchoring
   /let's meet/i,
   /come over/i,
@@ -189,11 +189,11 @@ export const FORBIDDEN_PATTERNS = [
   /my (apartment|house|place)/i,
   /the sunshine/i,
   /at the (beach|park|cafe|restaurant)/i,
-
+  
   // Explicit content
   /inside (you|me)/i,
   /fuck(ing|ed)? (you|me)/i,
-  /rid(e|ing) (you|me)/i,
+  /riding (you|me)/i,
   /pound(ing|ed)?/i,
   /thrust(ing|ed)?/i,
   /penetrat/i,
@@ -204,7 +204,7 @@ export const FORBIDDEN_PATTERNS = [
   /dick/i,
   /nipples?/i,
   /clit/i,
-
+  
   // Policy language (kills vibe)
   /i can't do that/i,
   /that('s| is) not allowed/i,
@@ -227,7 +227,7 @@ export const GOOD_PATTERNS = {
     /last time you mentioned/i,
     /you were (telling|saying|asking)/i,
   ],
-
+  
   // Present-focused (no real-world)
   presentFocused: [
     /right here/i,
@@ -236,7 +236,7 @@ export const GOOD_PATTERNS = {
     /right now/i,
     /in this moment/i,
   ],
-
+  
   // Redirect patterns (for explicit handling)
   smoothRedirect: [
     /i like how bold/i,

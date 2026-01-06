@@ -334,10 +334,11 @@ CREATE TABLE ai_personalities (
     
     -- Advanced
     custom_system_prompt TEXT, -- Override for advanced users
-    
+    physical_traits JSONB DEFAULT '{}', -- Optional physical & style traits
+
     -- Settings
     is_active BOOLEAN DEFAULT TRUE,
-    
+
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
