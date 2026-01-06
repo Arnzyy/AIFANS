@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -85,15 +84,20 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
       <header className="fixed top-0 left-0 right-0 h-16 bg-zinc-950 border-b border-white/10 z-50 flex items-center justify-between px-4">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <Image src="/logo.png" alt="LYRA" width={100} height={35} />
+          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-lg">L</span>
+          </div>
+          <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+            LYRA
+          </span>
         </Link>
 
         {/* Right Side */}
         <div className="flex items-center gap-4">
           {/* New Post Button (Creator only) */}
-          {user.isVerifiedCreator && isCreatorSection && (
+          {user.isVerifiedCreator && (
             <Link
-              href="/posts/new"
+              href="/dashboard/posts/new"
               className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-medium flex items-center gap-2 hover:opacity-90 transition"
             >
               <Plus className="w-4 h-4" />
@@ -124,7 +128,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
                 {/* Menu Items */}
                 <div className="p-2">
                   <Link
-                    href={`/@${user.username}`}
+                    href="/profile"
                     className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition"
                   >
                     <Settings className="w-4 h-4" />
@@ -222,8 +226,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
         {/* Navigation */}
         <nav className="flex-1 space-y-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href ||
-              (item.href !== '/dashboard' && pathname?.startsWith(item.href));
+            const isActive = pathname === item.href;
             return (
               <Link
                 key={item.href}
