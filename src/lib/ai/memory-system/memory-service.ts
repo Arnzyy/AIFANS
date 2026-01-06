@@ -194,6 +194,13 @@ export async function buildChatContext(
   creatorId: string,
   maxRecentMessages: number = 30
 ): Promise<ConversationContext> {
+  // Get user profile for fallback name
+  const { data: userProfile } = await supabase
+    .from('profiles')
+    .select('display_name, username')
+    .eq('id', subscriberId)
+    .single();
+
   // Get user memory
   const { data: memory } = await supabase
     .from('user_memory')
@@ -201,6 +208,22 @@ export async function buildChatContext(
     .eq('subscriber_id', subscriberId)
     .eq('creator_id', creatorId)
     .single();
+
+  // If memory exists but no preferred_name, use profile name as fallback
+  let enrichedMemory = memory as UserMemory | null;
+  if (enrichedMemory && !enrichedMemory.preferred_name && userProfile) {
+    enrichedMemory.preferred_name = userProfile.display_name || userProfile.username || undefined;
+  } else if (!enrichedMemory && userProfile) {
+    // No memory yet, create minimal memory with user's name
+    enrichedMemory = {
+      preferred_name: userProfile.display_name || userProfile.username || undefined,
+      interests: [],
+      preferences: {},
+      running_jokes: [],
+      neutral_topics: [],
+      message_count: 0,
+    };
+  }
 
   // Get conversation summary
   const { data: summaryData } = await supabase
@@ -251,7 +274,7 @@ export async function buildChatContext(
   }
 
   return {
-    memory: memory as UserMemory | null,
+    memory: enrichedMemory,
     summary: summaryData?.summary || null,
     recent_messages: recentMessages,
   };
