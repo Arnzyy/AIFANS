@@ -113,7 +113,7 @@ export async function generateChatResponse(
   }
 
   // 9. Save AI response
-  await supabase.from('chat_messages').insert({
+  await (supabase as any).from('chat_messages').insert({
     conversation_id: conversationId,
     creator_id: creatorId,
     subscriber_id: subscriberId,
@@ -122,7 +122,7 @@ export async function generateChatResponse(
   });
 
   // 10. Update conversation timestamp
-  await supabase
+  await (supabase as any)
     .from('conversations')
     .update({ last_message_at: new Date().toISOString() })
     .eq('id', conversationId);
