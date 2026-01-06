@@ -193,7 +193,7 @@ export const FORBIDDEN_PATTERNS = [
   // Explicit content
   /inside (you|me)/i,
   /fuck(ing|ed)? (you|me)/i,
-  /riding (you|me)/i,
+  /rid(e|ing) (you|me)/i,
   /pound(ing|ed)?/i,
   /thrust(ing|ed)?/i,
   /penetrat/i,

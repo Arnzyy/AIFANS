@@ -10,6 +10,11 @@ import {
   updateMemory,
   ConversationContext
 } from './memory-system/memory-service';
+import {
+  detectContentReference,
+  findMatchingContent,
+  buildContentContext,
+} from './content-awareness/content-service';
 import { buildPersonalityPrompt } from './personality/prompt-builder';
 import { AIPersonalityFull } from './personality/types';
 
@@ -37,6 +42,7 @@ export interface ChatResponse {
   conversationId: string;
   passed_compliance: boolean;
   compliance_issues?: string[];
+  referenced_content?: string[]; // IDs of content user referenced
 }
 
 // ===========================================
@@ -53,7 +59,19 @@ export async function generateChatResponse(
   // 1. Build context from memory
   const context = await buildChatContext(supabase, subscriberId, creatorId);
 
-  // 2. Get or create conversation
+  // 2. Check if user is referencing content
+  let contentContext = '';
+  let referencedContentIds: string[] = [];
+
+  if (detectContentReference(message)) {
+    const matches = await findMatchingContent(supabase, creatorId, message);
+    if (matches.length > 0) {
+      contentContext = buildContentContext(matches);
+      referencedContentIds = matches.map((m) => m.content.id);
+    }
+  }
+
+  // 3. Get or create conversation
   let conversationId = request.conversationId;
   if (!conversationId) {
     const { data: existing } = await supabase
@@ -80,7 +98,7 @@ export async function generateChatResponse(
     }
   }
 
-  // 3. Save user message
+  // 4. Save user message
   await supabase.from('chat_messages').insert({
     conversation_id: conversationId,
     sender_id: subscriberId,
@@ -89,28 +107,28 @@ export async function generateChatResponse(
     is_ai_generated: false,
   });
 
-  // 4. Build full system prompt
-  const systemPrompt = buildFullSystemPrompt(personality, context);
+  // 5. Build full system prompt (with content context if user referenced images)
+  const systemPrompt = buildFullSystemPrompt(personality, context, contentContext);
 
-  // 5. Build messages array (recent history + new message)
+  // 6. Build messages array (recent history + new message)
   const messages: ChatMessage[] = [
     ...context.recent_messages.slice(-20),
     { role: 'user', content: message },
   ];
 
-  // 6. Generate AI response
+  // 7. Generate AI response
   let aiResponse = await callAnthropicAPI(systemPrompt, messages);
 
-  // 7. Compliance check
+  // 8. Compliance check
   const complianceResult = checkCompliance(aiResponse);
 
-  // 8. If failed compliance, regenerate with stricter prompt
+  // 9. If failed compliance, regenerate with stricter prompt
   if (!complianceResult.passed) {
     console.warn('Compliance issues detected:', complianceResult.issues);
     aiResponse = await regenerateCompliant(systemPrompt, messages, complianceResult.issues);
   }
 
-  // 9. Save AI response
+  // 10. Save AI response
   await supabase.from('chat_messages').insert({
     conversation_id: conversationId,
     sender_id: creatorId,
@@ -119,13 +137,13 @@ export async function generateChatResponse(
     is_ai_generated: true,
   });
 
-  // 10. Update conversation timestamp
+  // 11. Update conversation timestamp
   await supabase
     .from('conversations')
     .update({ last_message_at: new Date().toISOString() })
     .eq('id', conversationId);
 
-  // 11. Trigger background memory update (non-blocking)
+  // 12. Trigger background memory update (non-blocking)
   updateMemoryInBackground(supabase, subscriberId, creatorId, [
     ...messages,
     { role: 'assistant', content: aiResponse },
@@ -136,6 +154,7 @@ export async function generateChatResponse(
     conversationId: conversationId!,
     passed_compliance: complianceResult.passed,
     compliance_issues: complianceResult.issues,
+    referenced_content: referencedContentIds.length > 0 ? referencedContentIds : undefined,
   };
 }
 
@@ -145,7 +164,8 @@ export async function generateChatResponse(
 
 function buildFullSystemPrompt(
   personality: AIPersonalityFull,
-  context: ConversationContext
+  context: ConversationContext,
+  contentContext: string = ''
 ): string {
   // 1. Start with non-negotiable master prompt
   let prompt = MASTER_SYSTEM_PROMPT;
@@ -157,6 +177,11 @@ function buildFullSystemPrompt(
   const memoryContext = formatMemoryForPrompt(context);
   if (memoryContext) {
     prompt += '\n' + memoryContext;
+  }
+
+  // 4. Add content context (if user referenced images)
+  if (contentContext) {
+    prompt += '\n' + contentContext;
   }
 
   return prompt;
