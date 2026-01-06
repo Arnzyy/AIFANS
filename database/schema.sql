@@ -109,10 +109,11 @@ CREATE TABLE creator_profiles (
     instagram_url TEXT,
     
     -- Settings
+    is_verified BOOLEAN DEFAULT FALSE, -- Creator verification status (controls dashboard access)
     is_accepting_messages BOOLEAN DEFAULT TRUE,
     message_price DECIMAL(10,2) DEFAULT 0, -- Price per message (0 = free)
     minimum_tip DECIMAL(10,2) DEFAULT 5.00,
-    
+
     -- AI Chat settings
     ai_chat_enabled BOOLEAN DEFAULT FALSE,
     ai_personality_id UUID, -- References ai_personalities
