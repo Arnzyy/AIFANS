@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     // Generate response using the new compliant chat service
     const result = await generateChatResponse(
-      supabase,
+      supabase as any,
       {
         subscriberId: user.id,
         creatorId,
