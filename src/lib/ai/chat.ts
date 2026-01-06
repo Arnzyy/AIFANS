@@ -202,10 +202,15 @@ REMEMBER:
 // MAIN GENERATE FUNCTION
 // ===========================================
 
+export interface UserContext {
+  name?: string;
+  memoryContext?: string; // Formatted memory context from memory service
+}
+
 export async function generateAIResponse(
   personality: AIPersonality,
   conversationHistory: { role: 'user' | 'assistant'; content: string }[],
-  userContext?: { name?: string }
+  userContext?: UserContext
 ): Promise<string> {
   // Build the system prompt
   let systemPrompt = buildSystemPrompt(personality);
@@ -213,6 +218,11 @@ export async function generateAIResponse(
   // Add user context if known
   if (userContext?.name) {
     systemPrompt += `\n\nThe user's name is ${userContext.name}. Use their name occasionally to be personal.`;
+  }
+
+  // Add memory context if available
+  if (userContext?.memoryContext) {
+    systemPrompt += userContext.memoryContext;
   }
 
   // Limit conversation history to last 20 messages for context window

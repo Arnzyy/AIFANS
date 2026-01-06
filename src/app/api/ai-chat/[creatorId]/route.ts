@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAIResponse, AIPersonality } from '@/lib/ai/chat';
+import { buildChatContext, formatMemoryForPrompt, updateMemory } from '@/lib/ai/memory-system/memory-service';
 
 // GET /api/ai-chat/[creatorId] - Get AI chat session
 export async function GET(
@@ -119,6 +120,16 @@ export async function POST(
     .eq('id', user.id)
     .single();
 
+  // Build memory context for personalization
+  let memoryContext = '';
+  try {
+    const context = await buildChatContext(supabase, user.id, params.creatorId);
+    memoryContext = formatMemoryForPrompt(context);
+  } catch (err) {
+    console.log('Memory context unavailable:', err);
+    // Continue without memory - tables may not exist yet
+  }
+
   // Save user message
   await supabase.from('ai_chat_messages').insert({
     session_id: session.id,
@@ -148,6 +159,7 @@ export async function POST(
       conversationHistory,
       {
         name: userProfile?.display_name || userProfile?.username || 'User',
+        memoryContext,
       }
     );
   } catch (err) {
@@ -174,6 +186,17 @@ export async function POST(
       last_message_at: new Date().toISOString(),
     })
     .eq('id', session.id);
+
+  // Update memory in background (non-blocking)
+  // Extract facts from conversation and update user memory
+  const messagesForMemory = [
+    ...conversationHistory,
+    { role: 'assistant' as const, content: aiResponse }
+  ];
+
+  updateMemory(supabase, user.id, params.creatorId, messagesForMemory).catch(err => {
+    console.log('Memory update failed (non-critical):', err);
+  });
 
   // ============================================
   // MOCK PAYMENT - In production:
