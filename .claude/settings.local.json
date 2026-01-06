@@ -13,7 +13,8 @@
       "Bash(npm run build:*)",
       "Bash(while read f)",
       "Bash(do cp \"$f\" \"c:\\\\Users\\\\Billy\\\\Documents\\\\GitHub\\\\AIFANS\\\\src\\\\components\\\\tokens$f\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(ls:*)"
     ]
   }
 }
