@@ -7,6 +7,7 @@ import { AgeGate } from '@/components/shared/AgeGate';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://www.joinlyra.com'),
   title: 'LYRA - AI Model Subscription Platform',
   description: 'Subscribe to your favorite AI influencers and models',
   icons: {
