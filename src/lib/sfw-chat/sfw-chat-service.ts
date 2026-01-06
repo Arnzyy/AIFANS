@@ -236,4 +236,4 @@ export function calculateSFWMessageCost(
 // EXPORTS
 // ===========================================
 
-export { SFWChatMessage, SFWChatRequest, SFWChatResponse };
+export type { SFWChatMessage, SFWChatRequest, SFWChatResponse };
