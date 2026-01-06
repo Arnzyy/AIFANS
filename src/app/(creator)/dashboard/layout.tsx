@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
 const navItems = [
@@ -25,8 +26,8 @@ export default function DashboardLayout({
       {/* Top navbar */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
         <div className="flex items-center justify-between px-4 h-16">
-          <Link href="/" className="text-xl font-bold gradient-text">
-            LYRA
+          <Link href="/">
+            <Image src="/logo.png" alt="LYRA" width={100} height={35} />
           </Link>
           
           <div className="flex items-center gap-4">
