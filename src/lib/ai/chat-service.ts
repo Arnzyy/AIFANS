@@ -71,7 +71,7 @@ export async function generateChatResponse(
   // 3. Get or create conversation
   let conversationId = request.conversationId;
   if (!conversationId) {
-    const { data: conv } = await supabase
+    const { data: conv } = await (supabase as any)
       .from('conversations')
       .upsert({
         subscriber_id: subscriberId,
@@ -84,7 +84,7 @@ export async function generateChatResponse(
   }
 
   // 4. Save user message
-  await supabase.from('chat_messages').insert({
+  await (supabase as any).from('chat_messages').insert({
     conversation_id: conversationId,
     creator_id: creatorId,
     subscriber_id: subscriberId,
