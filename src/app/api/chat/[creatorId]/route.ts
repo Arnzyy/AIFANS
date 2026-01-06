@@ -63,7 +63,7 @@ export async function POST(
 
     // Generate response
     const result = await generateChatResponse(
-      supabase,
+      supabase as any,
       {
         subscriberId: user.id,
         creatorId: creatorId,
