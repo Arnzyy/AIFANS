@@ -2,7 +2,7 @@ import { createServerClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
-export default async function CreatorDashboardLayout({
+export default async function FanLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -28,16 +28,11 @@ export default async function CreatorDashboardLayout({
     .eq('user_id', user.id)
     .single();
 
-  // If not a creator, redirect to browse
-  if (!creatorProfile) {
-    redirect('/browse');
-  }
-
   const dashboardUser = {
     id: user.id,
     name: profile?.display_name || profile?.username || 'User',
     username: profile?.username || user.id.substring(0, 8),
-    isCreator: true,
+    isCreator: !!creatorProfile,
     isVerifiedCreator: creatorProfile?.is_verified || false,
   };
 

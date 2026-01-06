@@ -57,6 +57,16 @@ export default function HomePage() {
               <PreviewCard image="/preview/4.png" username="mia_fresh" />
               <PreviewCard image="/preview/5.png" username="nova_night" />
             </div>
+
+            {/* Explore Link */}
+            <div className="mt-6 text-center">
+              <Link
+                href="/feed"
+                className="inline-block px-8 py-2.5 border border-purple-500 text-purple-400 rounded-lg font-semibold hover:bg-purple-500/10 transition-colors"
+              >
+                Explore lyra
+              </Link>
+            </div>
           </div>
         </div>
 

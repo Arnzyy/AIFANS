@@ -180,7 +180,7 @@ export function AIPersonalityWizard({
         </div>
 
         {/* Step Content */}
-        <div className="bg-zinc-900/50 border border-white/10 rounded-2xl p-6">
+        <div className="bg-zinc-900 border border-white/10 rounded-xl p-6">
           {renderStep()}
         </div>
 
@@ -218,6 +218,13 @@ export function AIPersonalityWizard({
               {isSaving ? 'Saving...' : 'Save & Activate'}
             </button>
           )}
+        </div>
+
+        {/* Subtle disclaimer */}
+        <div className="mt-6 pt-4 border-t border-white/10 text-center">
+          <p className="text-xs text-gray-500">
+            Your AI follows platform guidelines and won't engage in prohibited content. She's designed for entertainment and connection.
+          </p>
         </div>
       </div>
     </div>

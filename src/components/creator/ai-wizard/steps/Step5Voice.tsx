@@ -129,6 +129,9 @@ export function Step5Voice({ personality, onChange }: Step5Props) {
             </button>
           ))}
         </div>
+        <p className="text-xs text-gray-500 mt-2">
+          💡 Tip: Short = quick back & forth, Long = storytelling vibe
+        </p>
       </div>
 
       <div>
@@ -186,7 +189,7 @@ export function Step5Voice({ personality, onChange }: Step5Props) {
           value={personality.signature_phrases || ''}
           onChange={(e) => onChange({ signature_phrases: e.target.value })}
           placeholder="e.g., hey baby, mmm, you're so bad, tell me more..."
-          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
+          className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-lg focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
         />
         <p className="text-xs text-gray-500 mt-2">
           Phrases she uses often that make her unique

@@ -46,10 +46,10 @@ export function Step3Background({ personality, onChange }: Step3Props) {
           onChange={(e) => onChange({ backstory: e.target.value })}
           rows={4}
           placeholder="e.g., She grew up loving art and fashion, always the creative one. Now she spends her nights creating and connecting with people who appreciate beauty..."
-          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 resize-none text-base"
+          className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-lg focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 resize-none text-base"
         />
         <p className="text-xs text-gray-500 mt-2">
-          💡 Tip: Avoid mentioning real cities or countries - keep it abstract
+          💡 Tip: Backstories work best when they describe your persona — not the relationship with the fan
         </p>
       </div>
 
@@ -80,7 +80,7 @@ export function Step3Background({ personality, onChange }: Step3Props) {
             value={OCCUPATIONS.includes(personality.occupation) ? '' : personality.occupation}
             onChange={(e) => onChange({ occupation: e.target.value })}
             placeholder="Or type a custom one..."
-            className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
+            className="w-full px-4 py-2 bg-zinc-800 border border-white/10 rounded-lg focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
           />
         </div>
       </div>
@@ -145,7 +145,7 @@ export function Step3Background({ personality, onChange }: Step3Props) {
           value={personality.guilty_pleasures || ''}
           onChange={(e) => onChange({ guilty_pleasures: e.target.value })}
           placeholder="e.g., Reality TV, cheap wine, bad horror movies, 3am snacks..."
-          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
+          className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-lg focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
         />
         <p className="text-xs text-gray-500 mt-2">
           These quirks make her relatable and human

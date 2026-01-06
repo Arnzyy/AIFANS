@@ -149,7 +149,7 @@ export function Step6Behavior({ personality, onChange }: Step6Props) {
           value={personality.pet_peeves || ''}
           onChange={(e) => onChange({ pet_peeves: e.target.value })}
           placeholder="e.g., One word replies, being ignored, rudeness..."
-          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
+          className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-lg focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
         />
         <p className="text-xs text-gray-500 mt-2">
           Things that annoy her or make her lose interest

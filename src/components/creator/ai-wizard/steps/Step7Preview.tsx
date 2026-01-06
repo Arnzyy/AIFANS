@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AIPersonalityFull, WIZARD_STEPS } from '@/lib/ai/personality/types';
+import { AIPersonalityFull } from '@/lib/ai/personality/types';
 import {
   BODY_TYPES,
   PERSONALITY_TRAITS,
@@ -69,7 +69,7 @@ export function Step7Preview({ personality, onEdit }: Step7Props) {
 
   // Summary sections
   const getSummarySection = (title: string, items: string[], step: number) => (
-    <div className="bg-white/5 rounded-xl p-4">
+    <div className="bg-zinc-900 rounded-xl p-4">
       <div className="flex items-center justify-between mb-2">
         <h4 className="font-medium text-white">{title}</h4>
         <button
@@ -95,7 +95,7 @@ export function Step7Preview({ personality, onEdit }: Step7Props) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Identity */}
-          <div className="bg-white/5 rounded-xl p-4">
+          <div className="bg-zinc-900 rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-white">Identity</h4>
               <button onClick={() => onEdit(1)} className="text-xs text-purple-400 hover:text-purple-300">
@@ -120,7 +120,7 @@ export function Step7Preview({ personality, onEdit }: Step7Props) {
           )}
 
           {/* Background */}
-          <div className="bg-white/5 rounded-xl p-4">
+          <div className="bg-zinc-900 rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-white">Background</h4>
               <button onClick={() => onEdit(3)} className="text-xs text-purple-400 hover:text-purple-300">
@@ -135,7 +135,7 @@ export function Step7Preview({ personality, onEdit }: Step7Props) {
           </div>
 
           {/* Romantic Style */}
-          <div className="bg-white/5 rounded-xl p-4">
+          <div className="bg-zinc-900 rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-white">Romantic Style</h4>
               <button onClick={() => onEdit(4)} className="text-xs text-purple-400 hover:text-purple-300">
@@ -152,7 +152,7 @@ export function Step7Preview({ personality, onEdit }: Step7Props) {
           </div>
 
           {/* Voice */}
-          <div className="bg-white/5 rounded-xl p-4">
+          <div className="bg-zinc-900 rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-white">Voice & Speech</h4>
               <button onClick={() => onEdit(5)} className="text-xs text-purple-400 hover:text-purple-300">
@@ -167,7 +167,7 @@ export function Step7Preview({ personality, onEdit }: Step7Props) {
           </div>
 
           {/* Behavior */}
-          <div className="bg-white/5 rounded-xl p-4">
+          <div className="bg-zinc-900 rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-white">Behavior</h4>
               <button onClick={() => onEdit(6)} className="text-xs text-purple-400 hover:text-purple-300">
@@ -252,9 +252,9 @@ export function Step7Preview({ personality, onEdit }: Step7Props) {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && sendTestMessage()}
+                onKeyDown={(e) => e.key === 'Enter' && sendTestMessage()}
                 placeholder="Type a test message..."
-                className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-full focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
+                className="flex-1 px-4 py-2 bg-zinc-800 border border-white/10 rounded-full focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
               />
               <button
                 onClick={sendTestMessage}

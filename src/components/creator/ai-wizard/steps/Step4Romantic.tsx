@@ -209,11 +209,14 @@ export function Step4Romantic({ personality, onChange }: Step4Props) {
 
       {/* Turn Ons (Compliant) */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          What Gets Her Going 🔥
+        <label className="block text-sm font-medium text-gray-300 mb-1">
+          Likes
         </label>
+        <p className="text-xs text-gray-400 mb-3">
+          Fantasy Modes — Choose the styles of roleplay your AI is allowed to explore
+        </p>
         <p className="text-xs text-gray-500 mb-3">
-          Pick up to 5 vibes. Selected: {personality.turn_ons.length}/5
+          Pick up to 5. Selected: {personality.turn_ons.length}/5
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {TURN_ONS.map((turnOn) => (

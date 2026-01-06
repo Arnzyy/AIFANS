@@ -38,7 +38,7 @@ export function Step1Identity({ personality, onChange }: Step1Props) {
             value={personality.persona_name}
             onChange={(e) => onChange({ persona_name: e.target.value })}
             placeholder="e.g., Luna, Sofia, Aria..."
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
+            className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-lg focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
           />
         </div>
 
@@ -52,7 +52,7 @@ export function Step1Identity({ personality, onChange }: Step1Props) {
             max={50}
             value={personality.age}
             onChange={(e) => onChange({ age: parseInt(e.target.value) || 18 })}
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500 text-white text-base"
+            className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-lg focus:outline-none focus:border-purple-500 text-white text-base"
           />
           <p className="text-xs text-gray-500 mt-1">Must be 18+</p>
         </div>
@@ -109,7 +109,7 @@ export function Step1Identity({ personality, onChange }: Step1Props) {
           <select
             value={personality.hair_color}
             onChange={(e) => onChange({ hair_color: e.target.value })}
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500 text-white text-base"
+            className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-lg focus:outline-none focus:border-purple-500 text-white text-base"
           >
             {HAIR_COLORS.map((color) => (
               <option key={color} value={color} className="bg-zinc-900 text-white">
@@ -126,7 +126,7 @@ export function Step1Identity({ personality, onChange }: Step1Props) {
           <select
             value={personality.hair_style}
             onChange={(e) => onChange({ hair_style: e.target.value })}
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500 text-white text-base"
+            className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-lg focus:outline-none focus:border-purple-500 text-white text-base"
           >
             {HAIR_STYLES.map((style) => (
               <option key={style} value={style} className="bg-zinc-900 text-white">
@@ -220,7 +220,7 @@ export function Step1Identity({ personality, onChange }: Step1Props) {
           value={personality.distinguishing_features || ''}
           onChange={(e) => onChange({ distinguishing_features: e.target.value })}
           placeholder="e.g., Small tattoo on wrist, nose piercing, beauty mark..."
-          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
+          className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-lg focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
         />
       </div>
     </div>
