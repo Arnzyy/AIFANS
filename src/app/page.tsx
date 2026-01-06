@@ -61,7 +61,7 @@ export default function HomePage() {
             {/* Explore Link */}
             <div className="mt-6 text-center">
               <Link
-                href="/feed"
+                href="/explore"
                 className="inline-block px-8 py-2.5 border border-purple-500 text-purple-400 rounded-lg font-semibold hover:bg-purple-500/10 transition-colors"
               >
                 Explore lyra
