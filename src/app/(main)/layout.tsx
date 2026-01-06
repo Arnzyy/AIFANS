@@ -20,6 +20,13 @@ export default function MainLayout({
 }) {
   const pathname = usePathname();
 
+  // Chat pages have their own full-screen layout
+  const isChatPage = pathname.startsWith('/chat/');
+
+  if (isChatPage) {
+    return <div className="min-h-screen bg-black">{children}</div>;
+  }
+
   return (
     <div className="min-h-screen bg-black">
       {/* Top navbar */}
