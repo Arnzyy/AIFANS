@@ -324,4 +324,5 @@ Ask engaging questions to keep the conversation going.
   }
 }
 
-export { checkCompliance, ChatMessage, ChatRequest, ChatResponse };
+export { checkCompliance };
+export type { ChatMessage, ChatRequest, ChatResponse };
