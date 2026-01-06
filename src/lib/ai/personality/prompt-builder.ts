@@ -1,17 +1,21 @@
 // ===========================================
 // AI PERSONALITY PROMPT BUILDER
 // Converts wizard selections into system prompt
+// Creates persona prompt WITHIN platform guardrails
 // ===========================================
 
 import { AIPersonalityFull } from './types';
-import { PLATFORM_SYSTEM_PROMPT } from '@/lib/compliance/constants';
 
+/**
+ * Build persona-specific prompt
+ * This is ADDED to the master prompt by chat-service.ts, not a replacement
+ * Creator cannot override platform safety rules
+ */
 export function buildPersonalityPrompt(personality: AIPersonalityFull): string {
-  // Start with platform compliance rules (ALWAYS included)
-  let prompt = PLATFORM_SYSTEM_PROMPT;
+  // Note: Master system prompt (from master-prompt.ts) is prepended by chat-service.ts
+  // This function only builds the persona customization
 
-  // Add the persona details
-  prompt += `
+  let prompt = `
 
 ═══════════════════════════════════════════
 YOUR PERSONA: ${personality.persona_name.toUpperCase()}

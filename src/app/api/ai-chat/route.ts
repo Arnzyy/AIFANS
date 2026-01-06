@@ -1,23 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
-import { buildSystemPrompt, createChatCompletion, buildConversationHistory, extractUserInfo, AIPersonality } from '@/lib/ai/chat'
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@/lib/supabase/server';
+import { generateChatResponse, checkCompliance } from '@/lib/ai/chat-service';
+import { AIPersonalityFull } from '@/lib/ai/personality/types';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createServerClient();
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { creatorId, message, conversationId } = await request.json()
+    const { creatorId, message, conversationId } = await request.json();
 
     if (!creatorId || !message) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
-      )
+      );
     }
 
     // Fetch the creator's AI personality
@@ -26,176 +27,109 @@ export async function POST(request: NextRequest) {
       .select('*')
       .eq('creator_id', creatorId)
       .eq('is_active', true)
-      .single()
+      .single();
 
     if (personalityError || !personality) {
       return NextResponse.json(
         { error: 'AI chat not available for this creator' },
         { status: 404 }
-      )
+      );
     }
 
-    // Check if user has access (subscription or pay-per-message)
-    const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select('id')
-      .eq('subscriber_id', user.id)
-      .eq('creator_id', creatorId)
-      .eq('status', 'active')
-      .single()
+    // Check if user has access (subscription check - optional)
+    // For now, allow access if personality exists and is active
 
-    const hasAccess = !!subscription || personality.pricing_model === 'included'
-
-    // For pay-per-message, check wallet balance
-    if (personality.pricing_model === 'per_message' && !subscription) {
-      const { data: wallet } = await supabase
-        .from('wallets')
-        .select('balance')
-        .eq('user_id', user.id)
-        .single()
-
-      if (!wallet || wallet.balance < personality.price_per_message) {
-        return NextResponse.json(
-          { error: 'Insufficient balance', required: personality.price_per_message },
-          { status: 402 }
-        )
-      }
-
-      // Deduct from wallet
-      await supabase.rpc('deduct_wallet_balance', {
-        p_user_id: user.id,
-        p_amount: personality.price_per_message
-      })
-
-      // Record transaction
-      await supabase.from('transactions').insert({
-        user_id: user.id,
-        creator_id: creatorId,
-        type: 'ai_chat',
-        amount: personality.price_per_message,
-        status: 'completed'
-      })
-    }
-
-    // Get or create conversation
-    let convId = conversationId
-    if (!convId) {
-      const { data: existingConv } = await supabase
-        .from('conversations')
-        .select('id')
-        .or(`participant1_id.eq.${user.id},participant2_id.eq.${user.id}`)
-        .or(`participant1_id.eq.${creatorId},participant2_id.eq.${creatorId}`)
-        .single()
-
-      if (existingConv) {
-        convId = existingConv.id
-      } else {
-        const { data: newConv } = await supabase
-          .from('conversations')
-          .insert({
-            participant1_id: user.id,
-            participant2_id: creatorId,
-            is_ai_enabled: true
-          })
-          .select('id')
-          .single()
-        convId = newConv?.id
-      }
-    }
-
-    // Fetch recent messages for context
-    const { data: recentMessages } = await supabase
-      .from('messages')
-      .select('content, sender_id, created_at')
-      .eq('conversation_id', convId)
-      .order('created_at', { ascending: false })
-      .limit(20)
-
-    // Build conversation history
-    const messageHistory = (recentMessages || [])
-      .reverse()
-      .map(m => ({
-        role: m.sender_id === user.id ? 'user' as const : 'assistant' as const,
-        content: m.content
-      }))
-
-    // Fetch or create memory context
-    const { data: memory } = await supabase
-      .from('ai_chat_memory')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('creator_id', creatorId)
-      .single()
-
-    const memoryContext = memory?.context || {}
-
-    // Extract user info from the new message
-    const extractedInfo = extractUserInfo(message)
-    const updatedMemory = { ...memoryContext, ...extractedInfo }
-
-    // Build the system prompt
-    const systemPrompt = buildSystemPrompt(personality as AIPersonality)
-
-    // Build the full conversation
-    const messages = buildConversationHistory(
-      systemPrompt,
-      [...messageHistory, { role: 'user', content: message }],
+    // Generate response using the new compliant chat service
+    const result = await generateChatResponse(
+      supabase,
       {
-        userName: updatedMemory.name,
-        userDetails: updatedMemory,
-      }
-    )
+        subscriberId: user.id,
+        creatorId,
+        message,
+        conversationId,
+      },
+      personality as AIPersonalityFull
+    );
 
-    // Save user's message
-    await supabase.from('messages').insert({
-      conversation_id: convId,
-      sender_id: user.id,
-      receiver_id: creatorId,
-      content: message,
-      is_ai_generated: false
-    })
-
-    // Generate AI response
-    const aiResponse = await createChatCompletion({
-      messages,
-      temperature: 0.9,
-      maxTokens: 500
-    })
-
-    // Save AI response
-    await supabase.from('messages').insert({
-      conversation_id: convId,
-      sender_id: creatorId,
-      receiver_id: user.id,
-      content: aiResponse,
-      is_ai_generated: true
-    })
-
-    // Update conversation timestamp
-    await supabase
-      .from('conversations')
-      .update({ last_message_at: new Date().toISOString() })
-      .eq('id', convId)
-
-    // Update memory
-    if (extractedInfo && Object.keys(extractedInfo).length > 0) {
-      await supabase.from('ai_chat_memory').upsert({
-        user_id: user.id,
-        creator_id: creatorId,
-        context: updatedMemory
-      }, { onConflict: 'user_id,creator_id' })
+    // Log compliance issues if any (for monitoring)
+    if (!result.passed_compliance && result.compliance_issues) {
+      console.warn(`Compliance issues for creator ${creatorId}:`, result.compliance_issues);
     }
 
     return NextResponse.json({
-      response: aiResponse,
-      conversationId: convId
-    })
+      response: result.response,
+      conversationId: result.conversationId,
+    });
 
   } catch (error: any) {
-    console.error('AI Chat error:', error)
+    console.error('AI Chat error:', error);
     return NextResponse.json(
       { error: error.message || 'AI chat failed' },
       { status: 500 }
-    )
+    );
+  }
+}
+
+// GET - Retrieve chat history
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = await createServerClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const creatorId = searchParams.get('creatorId');
+
+    if (!creatorId) {
+      return NextResponse.json({ error: 'Missing creatorId' }, { status: 400 });
+    }
+
+    // Get conversation
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('id')
+      .or(
+        `and(participant1_id.eq.${user.id},participant2_id.eq.${creatorId}),` +
+        `and(participant1_id.eq.${creatorId},participant2_id.eq.${user.id})`
+      )
+      .single();
+
+    if (!conversation) {
+      return NextResponse.json({ messages: [] });
+    }
+
+    // Get messages - try chat_messages first, fall back to messages
+    let { data: messages } = await supabase
+      .from('chat_messages')
+      .select('id, sender_id, content, created_at, is_ai_generated')
+      .eq('conversation_id', conversation.id)
+      .order('created_at', { ascending: true })
+      .limit(50);
+
+    // If no chat_messages, try the messages table
+    if (!messages || messages.length === 0) {
+      const { data: oldMessages } = await supabase
+        .from('messages')
+        .select('id, sender_id, content, created_at, is_ai_generated')
+        .eq('conversation_id', conversation.id)
+        .order('created_at', { ascending: true })
+        .limit(50);
+      messages = oldMessages;
+    }
+
+    return NextResponse.json({
+      messages: messages || [],
+      conversationId: conversation.id,
+    });
+
+  } catch (error: any) {
+    console.error('Get chat error:', error);
+    return NextResponse.json(
+      { error: 'Failed to get chat history' },
+      { status: 500 }
+    );
   }
 }

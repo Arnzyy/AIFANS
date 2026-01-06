@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { generateAIResponse, AIPersonality } from '@/lib/ai/chat';
+import { generateMockResponse, ChatMessage } from '@/lib/ai/chat-service';
 import { getCreatorByUsername } from '@/lib/data/creators';
 
 export async function POST(request: NextRequest) {
@@ -30,41 +30,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user profile for personalization
-    const { data: userProfile } = await supabase
-      .from('profiles')
-      .select('username, display_name')
-      .eq('id', user.id)
-      .single();
-
-    // Build a mock personality from creator data
-    const personality: AIPersonality = {
-      name: mockCreator.displayName,
-      backstory: mockCreator.bio,
-      location: mockCreator.location,
-      personality_traits: mockCreator.tags,
-      interests: mockCreator.tags,
-      speaking_style: 'flirty, engaging, and warm',
-      emoji_usage: 'moderate',
-      response_length: 'medium',
-    };
-
     // Format conversation history
-    const history = (conversationHistory || []).map((m: { role: string; content: string }) => ({
+    const history: ChatMessage[] = (conversationHistory || []).map((m: { role: string; content: string }) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
     }));
 
-    // Add the new message to history
-    history.push({ role: 'user' as const, content: message });
-
-    // Generate AI response
-    const response = await generateAIResponse(
-      personality,
-      history,
-      {
-        name: userProfile?.display_name || userProfile?.username || 'User',
-      }
+    // Generate compliant AI response using the new chat service
+    const response = await generateMockResponse(
+      mockCreator.displayName,
+      message,
+      history
     );
 
     return NextResponse.json({
