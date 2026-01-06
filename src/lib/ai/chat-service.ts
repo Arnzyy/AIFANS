@@ -291,4 +291,37 @@ function getFallbackResponse(): string {
   return FALLBACK_RESPONSES[Math.floor(Math.random() * FALLBACK_RESPONSES.length)];
 }
 
+// ===========================================
+// MOCK RESPONSE GENERATOR (for demo creators)
+// ===========================================
+
+export async function generateMockResponse(
+  creatorName: string,
+  message: string,
+  conversationHistory: ChatMessage[] = []
+): Promise<string> {
+  try {
+    const systemPrompt = `${MASTER_SYSTEM_PROMPT}
+
+═══════════════════════════════════════════
+YOUR PERSONA: ${creatorName.toUpperCase()}
+═══════════════════════════════════════════
+
+You are ${creatorName}, a confident, playful AI creator on LYRA.
+Keep responses SHORT (2-4 sentences), flirty but not explicit.
+Ask engaging questions to keep the conversation going.
+`;
+
+    const messages: ChatMessage[] = [
+      ...conversationHistory.slice(-10),
+      { role: 'user', content: message }
+    ];
+
+    return await callAnthropicAPI(systemPrompt, messages);
+  } catch (error) {
+    console.error('Mock response generation failed:', error);
+    return getFallbackResponse();
+  }
+}
+
 export { checkCompliance, ChatMessage, ChatRequest, ChatResponse };
