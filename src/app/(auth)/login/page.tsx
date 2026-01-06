@@ -20,7 +20,7 @@ function LoginForm() {
     setLoading(true);
     setError('');
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -31,7 +31,24 @@ function LoginForm() {
       return;
     }
 
-    router.push(redirect);
+    // Check if user is a creator
+    if (data.user) {
+      const { data: creatorProfile } = await supabase
+        .from('creator_profiles')
+        .select('id')
+        .eq('user_id', data.user.id)
+        .single();
+
+      // Redirect creators to dashboard, regular users to feed
+      if (creatorProfile) {
+        router.push('/dashboard');
+      } else {
+        router.push(redirect);
+      }
+    } else {
+      router.push(redirect);
+    }
+
     router.refresh();
   };
 
