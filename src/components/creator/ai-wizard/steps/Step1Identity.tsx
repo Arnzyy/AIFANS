@@ -112,7 +112,7 @@ export function Step1Identity({ personality, onChange }: Step1Props) {
             className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500 text-white text-base"
           >
             {HAIR_COLORS.map((color) => (
-              <option key={color} value={color} className="bg-zinc-900">
+              <option key={color} value={color} className="bg-zinc-900 text-white">
                 {color}
               </option>
             ))}
@@ -129,7 +129,7 @@ export function Step1Identity({ personality, onChange }: Step1Props) {
             className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500 text-white text-base"
           >
             {HAIR_STYLES.map((style) => (
-              <option key={style} value={style} className="bg-zinc-900">
+              <option key={style} value={style} className="bg-zinc-900 text-white">
                 {style}
               </option>
             ))}
