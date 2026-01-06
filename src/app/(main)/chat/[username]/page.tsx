@@ -274,7 +274,7 @@ export default function AIChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-black">
+    <div className="flex flex-col h-[100dvh] bg-black">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
         <div className="flex items-center gap-3 px-3 md:px-4 h-14 md:h-16">
@@ -423,7 +423,7 @@ export default function AIChatPage() {
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Type a message..."
-            className="flex-1 px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors text-sm md:text-base"
+            className="flex-1 px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors text-base"
             disabled={sending}
           />
           <button

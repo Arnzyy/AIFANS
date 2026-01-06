@@ -127,12 +127,12 @@ export default async function DashboardPage() {
         </Link>
 
         <Link
-          href="/dashboard/ai-chat"
-          className="p-6 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-colors group"
+          href="/dashboard/ai-personality"
+          className="p-6 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 hover:border-purple-500/40 transition-colors group"
         >
-          <div className="text-3xl mb-3">🤖</div>
-          <h3 className="font-semibold group-hover:text-purple-400 transition-colors">AI Chat Setup</h3>
-          <p className="text-sm text-gray-400 mt-1">Configure your AI persona</p>
+          <div className="text-3xl mb-3">🎭</div>
+          <h3 className="font-semibold group-hover:text-purple-400 transition-colors">AI Personality</h3>
+          <p className="text-sm text-gray-400 mt-1">Build your unique AI persona</p>
         </Link>
 
         <Link
@@ -197,13 +197,13 @@ export default async function DashboardPage() {
       {creatorProfile?.ai_chat_enabled ? (
         <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">🤖</span>
+            <span className="text-2xl">🎭</span>
             <div>
-              <p className="font-medium text-green-400">AI Chat is Active</p>
+              <p className="font-medium text-green-400">AI Persona Active</p>
               <p className="text-sm text-gray-400">Your AI persona is chatting with fans 24/7</p>
             </div>
-            <Link 
-              href="/dashboard/ai-chat"
+            <Link
+              href="/dashboard/ai-personality"
               className="ml-auto px-3 py-1.5 text-sm border border-green-500/30 rounded-lg hover:bg-green-500/10 transition-colors"
             >
               Manage
@@ -211,18 +211,18 @@ export default async function DashboardPage() {
           </div>
         </div>
       ) : (
-        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+        <div className="p-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">🤖</span>
+            <span className="text-2xl">🎭</span>
             <div>
-              <p className="font-medium">Enable AI Chat</p>
-              <p className="text-sm text-gray-400">Let AI chat with your fans while you sleep</p>
+              <p className="font-medium">Create AI Persona</p>
+              <p className="text-sm text-gray-400">Build a unique AI that chats with your fans 24/7</p>
             </div>
-            <Link 
-              href="/dashboard/ai-chat"
-              className="ml-auto px-3 py-1.5 text-sm bg-purple-500 rounded-lg hover:bg-purple-600 transition-colors"
+            <Link
+              href="/dashboard/ai-personality"
+              className="ml-auto px-3 py-1.5 text-sm bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg hover:opacity-90 transition-opacity"
             >
-              Set Up
+              Create
             </Link>
           </div>
         </div>
