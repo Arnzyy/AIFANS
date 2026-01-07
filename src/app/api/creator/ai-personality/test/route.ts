@@ -2,17 +2,19 @@ import { createServerClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { buildPersonalityPrompt } from '@/lib/ai/personality/prompt-builder';
 import { AIPersonalityFull } from '@/lib/ai/personality/types';
+import { MASTER_SYSTEM_PROMPT } from '@/lib/ai/master-prompt';
 
 // Mock responses for when API is unavailable
+// Note: Compliant with LYRA rules (no emotional dependency)
 const mockResponses = [
-  "Hey there! 💕 I was just thinking about you...",
+  "Hey there! 💕 What's on your mind?",
   "Mmm, that's really interesting! Tell me more? 😘",
   "You always know how to make me smile 💖",
   "I love chatting with you... what else is on your mind?",
   "That's so sweet of you to say! 🥰",
   "Ooh, I like where this is going... 😏",
   "You're such a tease! I love it 💋",
-  "I've been waiting to hear from you all day...",
+  "Well look who it is... you've got my attention 😏",
 ];
 
 function getMockResponse(userMessage: string, personality: AIPersonalityFull): string {
@@ -84,8 +86,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Personality required' }, { status: 400 });
     }
 
-    // Build the system prompt using our new prompt builder
-    const systemPrompt = buildPersonalityPrompt(personality as AIPersonalityFull);
+    // Build the system prompt using MASTER + personality
+    // This mirrors production behavior for accurate testing
+    const systemPrompt = MASTER_SYSTEM_PROMPT + '\n\n' + buildPersonalityPrompt(personality as AIPersonalityFull);
 
     // Format messages for API
     const conversationMessages = (messages || []).map((m: { role: string; content: string }) => ({
