@@ -141,16 +141,23 @@ export default function AIChatPage() {
           },
         } as Creator);
 
-        // For mock creators, set default access (no real paywall)
-        setChatAccess({
-          hasAccess: true,
-          accessType: 'subscription',
-          messagesRemaining: null,
-          canSendMessage: true,
-          requiresUnlock: false,
-          unlockOptions: [],
-          isLowMessages: false,
-        });
+        // For mock creators: logged-in users get free access, guests see paywall demo
+        if (user) {
+          // Logged-in users can chat freely with mock creators
+          setChatAccess({
+            hasAccess: true,
+            accessType: 'subscription',
+            messagesRemaining: null,
+            canSendMessage: true,
+            requiresUnlock: false,
+            unlockOptions: [],
+            isLowMessages: false,
+          });
+        } else {
+          // Guests see the access gate (demo the paywall experience)
+          setOpeningMessage(`Hey! I'm ${mockCreator.displayName}. I've been looking forward to meeting someone new... Something tells me we're going to get along really well 💕`);
+          // Guest access already set above, don't overwrite
+        }
         setLoading(false);
         return; // Skip conversation creation for mock creators
       }
