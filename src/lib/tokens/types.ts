@@ -15,7 +15,8 @@ export type TokenLedgerReason =
   | 'REFUND'
   | 'ADJUSTMENT'
   | 'PROMO_CREDIT'
-  | 'PPV_UNLOCK';
+  | 'PPV_UNLOCK'
+  | 'CHAT_SESSION';
 
 export type PurchaseStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'REFUNDED';
 

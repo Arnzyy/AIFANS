@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
@@ -8,6 +8,10 @@ import { AI_CHAT_DISCLOSURE } from '@/lib/compliance/constants';
 import { getCreatorByUsername } from '@/lib/data/creators';
 import { formatDistanceToNow } from 'date-fns';
 import { TipButton } from '@/components/tokens/TipButton';
+import { ChatAccessGate } from '@/components/chat/ChatAccessGate';
+import { PurchaseSessionModal } from '@/components/chat/PurchaseSessionModal';
+import { InlineTokenBalance } from '@/components/chat/ChatTokenBalance';
+import type { ChatAccess, UnlockOption, MessagePack } from '@/lib/chat';
 
 interface Message {
   id: string;
@@ -45,6 +49,14 @@ export default function AIChatPage() {
   const [typing, setTyping] = useState(false);
   const [showDisclosure, setShowDisclosure] = useState(true);
 
+  // Chat access state
+  const [chatAccess, setChatAccess] = useState<ChatAccess | null>(null);
+  const [tokenBalance, setTokenBalance] = useState(0);
+  const [openingMessage, setOpeningMessage] = useState<string | null>(null);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [accessLoading, setAccessLoading] = useState(false);
+
   useEffect(() => {
     loadChat();
   }, [username]);
@@ -56,10 +68,9 @@ export default function AIChatPage() {
   const loadChat = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login?redirect=/chat/' + username);
-        return;
-      }
+
+      // Allow viewing even without login (for opening message)
+      // Only redirect if trying to send messages
       setCurrentUser(user);
 
       // Try to fetch the creator from database first
@@ -78,12 +89,15 @@ export default function AIChatPage() {
         ? creatorData.creator_profiles[0]
         : creatorData?.creator_profiles;
 
+      let creatorId: string;
+
       if (creatorData && creatorProfiles?.ai_chat_enabled) {
         // Real creator from database
         setCreator({
           ...creatorData,
           creator_profiles: creatorProfiles,
         } as Creator);
+        creatorId = creatorData.id;
       } else {
         // Try mock creators
         const mockCreator = getCreatorByUsername(username.toLowerCase());
@@ -102,53 +116,51 @@ export default function AIChatPage() {
             bio: mockCreator.bio,
           },
         } as Creator);
+
+        // For mock creators, set default access (no real paywall)
+        setChatAccess({
+          hasAccess: true,
+          accessType: 'subscription',
+          messagesRemaining: null,
+          canSendMessage: true,
+          requiresUnlock: false,
+          unlockOptions: [],
+          isLowMessages: false,
+        });
         setLoading(false);
         return; // Skip conversation creation for mock creators
       }
 
-      // Find or create AI chat conversation
-      const { data: existingConv } = await supabase
-        .from('conversations')
-        .select('id')
-        .or(
-          `and(participant1_id.eq.${user.id},participant2_id.eq.${creatorData.id}),` +
-          `and(participant1_id.eq.${creatorData.id},participant2_id.eq.${user.id})`
-        )
-        .eq('is_ai_enabled', true)
-        .single();
+      // Call start chat endpoint to get opening message and access status
+      const startResponse = await fetch(`/api/chat/${creatorId}/start`);
+      const startData = await startResponse.json();
 
-      let convId: string;
-
-      if (existingConv) {
-        convId = existingConv.id;
-        setShowDisclosure(false); // Already chatted before
-      } else {
-        const { data: newConv } = await supabase
-          .from('conversations')
-          .insert({
-            participant1_id: user.id,
-            participant2_id: creatorData.id,
-            is_ai_enabled: true
-          })
-          .select('id')
-          .single();
-
-        if (!newConv) {
-          throw new Error('Failed to create conversation');
-        }
-        convId = newConv.id;
+      if (startData.openingMessage) {
+        setOpeningMessage(startData.openingMessage.content);
+      }
+      if (startData.access) {
+        setChatAccess(startData.access);
+      }
+      if (startData.tokenBalance !== undefined) {
+        setTokenBalance(startData.tokenBalance);
+      }
+      if (startData.conversationId) {
+        setConversationId(startData.conversationId);
       }
 
-      setConversationId(convId);
+      // If user is logged in, fetch existing messages
+      if (user && startData.conversationId) {
+        const { data: messagesData } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', startData.conversationId)
+          .order('created_at', { ascending: true });
 
-      // Fetch messages
-      const { data: messagesData } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', convId)
-        .order('created_at', { ascending: true });
-
-      setMessages(messagesData || []);
+        setMessages(messagesData || []);
+        if (messagesData && messagesData.length > 0) {
+          setShowDisclosure(false); // Already chatted before
+        }
+      }
 
     } catch (error) {
       console.error('Error loading chat:', error);
@@ -157,9 +169,94 @@ export default function AIChatPage() {
     }
   };
 
+  // Purchase session handler
+  const handlePurchaseSession = useCallback(async (pack: MessagePack) => {
+    if (!creator) return;
+    setAccessLoading(true);
+    setPurchaseError(null);
+
+    try {
+      const response = await fetch(`/api/chat/${creator.id}/session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: pack.messages }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to purchase session');
+      }
+
+      // Update state with new access and balance
+      if (data.access) {
+        setChatAccess(data.access);
+      }
+      if (data.new_balance !== undefined) {
+        setTokenBalance(data.new_balance);
+      }
+
+      setShowPurchaseModal(false);
+    } catch (error: any) {
+      setPurchaseError(error.message);
+    } finally {
+      setAccessLoading(false);
+    }
+  }, [creator]);
+
+  // Extend messages handler
+  const handleExtendMessages = useCallback(async (option: UnlockOption) => {
+    if (!creator || !option.messages) return;
+    setAccessLoading(true);
+
+    try {
+      const response = await fetch(`/api/chat/${creator.id}/extend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: option.messages }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to extend messages');
+      }
+
+      if (data.access) {
+        setChatAccess(data.access);
+      }
+      if (data.new_balance !== undefined) {
+        setTokenBalance(data.new_balance);
+      }
+    } catch (error: any) {
+      console.error('Extend error:', error);
+    } finally {
+      setAccessLoading(false);
+    }
+  }, [creator]);
+
+  // Subscribe handler
+  const handleSubscribe = useCallback(() => {
+    if (creator) {
+      router.push(`/${creator.username}?subscribe=true`);
+    }
+  }, [creator, router]);
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !creator || sending) return;
+
+    // Check if user is logged in
+    if (!currentUser) {
+      router.push('/login?redirect=/chat/' + username);
+      return;
+    }
+
+    // Check access
+    if (chatAccess && !chatAccess.canSendMessage) {
+      setShowPurchaseModal(true);
+      return;
+    }
 
     setShowDisclosure(false);
     setSending(true);
@@ -216,12 +313,11 @@ export default function AIChatPage() {
         };
         setMessages(prev => [...prev, aiMsg]);
       } else {
-        // Call real AI chat API for database creators
-        const response = await fetch('/api/ai-chat', {
+        // Call real AI chat API for database creators (with access control)
+        const response = await fetch(`/api/chat/${creator.id}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            creatorId: creator.id,
             message: messageContent,
             conversationId
           })
@@ -230,12 +326,29 @@ export default function AIChatPage() {
         const data = await response.json();
 
         if (!response.ok) {
+          // Handle access denied
+          if (response.status === 403 && data.access) {
+            setChatAccess(data.access);
+            setShowPurchaseModal(true);
+            throw new Error('Chat access required');
+          }
           throw new Error(data.error || 'Failed to send message');
         }
 
         // Update conversation ID if new
         if (data.conversationId && !conversationId) {
           setConversationId(data.conversationId);
+        }
+
+        // Update access state from response
+        if (data.access) {
+          setChatAccess(prevAccess => prevAccess ? {
+            ...prevAccess,
+            messagesRemaining: data.access.messagesRemaining,
+            canSendMessage: data.access.canSendMessage,
+            isLowMessages: data.access.isLowMessages,
+            warningMessage: data.access.warningMessage,
+          } : null);
         }
 
         // Add AI response
@@ -345,6 +458,11 @@ export default function AIChatPage() {
             </Link>
           )}
 
+          {/* Token balance (only for logged in users with real creators) */}
+          {currentUser && creator && creator.id.includes('-') && creator.id.length >= 30 && (
+            <InlineTokenBalance balance={tokenBalance} />
+          )}
+
           {/* Tip Button - only for real creators */}
           {creator && creator.id.includes('-') && creator.id.length >= 30 && (
             <TipButton
@@ -371,7 +489,7 @@ export default function AIChatPage() {
       {/* Messages */}
       <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
         <div className="max-w-2xl mx-auto space-y-4">
-          {messages.length === 0 ? (
+          {messages.length === 0 && !openingMessage ? (
             <div className="text-center py-6 md:py-12">
               <div className="mb-3 md:mb-4">
                 {creator?.avatar_url ? (
@@ -392,6 +510,29 @@ export default function AIChatPage() {
               <p className="text-sm md:text-base text-gray-400 max-w-sm mx-auto px-4">
                 Start a conversation! AI-powered chat available 24/7.
               </p>
+            </div>
+          ) : messages.length === 0 && openingMessage ? (
+            /* Opening message for new conversations */
+            <div className="flex justify-start">
+              {creator && (
+                <div className="w-8 h-8 rounded-full mr-2 flex-shrink-0 overflow-hidden">
+                  {creator.avatar_url ? (
+                    <img
+                      src={creator.avatar_url}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-sm">
+                      {(creator.display_name || creator.username).charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="max-w-[75%] px-4 py-2.5 rounded-2xl bg-white/10 rounded-bl-md">
+                <p className="whitespace-pre-wrap break-words">{openingMessage}</p>
+                <p className="text-xs mt-1 text-gray-500">Just now</p>
+              </div>
             </div>
           ) : (
             messages.map((message) => {
@@ -489,30 +630,83 @@ export default function AIChatPage() {
           </div>
         )}
 
-        {/* Message Input */}
+        {/* Message Input with Access Gate */}
         <div className="p-3 md:p-4">
-          <form onSubmit={sendMessage} className="max-w-2xl mx-auto flex gap-2 md:gap-3">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1 px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors text-base"
-              disabled={sending}
-            />
-            <button
-              type="submit"
-              disabled={!newMessage.trim() || sending}
-              className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
-            >
-              {sending ? '...' : 'Send'}
-            </button>
-          </form>
+          <div className="max-w-2xl mx-auto">
+            {chatAccess ? (
+              <ChatAccessGate
+                access={chatAccess}
+                onSubscribe={handleSubscribe}
+                onPurchaseSession={(option) => {
+                  if (option.messages) {
+                    const pack = { messages: option.messages, tokens: option.cost || 0, label: option.label };
+                    handlePurchaseSession(pack);
+                  } else {
+                    setShowPurchaseModal(true);
+                  }
+                }}
+                onExtendMessages={handleExtendMessages}
+                tokenBalance={tokenBalance}
+                isLoading={accessLoading}
+              >
+                <form onSubmit={sendMessage} className="flex gap-2 md:gap-3">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder={currentUser ? "Type a message..." : "Log in to chat..."}
+                    className="flex-1 px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors text-base"
+                    disabled={sending || !currentUser}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!newMessage.trim() || sending || !currentUser}
+                    className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
+                  >
+                    {sending ? '...' : 'Send'}
+                  </button>
+                </form>
+              </ChatAccessGate>
+            ) : (
+              // Fallback when access not yet loaded
+              <form onSubmit={sendMessage} className="flex gap-2 md:gap-3">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder={currentUser ? "Type a message..." : "Log in to chat..."}
+                  className="flex-1 px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors text-base"
+                  disabled={sending || !currentUser}
+                />
+                <button
+                  type="submit"
+                  disabled={!newMessage.trim() || sending || !currentUser}
+                  className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
+                >
+                  {sending ? '...' : 'Send'}
+                </button>
+              </form>
+            )}
+          </div>
           <p className="text-center text-[10px] md:text-xs text-gray-500 mt-1.5 md:mt-2">
             AI responses may not reflect the creator&apos;s actual views
           </p>
         </div>
       </div>
+
+      {/* Purchase Session Modal */}
+      <PurchaseSessionModal
+        isOpen={showPurchaseModal}
+        onClose={() => {
+          setShowPurchaseModal(false);
+          setPurchaseError(null);
+        }}
+        onPurchase={handlePurchaseSession}
+        tokenBalance={tokenBalance}
+        modelName={creator?.display_name || creator?.username}
+        isLoading={accessLoading}
+        error={purchaseError}
+      />
     </div>
   );
 }

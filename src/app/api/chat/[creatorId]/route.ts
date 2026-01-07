@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { generateChatResponse } from '@/lib/ai/chat-service';
+import { checkChatAccess, decrementMessage, isLowMessages } from '@/lib/chat';
 
 export async function POST(
   request: NextRequest,
@@ -23,18 +24,16 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check subscription + chat access
-    const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select('status, tier_id, expires_at')
-      .eq('subscriber_id', user.id)
-      .eq('creator_id', creatorId)
-      .eq('status', 'active')
-      .single();
+    // Check chat access (subscription OR paid session)
+    const access = await checkChatAccess(supabase, user.id, creatorId);
 
-    if (!subscription) {
+    if (!access.hasAccess || !access.canSendMessage) {
       return NextResponse.json(
-        { error: 'Active subscription required' },
+        {
+          error: 'Chat access required',
+          access,
+          unlockOptions: access.unlockOptions,
+        },
         { status: 403 }
       );
     }
@@ -78,11 +77,42 @@ export async function POST(
       console.warn('Compliance issues detected:', result.compliance_issues);
     }
 
-    return NextResponse.json({
+    // Decrement message count after successful response
+    const decrementResult = await decrementMessage(
+      supabase,
+      user.id,
+      creatorId,
+      access.accessType
+    );
+
+    // Get updated access state
+    const updatedAccess = await checkChatAccess(supabase, user.id, creatorId);
+
+    // Build response with access info
+    const response: Record<string, unknown> = {
       response: result.response,
       conversationId: result.conversationId,
       passed_compliance: result.passed_compliance,
-    });
+      access: {
+        messagesRemaining: updatedAccess.messagesRemaining,
+        canSendMessage: updatedAccess.canSendMessage,
+        isLowMessages: updatedAccess.isLowMessages,
+        warningMessage: updatedAccess.warningMessage,
+        accessType: updatedAccess.accessType,
+      },
+    };
+
+    // Add warning if messages are low
+    if (updatedAccess.isLowMessages && updatedAccess.messagesRemaining !== null) {
+      response.messageWarning = updatedAccess.warningMessage;
+    }
+
+    // If messages exhausted, include unlock options
+    if (!updatedAccess.canSendMessage) {
+      response.unlockOptions = updatedAccess.unlockOptions;
+    }
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error('Chat error:', error);
     return NextResponse.json({ error: 'Chat failed' }, { status: 500 });

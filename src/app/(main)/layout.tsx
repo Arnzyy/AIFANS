@@ -3,14 +3,14 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Home, Compass, MessageCircle, Bookmark, User, Gem, Bell } from 'lucide-react';
+import { Home, Compass, MessageCircle, Bookmark, LayoutDashboard, Gem, Bell } from 'lucide-react';
 
 const navItems = [
   { href: '/feed', label: 'Feed', icon: Home },
   { href: '/explore', label: 'Explore', icon: Compass },
   { href: '/messages', label: 'Messages', icon: MessageCircle },
   { href: '/bookmarks', label: 'Saved', icon: Bookmark },
-  { href: '/profile', label: 'Profile', icon: User },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
 ];
 
 export default function MainLayout({
