@@ -73,6 +73,24 @@ export default function AIChatPage() {
       // Only redirect if trying to send messages
       setCurrentUser(user);
 
+      // Set default guest access immediately for non-logged-in users
+      // This ensures the access gate shows while API loads
+      if (!user) {
+        setChatAccess({
+          hasAccess: false,
+          accessType: 'guest',
+          messagesRemaining: null,
+          canSendMessage: false,
+          requiresUnlock: true,
+          unlockOptions: [
+            { type: 'login', label: 'Log in to chat', recommended: true },
+            { type: 'subscribe', label: 'Subscribe for unlimited access' },
+            { type: 'paid_session', label: 'Try 5 messages', cost: 125, costDisplay: '£0.50', messages: 5 },
+          ],
+          isLowMessages: false,
+        });
+      }
+
       // Try to fetch the creator from database first
       const { data: creatorData } = await supabase
         .from('profiles')
@@ -98,6 +116,12 @@ export default function AIChatPage() {
           creator_profiles: creatorProfiles,
         } as Creator);
         creatorId = creatorData.id;
+
+        // Set a default opening message for guests while API loads
+        const creatorName = creatorData.display_name || creatorData.username;
+        if (!user) {
+          setOpeningMessage(`Hey! I'm ${creatorName}. I've been looking forward to meeting someone new... Something tells me we're going to get along really well 💕`);
+        }
       } else {
         // Try mock creators
         const mockCreator = getCreatorByUsername(username.toLowerCase());
