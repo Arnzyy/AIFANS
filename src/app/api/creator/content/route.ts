@@ -120,7 +120,7 @@ export async function GET() {
   }
 }
 
-// PATCH - Re-analyze content
+// PATCH - Update content metadata
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createServerClient();
@@ -132,36 +132,50 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { content_id } = await request.json();
+    const { content_id, title, description, visibility, is_nsfw } = await request.json();
 
     if (!content_id) {
       return NextResponse.json({ error: 'content_id required' }, { status: 400 });
     }
 
-    // Verify ownership
-    const { data: content } = await supabase
-      .from('content_metadata')
-      .select('creator_id')
-      .eq('id', content_id)
+    // Get creator
+    const { data: creator } = await supabase
+      .from('creators')
+      .select('id')
+      .eq('user_id', user.id)
       .single();
 
-    if (!content || content.creator_id !== user.id) {
-      return NextResponse.json(
-        { error: 'Not found or not authorized' },
-        { status: 404 }
-      );
+    if (!creator) {
+      return NextResponse.json({ error: 'Creator not found' }, { status: 404 });
     }
 
-    const success = await reanalyzeContent(supabase, content_id);
+    // Verify ownership and update
+    const { data: content, error } = await supabase
+      .from('content_items')
+      .update({
+        title,
+        description,
+        visibility,
+        is_nsfw,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', content_id)
+      .eq('creator_id', creator.id)
+      .select()
+      .single();
 
-    return NextResponse.json({ success });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ item: content });
   } catch (error) {
-    console.error('Reanalyze error:', error);
+    console.error('Update content error:', error);
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
 
-// DELETE - Delete content metadata
+// DELETE - Delete content item
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createServerClient();
@@ -180,11 +194,22 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'id required' }, { status: 400 });
     }
 
+    // Get creator
+    const { data: creator } = await supabase
+      .from('creators')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!creator) {
+      return NextResponse.json({ error: 'Creator not found' }, { status: 404 });
+    }
+
     const { error } = await supabase
-      .from('content_metadata')
+      .from('content_items')
       .delete()
       .eq('id', contentId)
-      .eq('creator_id', user.id);
+      .eq('creator_id', creator.id);
 
     if (error) throw error;
 

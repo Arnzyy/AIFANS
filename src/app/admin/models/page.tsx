@@ -41,13 +41,13 @@ interface PaginatedResponse {
   total_pages: number;
 }
 
-const statusConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ size?: number }> }> = {
+const statusConfig = {
   draft: { label: 'Draft', color: 'text-zinc-400 bg-zinc-500/20', icon: FileText },
   pending_review: { label: 'Pending Review', color: 'text-yellow-400 bg-yellow-500/20', icon: Clock },
   approved: { label: 'Approved', color: 'text-green-400 bg-green-500/20', icon: CheckCircle },
   rejected: { label: 'Rejected', color: 'text-red-400 bg-red-500/20', icon: XCircle },
   suspended: { label: 'Suspended', color: 'text-orange-400 bg-orange-500/20', icon: XCircle },
-};
+} as const;
 
 export default function AdminModelsPage() {
   const searchParams = useSearchParams();
@@ -178,7 +178,7 @@ export default function AdminModelsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {models.map((model) => {
-            const statusInfo = statusConfig[model.status] || statusConfig.draft;
+            const statusInfo = statusConfig[model.status as keyof typeof statusConfig] || statusConfig.draft;
             const StatusIcon = statusInfo.icon;
 
             return (

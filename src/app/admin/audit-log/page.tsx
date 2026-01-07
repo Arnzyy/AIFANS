@@ -23,7 +23,7 @@ interface AuditEntry {
   created_at: string;
 }
 
-const actionConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ size?: number }> }> = {
+const actionConfig = {
   approve_creator: { label: 'Approved Creator', color: 'text-green-400', icon: CheckCircle },
   reject_creator: { label: 'Rejected Creator', color: 'text-red-400', icon: XCircle },
   approve_model: { label: 'Approved Model', color: 'text-green-400', icon: CheckCircle },
@@ -31,7 +31,7 @@ const actionConfig: Record<string, { label: string; color: string; icon: React.C
   suspend_creator: { label: 'Suspended Creator', color: 'text-orange-400', icon: AlertTriangle },
   issue_strike: { label: 'Issued Strike', color: 'text-yellow-400', icon: AlertTriangle },
   resolve_report: { label: 'Resolved Report', color: 'text-blue-400', icon: ScrollText },
-};
+} as const;
 
 export default function AdminAuditLogPage() {
   const searchParams = useSearchParams();
@@ -125,7 +125,7 @@ export default function AdminAuditLogPage() {
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {entries.map((entry) => {
-                const config = actionConfig[entry.action] || {
+                const config = actionConfig[entry.action as keyof typeof actionConfig] || {
                   label: entry.action,
                   color: 'text-zinc-400',
                   icon: ScrollText,

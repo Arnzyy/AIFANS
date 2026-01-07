@@ -25,12 +25,12 @@ interface Report {
   resolution_notes?: string;
 }
 
-const statusConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ size?: number }> }> = {
+const statusConfig = {
   pending: { label: 'Pending', color: 'text-yellow-400 bg-yellow-500/20', icon: Clock },
   investigating: { label: 'Investigating', color: 'text-blue-400 bg-blue-500/20', icon: AlertTriangle },
   resolved: { label: 'Resolved', color: 'text-green-400 bg-green-500/20', icon: CheckCircle },
   dismissed: { label: 'Dismissed', color: 'text-zinc-400 bg-zinc-500/20', icon: XCircle },
-};
+} as const;
 
 const reasonLabels: Record<string, string> = {
   spam: 'Spam',
@@ -125,7 +125,7 @@ export default function AdminReportsPage() {
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {reports.map((report) => {
-                const statusInfo = statusConfig[report.status] || statusConfig.pending;
+                const statusInfo = statusConfig[report.status as keyof typeof statusConfig] || statusConfig.pending;
                 const StatusIcon = statusInfo.icon;
 
                 return (

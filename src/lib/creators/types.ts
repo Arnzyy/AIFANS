@@ -30,8 +30,11 @@ export interface Creator {
   country: string;
 
   // KYC & Verification
-  kyc_status: 'not_started' | 'pending' | 'verified' | 'failed';
+  kyc_status: 'not_started' | 'pending' | 'submitted' | 'verified' | 'failed';
   id_verified: boolean;
+  date_of_birth?: string;
+  id_document_url?: string;
+  selfie_url?: string;
 
   // Stripe Connect
   stripe_account_id?: string;
@@ -398,10 +401,12 @@ export interface OnboardingFormData {
   business_name?: string;
   country: string;
 
-  // Step 2: Identity
+  // Step 2: Identity & KYC
   display_name: string;
   bio?: string;
   date_of_birth?: string;
+  id_document_url?: string;
+  selfie_url?: string;
 
   // Step 3: Stripe - handled separately
 

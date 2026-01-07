@@ -148,9 +148,11 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-function getNextStep(currentStep: string): string {
-  const steps = ['account_type', 'identity', 'stripe_connect', 'declarations', 'submit'];
-  const currentIndex = steps.indexOf(currentStep);
+type OnboardingStep = 'account_type' | 'identity' | 'stripe_connect' | 'declarations' | 'submit';
+
+function getNextStep(currentStep: string): OnboardingStep {
+  const steps: OnboardingStep[] = ['account_type', 'identity', 'stripe_connect', 'declarations', 'submit'];
+  const currentIndex = steps.indexOf(currentStep as OnboardingStep);
   if (currentIndex === -1 || currentIndex >= steps.length - 1) {
     return 'submit';
   }

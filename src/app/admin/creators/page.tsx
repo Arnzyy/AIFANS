@@ -40,12 +40,12 @@ interface PaginatedResponse {
   total_pages: number;
 }
 
-const statusConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ size?: number }> }> = {
+const statusConfig = {
   pending: { label: 'Pending', color: 'text-yellow-400 bg-yellow-500/20', icon: Clock },
   approved: { label: 'Approved', color: 'text-green-400 bg-green-500/20', icon: CheckCircle },
   rejected: { label: 'Rejected', color: 'text-red-400 bg-red-500/20', icon: XCircle },
   suspended: { label: 'Suspended', color: 'text-orange-400 bg-orange-500/20', icon: AlertCircle },
-};
+} as const;
 
 export default function AdminCreatorsPage() {
   const searchParams = useSearchParams();
@@ -181,7 +181,7 @@ export default function AdminCreatorsPage() {
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {creators.map((creator) => {
-                const statusInfo = statusConfig[creator.status] || statusConfig.pending;
+                const statusInfo = statusConfig[creator.status as keyof typeof statusConfig] || statusConfig.pending;
                 const StatusIcon = statusInfo.icon;
 
                 return (

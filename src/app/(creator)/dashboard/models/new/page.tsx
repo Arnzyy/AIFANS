@@ -17,13 +17,13 @@ import {
 
 type WizardStep = 'basic' | 'persona' | 'chat' | 'pricing' | 'review';
 
-const wizardSteps: { id: WizardStep; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
-  { id: 'basic', label: 'Basic Info', icon: User },
-  { id: 'persona', label: 'Persona', icon: Sparkles },
-  { id: 'chat', label: 'Chat Settings', icon: MessageSquare },
-  { id: 'pricing', label: 'Pricing', icon: DollarSign },
-  { id: 'review', label: 'Review', icon: Check },
-];
+const wizardSteps = [
+  { id: 'basic' as WizardStep, label: 'Basic Info', icon: User },
+  { id: 'persona' as WizardStep, label: 'Persona', icon: Sparkles },
+  { id: 'chat' as WizardStep, label: 'Chat Settings', icon: MessageSquare },
+  { id: 'pricing' as WizardStep, label: 'Pricing', icon: DollarSign },
+  { id: 'review' as WizardStep, label: 'Review', icon: Check },
+] as const;
 
 const personalityTraits = [
   'Flirty', 'Playful', 'Sweet', 'Confident', 'Shy',

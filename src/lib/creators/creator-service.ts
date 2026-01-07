@@ -124,7 +124,8 @@ export class CreatorService {
     if (creator.business_type && creator.country) {
       stepsCompleted.push('account_type');
     }
-    if (creator.display_name && creator.id_verified) {
+    // Identity step requires display name, DOB, and KYC documents
+    if (creator.display_name && creator.date_of_birth && creator.id_document_url && creator.selfie_url) {
       stepsCompleted.push('identity');
     }
     if (creator.stripe_onboarding_complete) {
@@ -183,6 +184,20 @@ export class CreatorService {
       case 'identity':
         updates.display_name = data.display_name;
         updates.bio = data.bio;
+        // KYC fields
+        if (data.date_of_birth) {
+          updates.date_of_birth = data.date_of_birth;
+        }
+        if (data.id_document_url) {
+          updates.id_document_url = data.id_document_url;
+        }
+        if (data.selfie_url) {
+          updates.selfie_url = data.selfie_url;
+        }
+        // Mark KYC as submitted if all documents provided
+        if (data.id_document_url && data.selfie_url && data.date_of_birth) {
+          updates.kyc_status = 'submitted';
+        }
         break;
       case 'declarations':
         // Declarations are saved separately
