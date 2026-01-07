@@ -233,43 +233,69 @@ export async function buildChatContext(
     .eq('creator_id', creatorId)
     .single();
 
-  // Get recent messages from existing conversations table
-  const { data: conversation } = await supabase
-    .from('conversations')
-    .select('id')
-    .or(
-      `and(participant1_id.eq.${subscriberId},participant2_id.eq.${creatorId}),` +
-      `and(participant1_id.eq.${creatorId},participant2_id.eq.${subscriberId})`
-    )
-    .single();
-
   let recentMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
 
-  if (conversation) {
-    // Try chat_messages first (new schema)
-    let { data: messages } = await supabase
-      .from('chat_messages')
-      .select('sender_id, content')
-      .eq('conversation_id', conversation.id)
+  // FIRST: Try AI chat sessions (primary for AI chat)
+  const { data: aiSession } = await supabase
+    .from('ai_chat_sessions')
+    .select('id')
+    .eq('user_id', subscriberId)
+    .eq('creator_id', creatorId)
+    .single();
+
+  if (aiSession) {
+    const { data: aiMessages } = await supabase
+      .from('ai_chat_messages')
+      .select('role, content')
+      .eq('session_id', aiSession.id)
       .order('created_at', { ascending: false })
       .limit(maxRecentMessages);
 
-    // If no chat_messages, try messages table (old schema)
-    if (!messages || messages.length === 0) {
-      const { data: oldMessages } = await supabase
-        .from('messages')
+    if (aiMessages && aiMessages.length > 0) {
+      recentMessages = aiMessages.reverse().map((m: any) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+    }
+  }
+
+  // FALLBACK: Try regular conversations table if no AI messages found
+  if (recentMessages.length === 0) {
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('id')
+      .or(
+        `and(participant1_id.eq.${subscriberId},participant2_id.eq.${creatorId}),` +
+        `and(participant1_id.eq.${creatorId},participant2_id.eq.${subscriberId})`
+      )
+      .single();
+
+    if (conversation) {
+      // Try chat_messages first (new schema)
+      let { data: messages } = await supabase
+        .from('chat_messages')
         .select('sender_id, content')
         .eq('conversation_id', conversation.id)
         .order('created_at', { ascending: false })
         .limit(maxRecentMessages);
-      messages = oldMessages;
-    }
 
-    if (messages) {
-      recentMessages = messages.reverse().map((m: any) => ({
-        role: m.sender_id === subscriberId ? 'user' : 'assistant',
-        content: m.content,
-      })) as any;
+      // If no chat_messages, try messages table (old schema)
+      if (!messages || messages.length === 0) {
+        const { data: oldMessages } = await supabase
+          .from('messages')
+          .select('sender_id, content')
+          .eq('conversation_id', conversation.id)
+          .order('created_at', { ascending: false })
+          .limit(maxRecentMessages);
+        messages = oldMessages;
+      }
+
+      if (messages) {
+        recentMessages = messages.reverse().map((m: any) => ({
+          role: m.sender_id === subscriberId ? 'user' : 'assistant',
+          content: m.content,
+        })) as any;
+      }
     }
   }
 

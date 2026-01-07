@@ -125,6 +125,13 @@ export async function POST(
   try {
     const context = await buildChatContext(supabase, user.id, params.creatorId);
     memoryContext = formatMemoryForPrompt(context);
+    console.log('Memory context loaded:', {
+      hasMemory: !!context.memory,
+      hasSummary: !!context.summary,
+      recentMessageCount: context.recent_messages.length,
+      preferredName: context.memory?.preferred_name,
+      interests: context.memory?.interests,
+    });
   } catch (err) {
     console.log('Memory context unavailable:', err);
     // Continue without memory - tables may not exist yet
