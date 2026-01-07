@@ -132,33 +132,68 @@ export default function AIChatPage() {
       }
 
       // Call start chat endpoint to get opening message and access status
-      const startResponse = await fetch(`/api/chat/${creatorId}/start`);
-      const startData = await startResponse.json();
+      try {
+        const startResponse = await fetch(`/api/chat/${creatorId}/start`);
+        const startData = await startResponse.json();
 
-      if (startData.openingMessage) {
-        setOpeningMessage(startData.openingMessage.content);
-      }
-      if (startData.access) {
-        setChatAccess(startData.access);
-      }
-      if (startData.tokenBalance !== undefined) {
-        setTokenBalance(startData.tokenBalance);
-      }
-      if (startData.conversationId) {
-        setConversationId(startData.conversationId);
-      }
+        if (startData.openingMessage) {
+          setOpeningMessage(startData.openingMessage.content);
+        }
+        if (startData.access) {
+          setChatAccess(startData.access);
+        } else if (!user) {
+          // Fallback guest access if endpoint doesn't return access
+          setChatAccess({
+            hasAccess: false,
+            accessType: 'guest',
+            messagesRemaining: null,
+            canSendMessage: false,
+            requiresUnlock: true,
+            unlockOptions: [
+              { type: 'login', label: 'Log in to chat', recommended: true },
+              { type: 'subscribe', label: 'Subscribe for unlimited access' },
+              { type: 'paid_session', label: 'Try 5 messages', cost: 125, costDisplay: '£0.50', messages: 5 },
+            ],
+            isLowMessages: false,
+          });
+        }
+        if (startData.tokenBalance !== undefined) {
+          setTokenBalance(startData.tokenBalance);
+        }
+        if (startData.conversationId) {
+          setConversationId(startData.conversationId);
+        }
 
-      // If user is logged in, fetch existing messages
-      if (user && startData.conversationId) {
-        const { data: messagesData } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('conversation_id', startData.conversationId)
-          .order('created_at', { ascending: true });
+        // If user is logged in, fetch existing messages
+        if (user && startData.conversationId) {
+          const { data: messagesData } = await supabase
+            .from('messages')
+            .select('*')
+            .eq('conversation_id', startData.conversationId)
+            .order('created_at', { ascending: true });
 
-        setMessages(messagesData || []);
-        if (messagesData && messagesData.length > 0) {
-          setShowDisclosure(false); // Already chatted before
+          setMessages(messagesData || []);
+          if (messagesData && messagesData.length > 0) {
+            setShowDisclosure(false); // Already chatted before
+          }
+        }
+      } catch (startError) {
+        console.error('Error calling start endpoint:', startError);
+        // Set fallback access for guests
+        if (!user) {
+          setChatAccess({
+            hasAccess: false,
+            accessType: 'guest',
+            messagesRemaining: null,
+            canSendMessage: false,
+            requiresUnlock: true,
+            unlockOptions: [
+              { type: 'login', label: 'Log in to chat', recommended: true },
+              { type: 'subscribe', label: 'Subscribe for unlimited access' },
+              { type: 'paid_session', label: 'Try 5 messages', cost: 125, costDisplay: '£0.50', messages: 5 },
+            ],
+            isLowMessages: false,
+          });
         }
       }
 

@@ -87,33 +87,51 @@ async function getCustomOpeningMessage(
   modelId: string | undefined,
   messageType: OpeningMessageType
 ): Promise<string | null> {
-  // Try model-specific message first
-  if (modelId) {
-    const { data: modelMessage } = await supabase
+  try {
+    // Try model-specific message first
+    if (modelId) {
+      const { data: modelMessage, error: modelError } = await supabase
+        .from('opening_messages')
+        .select('content')
+        .eq('creator_id', creatorId)
+        .eq('model_id', modelId)
+        .eq('message_type', messageType)
+        .eq('is_active', true)
+        .single();
+
+      // If table doesn't exist or other error, fall through to defaults
+      if (modelError && modelError.code !== 'PGRST116') {
+        console.warn('Opening messages query error:', modelError.message);
+        return null;
+      }
+
+      if (modelMessage?.content) {
+        return modelMessage.content;
+      }
+    }
+
+    // Fall back to creator-level message
+    const { data: creatorMessage, error: creatorError } = await supabase
       .from('opening_messages')
       .select('content')
       .eq('creator_id', creatorId)
-      .eq('model_id', modelId)
+      .is('model_id', null)
       .eq('message_type', messageType)
       .eq('is_active', true)
       .single();
 
-    if (modelMessage?.content) {
-      return modelMessage.content;
+    // If table doesn't exist or other error, fall through to defaults
+    if (creatorError && creatorError.code !== 'PGRST116') {
+      console.warn('Opening messages query error:', creatorError.message);
+      return null;
     }
+
+    return creatorMessage?.content ?? null;
+  } catch (error) {
+    // Table might not exist yet - gracefully fall back to defaults
+    console.warn('Opening messages table error, using defaults:', error);
+    return null;
   }
-
-  // Fall back to creator-level message
-  const { data: creatorMessage } = await supabase
-    .from('opening_messages')
-    .select('content')
-    .eq('creator_id', creatorId)
-    .is('model_id', null)
-    .eq('message_type', messageType)
-    .eq('is_active', true)
-    .single();
-
-  return creatorMessage?.content ?? null;
 }
 
 /**
