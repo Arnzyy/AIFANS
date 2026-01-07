@@ -180,13 +180,16 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
 
                   {/* Menu Items */}
                   <div className="p-2">
-                    <Link
-                      href="/browse"
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 active:bg-white/10 transition"
-                    >
-                      <Search className="w-4 h-4" />
-                      Explore
-                    </Link>
+                    {/* Only show Explore in dropdown when in creator dashboard */}
+                    {isCreatorSection && (
+                      <Link
+                        href="/browse"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 active:bg-white/10 transition"
+                      >
+                        <Search className="w-4 h-4" />
+                        Explore
+                      </Link>
+                    )}
 
                     <Link
                       href={`/@${user.username}`}
