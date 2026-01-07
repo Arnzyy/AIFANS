@@ -9,10 +9,10 @@ import { CHAT_CONFIG, calculateExtensionCost, formatTokensAsGbp } from './config
 // TYPES
 // ===========================================
 
-export type ChatAccessType = 'none' | 'subscription' | 'paid_session' | 'preview';
+export type ChatAccessType = 'none' | 'subscription' | 'paid_session' | 'preview' | 'guest';
 
 export interface UnlockOption {
-  type: 'subscribe' | 'paid_session' | 'extend_messages';
+  type: 'login' | 'subscribe' | 'paid_session' | 'extend_messages';
   label: string;
   cost?: number; // tokens
   costDisplay?: string; // £X.XX
@@ -72,15 +72,15 @@ export async function checkChatAccess(
   userId: string | null,
   creatorId: string
 ): Promise<ChatAccess> {
-  // Not logged in = preview only
+  // Not logged in = guest preview
   if (!userId) {
     return {
       hasAccess: false,
-      accessType: 'preview',
+      accessType: 'guest',
       messagesRemaining: null,
       canSendMessage: false,
       requiresUnlock: true,
-      unlockOptions: getUnlockOptions(false, null),
+      unlockOptions: getGuestUnlockOptions(),
       isLowMessages: false,
     };
   }
@@ -362,6 +362,40 @@ export async function decrementMessage(
 // ===========================================
 // HELPERS
 // ===========================================
+
+/**
+ * Get unlock options for guest (not logged in) users
+ */
+function getGuestUnlockOptions(): UnlockOption[] {
+  const options: UnlockOption[] = [];
+
+  // Login is primary CTA for guests
+  options.push({
+    type: 'login',
+    label: 'Log in to chat',
+    recommended: true,
+  });
+
+  // Also show subscribe option (will need to log in first)
+  options.push({
+    type: 'subscribe',
+    label: 'Subscribe for unlimited access',
+  });
+
+  // Show one session pack option to tease the pricing
+  const smallPack = CHAT_CONFIG.session_message_packs[0];
+  if (smallPack) {
+    options.push({
+      type: 'paid_session',
+      label: `Try ${smallPack.messages} messages`,
+      cost: smallPack.tokens,
+      costDisplay: formatTokensAsGbp(smallPack.tokens),
+      messages: smallPack.messages,
+    });
+  }
+
+  return options;
+}
 
 function getUnlockOptions(isSubscriber: boolean, remaining: number | null): UnlockOption[] {
   const options: UnlockOption[] = [];

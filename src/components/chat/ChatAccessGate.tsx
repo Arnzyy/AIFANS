@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Lock, Coins, Heart, AlertTriangle } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
+import { Lock, Coins, Heart, AlertTriangle, LogIn, Sparkles } from 'lucide-react';
 import type { ChatAccess, UnlockOption } from '@/lib/chat';
 
 // ===========================================
@@ -16,6 +18,7 @@ interface ChatAccessGateProps {
   tokenBalance?: number;
   isLoading?: boolean;
   children: React.ReactNode; // The chat input
+  creatorUsername?: string; // For login redirect
 }
 
 // ===========================================
@@ -30,8 +33,10 @@ export function ChatAccessGate({
   tokenBalance = 0,
   isLoading = false,
   children,
+  creatorUsername,
 }: ChatAccessGateProps) {
   const [showOptions, setShowOptions] = useState(false);
+  const pathname = usePathname();
 
   // If user can send messages, just render the input
   if (access.canSendMessage) {
@@ -51,6 +56,8 @@ export function ChatAccessGate({
   }
 
   // User cannot send - show locked state with unlock options
+  const isGuest = access.accessType === 'guest';
+
   return (
     <div className="space-y-4">
       {/* Locked input state */}
@@ -69,6 +76,8 @@ export function ChatAccessGate({
         onPurchaseSession={onPurchaseSession}
         onExtendMessages={onExtendMessages}
         isLoading={isLoading}
+        loginRedirect={pathname || `/chat/${creatorUsername}`}
+        isGuest={isGuest}
       />
     </div>
   );
@@ -127,6 +136,8 @@ function UnlockPrompt({
   onPurchaseSession,
   onExtendMessages,
   isLoading,
+  loginRedirect,
+  isGuest,
 }: {
   access: ChatAccess;
   tokenBalance: number;
@@ -134,6 +145,8 @@ function UnlockPrompt({
   onPurchaseSession: (option: UnlockOption) => void;
   onExtendMessages: (option: UnlockOption) => void;
   isLoading: boolean;
+  loginRedirect: string;
+  isGuest: boolean;
 }) {
   const { unlockOptions, accessType } = access;
 
@@ -145,7 +158,17 @@ function UnlockPrompt({
     <div className="bg-zinc-900/80 border border-white/10 rounded-xl p-4 space-y-4">
       {/* Header */}
       <div className="text-center">
-        {isSubscriber ? (
+        {isGuest ? (
+          <>
+            <div className="flex justify-center mb-2">
+              <Sparkles className="w-6 h-6 text-purple-400" />
+            </div>
+            <h3 className="font-semibold text-white">Ready to chat?</h3>
+            <p className="text-sm text-gray-400 mt-1">
+              Log in to start chatting or subscribe for full access
+            </p>
+          </>
+        ) : isSubscriber ? (
           <>
             <h3 className="font-semibold text-white">Monthly messages used</h3>
             <p className="text-sm text-gray-400 mt-1">
@@ -181,20 +204,38 @@ function UnlockPrompt({
                 onSubscribe();
               } else if (option.type === 'paid_session') {
                 onPurchaseSession(option);
-              } else {
+              } else if (option.type === 'extend_messages') {
                 onExtendMessages(option);
               }
+              // Login is handled by the button itself via Link
             }}
             isLoading={isLoading}
+            loginRedirect={loginRedirect}
+            isGuest={isGuest}
           />
         ))}
       </div>
 
-      {/* Token balance reminder */}
-      <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
-        <Coins className="w-4 h-4" />
-        <span>Your balance: {tokenBalance.toLocaleString()} tokens</span>
-      </div>
+      {/* Token balance reminder - only show for logged in users */}
+      {!isGuest && (
+        <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+          <Coins className="w-4 h-4" />
+          <span>Your balance: {tokenBalance.toLocaleString()} tokens</span>
+        </div>
+      )}
+
+      {/* Sign up CTA for guests */}
+      {isGuest && (
+        <div className="text-center text-sm text-gray-500">
+          <span>Don&apos;t have an account? </span>
+          <Link
+            href={`/signup?redirect=${encodeURIComponent(loginRedirect)}`}
+            className="text-purple-400 hover:text-purple-300 font-medium"
+          >
+            Sign up free
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
@@ -208,15 +249,57 @@ function UnlockOptionButton({
   tokenBalance,
   onSelect,
   isLoading,
+  loginRedirect,
+  isGuest,
 }: {
   option: UnlockOption;
   tokenBalance: number;
   onSelect: () => void;
   isLoading: boolean;
+  loginRedirect: string;
+  isGuest: boolean;
 }) {
   const canAfford = !option.cost || tokenBalance >= option.cost;
 
+  // Login button - special handling
+  if (option.type === 'login') {
+    return (
+      <Link
+        href={`/login?redirect=${encodeURIComponent(loginRedirect)}`}
+        className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition ${
+          option.recommended
+            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:opacity-90'
+            : 'bg-white/10 text-white hover:bg-white/20'
+        }`}
+      >
+        <LogIn className="w-4 h-4" />
+        {option.label}
+      </Link>
+    );
+  }
+
+  // Subscribe button
   if (option.type === 'subscribe') {
+    // If guest, this needs login first
+    if (isGuest) {
+      return (
+        <Link
+          href={`/login?redirect=${encodeURIComponent(loginRedirect)}&subscribe=true`}
+          className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition ${
+            option.recommended
+              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:opacity-90'
+              : 'bg-white/10 text-white hover:bg-white/20'
+          }`}
+        >
+          <Heart className="w-4 h-4" />
+          {option.label}
+          {option.recommended && (
+            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">Recommended</span>
+          )}
+        </Link>
+      );
+    }
+
     return (
       <button
         onClick={onSelect}
@@ -233,6 +316,26 @@ function UnlockOptionButton({
           <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">Recommended</span>
         )}
       </button>
+    );
+  }
+
+  // Paid session / extend - for guests, show price but require login
+  if (isGuest) {
+    return (
+      <Link
+        href={`/login?redirect=${encodeURIComponent(loginRedirect)}`}
+        className="w-full flex items-center justify-between py-3 px-4 rounded-lg transition bg-white/10 text-white hover:bg-white/20"
+      >
+        <div className="flex items-center gap-2">
+          <Coins className="w-4 h-4" />
+          <span>{option.label}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {option.costDisplay && (
+            <span className="text-sm text-gray-400">{option.costDisplay}</span>
+          )}
+        </div>
+      </Link>
     );
   }
 

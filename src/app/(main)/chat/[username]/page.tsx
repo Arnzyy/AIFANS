@@ -648,6 +648,7 @@ export default function AIChatPage() {
                 onExtendMessages={handleExtendMessages}
                 tokenBalance={tokenBalance}
                 isLoading={accessLoading}
+                creatorUsername={creator?.username}
               >
                 <form onSubmit={sendMessage} className="flex gap-2 md:gap-3">
                   <input
