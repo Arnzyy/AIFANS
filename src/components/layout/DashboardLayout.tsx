@@ -367,20 +367,21 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-zinc-950 border-t border-white/10 z-50 safe-area-inset-bottom">
-        <div className="flex items-center justify-around h-full px-2">
+        <div className="grid grid-cols-5 items-center h-full">
           {MOBILE_BOTTOM_NAV.map((item) => {
             const isActive = pathname === item.href ||
               (item.href !== '/dashboard' && item.href !== '/posts/new' && pathname?.startsWith(item.href));
 
             if (item.isAction) {
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="flex flex-col items-center justify-center w-14 h-14 -mt-4 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 shadow-lg shadow-purple-500/30"
-                >
-                  <item.icon className="w-6 h-6 text-white" />
-                </Link>
+                <div key={item.href} className="flex justify-center">
+                  <Link
+                    href={item.href}
+                    className="flex items-center justify-center w-14 h-14 -mt-4 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 shadow-lg shadow-purple-500/30"
+                  >
+                    <item.icon className="w-6 h-6 text-white" />
+                  </Link>
+                </div>
               );
             }
 
@@ -388,7 +389,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-lg transition ${
+                className={`flex flex-col items-center justify-center gap-0.5 py-2 transition ${
                   isActive ? 'text-purple-400' : 'text-gray-500'
                 }`}
               >
