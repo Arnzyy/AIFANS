@@ -82,110 +82,116 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 md:space-y-6 lg:space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">
+        <h1 className="text-xl md:text-2xl font-bold">
           Welcome back{profile?.display_name ? `, ${profile.display_name}` : ''}
         </h1>
-        <p className="text-gray-400 mt-1">Here's how your content is performing</p>
+        <p className="text-sm md:text-base text-gray-400 mt-1">Here&apos;s how your content is performing</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
         {stats.map((stat) => (
           <Link
             key={stat.label}
             href={stat.href}
-            className="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-colors"
+            className="p-3 md:p-4 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 active:bg-white/10 transition-colors"
           >
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-400">{stat.label}</p>
+              <p className="text-xs md:text-sm text-gray-400">{stat.label}</p>
               {stat.badge && (
-                <span className="px-2 py-0.5 text-xs bg-purple-500 rounded-full">
+                <span className="px-1.5 md:px-2 py-0.5 text-[10px] md:text-xs bg-purple-500 rounded-full">
                   {stat.badge}
                 </span>
               )}
             </div>
-            <p className="text-2xl font-bold mt-2">{stat.value}</p>
+            <p className="text-lg md:text-2xl font-bold mt-1 md:mt-2">{stat.value}</p>
             {stat.change && (
-              <p className="text-sm text-green-400 mt-1">{stat.change} this month</p>
+              <p className="text-[10px] md:text-sm text-green-400 mt-0.5 md:mt-1">{stat.change} this month</p>
             )}
           </Link>
         ))}
       </div>
 
       {/* Quick Actions */}
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-4">
         <Link
           href="/posts/new"
-          className="p-6 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 hover:border-purple-500/50 transition-colors group"
+          className="p-4 md:p-6 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 hover:border-purple-500/50 active:bg-purple-500/10 transition-colors group flex sm:block items-center gap-3"
         >
-          <div className="text-3xl mb-3">📝</div>
-          <h3 className="font-semibold group-hover:text-purple-400 transition-colors">Create Post</h3>
-          <p className="text-sm text-gray-400 mt-1">Share new content with your fans</p>
+          <div className="text-2xl md:text-3xl sm:mb-3">📝</div>
+          <div>
+            <h3 className="font-semibold text-sm md:text-base group-hover:text-purple-400 transition-colors">Create Post</h3>
+            <p className="text-xs md:text-sm text-gray-400 mt-0.5 md:mt-1">Share new content with your fans</p>
+          </div>
         </Link>
 
         <Link
           href="/dashboard/ai-personality"
-          className="p-6 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 hover:border-purple-500/40 transition-colors group"
+          className="p-4 md:p-6 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 hover:border-purple-500/40 active:bg-purple-500/5 transition-colors group flex sm:block items-center gap-3"
         >
-          <div className="text-3xl mb-3">🎭</div>
-          <h3 className="font-semibold group-hover:text-purple-400 transition-colors">AI Personality</h3>
-          <p className="text-sm text-gray-400 mt-1">Build your unique AI persona</p>
+          <div className="text-2xl md:text-3xl sm:mb-3">🎭</div>
+          <div>
+            <h3 className="font-semibold text-sm md:text-base group-hover:text-purple-400 transition-colors">AI Personality</h3>
+            <p className="text-xs md:text-sm text-gray-400 mt-0.5 md:mt-1">Build your unique AI persona</p>
+          </div>
         </Link>
 
         <Link
           href="/dashboard/settings"
-          className="p-6 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-colors group"
+          className="p-4 md:p-6 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 active:bg-white/10 transition-colors group flex sm:block items-center gap-3"
         >
-          <div className="text-3xl mb-3">💳</div>
-          <h3 className="font-semibold group-hover:text-purple-400 transition-colors">Subscription Tiers</h3>
-          <p className="text-sm text-gray-400 mt-1">Manage your pricing</p>
+          <div className="text-2xl md:text-3xl sm:mb-3">💳</div>
+          <div>
+            <h3 className="font-semibold text-sm md:text-base group-hover:text-purple-400 transition-colors">Subscription Tiers</h3>
+            <p className="text-xs md:text-sm text-gray-400 mt-0.5 md:mt-1">Manage your pricing</p>
+          </div>
         </Link>
       </div>
 
       {/* Recent Posts */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Recent Posts</h2>
-          <Link href="/dashboard/posts" className="text-sm text-purple-400 hover:text-purple-300">
+        <div className="flex items-center justify-between mb-3 md:mb-4">
+          <h2 className="text-base md:text-lg font-semibold">Recent Posts</h2>
+          <Link href="/dashboard/posts" className="text-xs md:text-sm text-purple-400 hover:text-purple-300">
             View all →
           </Link>
         </div>
 
         {recentPosts && recentPosts.length > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-2 md:space-y-3">
             {recentPosts.map((post) => (
               <div
                 key={post.id}
-                className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/10"
+                className="flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl bg-white/5 border border-white/10"
               >
-                <div className="w-16 h-16 rounded-lg bg-white/10 flex-shrink-0" />
+                <div className="w-12 h-12 md:w-16 md:h-16 rounded-lg bg-white/10 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">
-                    {post.text_content?.slice(0, 50) || 'Untitled post'}
-                    {post.text_content?.length > 50 ? '...' : ''}
+                  <p className="text-sm md:text-base font-medium truncate">
+                    {post.text_content?.slice(0, 40) || 'Untitled post'}
+                    {post.text_content?.length > 40 ? '...' : ''}
                   </p>
-                  <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
+                  <div className="flex items-center gap-2 md:gap-4 mt-0.5 md:mt-1 text-xs md:text-sm text-gray-400">
                     <span>{post.is_ppv ? `£${(post.ppv_price || 0) / 100} PPV` : 'Free'}</span>
-                    <span>•</span>
-                    <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                    <span className="hidden md:inline">•</span>
+                    <span className="hidden md:inline">{new Date(post.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
-                <div className="text-right text-sm">
+                <div className="text-right text-xs md:text-sm hidden sm:block">
                   <p className="text-gray-400">{post.likes_count || 0} likes</p>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="text-center py-12 rounded-xl bg-white/5 border border-white/10">
-            <div className="text-4xl mb-3">📭</div>
-            <p className="text-gray-400">No posts yet</p>
+          <div className="text-center py-8 md:py-12 rounded-xl bg-white/5 border border-white/10">
+            <div className="text-3xl md:text-4xl mb-2 md:mb-3">📭</div>
+            <p className="text-sm md:text-base text-gray-400">No posts yet</p>
             <Link
               href="/posts/new"
-              className="inline-block mt-4 px-4 py-2 bg-purple-500 rounded-lg text-sm font-medium hover:bg-purple-600 transition-colors"
+              className="inline-block mt-3 md:mt-4 px-4 py-2 bg-purple-500 rounded-lg text-xs md:text-sm font-medium hover:bg-purple-600 transition-colors"
             >
               Create your first post
             </Link>
@@ -195,32 +201,32 @@ export default async function DashboardPage() {
 
       {/* AI Chat Status */}
       {creatorProfile?.ai_chat_enabled ? (
-        <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🎭</span>
-            <div>
-              <p className="font-medium text-green-400">AI Persona Active</p>
-              <p className="text-sm text-gray-400">Your AI persona is chatting with fans 24/7</p>
+        <div className="p-3 md:p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+          <div className="flex items-center gap-2 md:gap-3">
+            <span className="text-xl md:text-2xl">🎭</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm md:text-base font-medium text-green-400">AI Persona Active</p>
+              <p className="text-xs md:text-sm text-gray-400 truncate">Your AI persona is chatting with fans 24/7</p>
             </div>
             <Link
               href="/dashboard/ai-personality"
-              className="ml-auto px-3 py-1.5 text-sm border border-green-500/30 rounded-lg hover:bg-green-500/10 transition-colors"
+              className="px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm border border-green-500/30 rounded-lg hover:bg-green-500/10 transition-colors flex-shrink-0"
             >
               Manage
             </Link>
           </div>
         </div>
       ) : (
-        <div className="p-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🎭</span>
-            <div>
-              <p className="font-medium">Create AI Persona</p>
-              <p className="text-sm text-gray-400">Build a unique AI that chats with your fans 24/7</p>
+        <div className="p-3 md:p-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20">
+          <div className="flex items-center gap-2 md:gap-3">
+            <span className="text-xl md:text-2xl">🎭</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm md:text-base font-medium">Create AI Persona</p>
+              <p className="text-xs md:text-sm text-gray-400 truncate">Build a unique AI that chats with your fans 24/7</p>
             </div>
             <Link
               href="/dashboard/ai-personality"
-              className="ml-auto px-3 py-1.5 text-sm bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg hover:opacity-90 transition-opacity"
+              className="px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg hover:opacity-90 transition-opacity flex-shrink-0"
             >
               Create
             </Link>

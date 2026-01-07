@@ -598,32 +598,32 @@ export default function AIChatPage() {
 
       {/* Input Area with Tip Bar */}
       <div className="sticky bottom-0 border-t border-white/10 bg-black flex-shrink-0">
-        {/* Quick Tip Bar - Chaturbate Style (only for real creators, not mock) */}
+        {/* Quick Tip Bar - Mobile Optimized */}
         {creator && creator.id.includes('-') && creator.id.length >= 30 && (
-          <div className="px-3 md:px-4 py-2 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border-b border-white/5">
-            <div className="max-w-2xl mx-auto flex items-center gap-2 overflow-x-auto">
-              <span className="text-xs text-pink-400 font-medium whitespace-nowrap">Quick Tip:</span>
-              {[50, 100, 250, 500, 1000].map((amount) => (
-                <button
-                  key={amount}
-                  onClick={() => {
-                    // Quick tip functionality - will open modal with preset
-                    const tipButton = document.querySelector('[data-tip-button]') as HTMLButtonElement;
-                    if (tipButton) tipButton.click();
-                  }}
-                  className="px-3 py-1.5 bg-pink-500/20 hover:bg-pink-500/40 rounded-lg text-pink-300 text-sm font-medium transition whitespace-nowrap flex items-center gap-1"
-                >
-                  <span className="text-yellow-400">🪙</span>
-                  {amount}
-                </button>
-              ))}
+          <div className="px-2 md:px-4 py-1.5 md:py-2 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border-b border-white/5">
+            <div className="max-w-2xl mx-auto flex items-center gap-1 md:gap-2">
+              <span className="text-[10px] md:text-xs text-pink-400 font-medium whitespace-nowrap">💝</span>
+              <div className="flex items-center gap-1 md:gap-2 flex-1 overflow-x-auto scrollbar-hide">
+                {[25, 50, 100, 250].map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => {
+                      const tipButton = document.querySelector('[data-tip-button]') as HTMLButtonElement;
+                      if (tipButton) tipButton.click();
+                    }}
+                    className="px-2 md:px-3 py-1 md:py-1.5 bg-pink-500/20 hover:bg-pink-500/40 active:bg-pink-500/50 rounded-lg text-pink-300 text-[11px] md:text-sm font-medium transition whitespace-nowrap flex items-center gap-0.5 md:gap-1 flex-shrink-0"
+                  >
+                    🪙{amount}
+                  </button>
+                ))}
+              </div>
               <TipButton
                 creatorId={creator.id}
                 creatorName={creator.display_name || creator.username}
                 threadId={conversationId || undefined}
                 chatMode="nsfw"
                 variant="custom"
-                className="ml-auto"
+                className="flex-shrink-0"
                 onTipSent={handleTipSent}
               />
             </div>
