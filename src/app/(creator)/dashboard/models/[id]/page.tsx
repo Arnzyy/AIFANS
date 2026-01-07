@@ -12,7 +12,11 @@ import {
   CheckCircle,
   Clock,
   XCircle,
+  Plus,
+  X,
+  Image as ImageIcon,
 } from 'lucide-react';
+import ImageUpload from '@/components/ui/ImageUpload';
 
 interface Model {
   id: string;
@@ -36,6 +40,14 @@ interface Model {
   default_chat_mode: string;
   status: string;
   rejection_reason?: string;
+  physical_traits?: {
+    hair_color?: string;
+    eye_color?: string;
+    body_type?: string;
+    height?: string;
+    ethnicity?: string;
+    style?: string;
+  };
 }
 
 const personalityTraits = [
@@ -50,12 +62,29 @@ const interestOptions = [
   'Dancing', 'Nature', 'Technology', 'Sports', 'Anime',
 ];
 
-const statusConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ size?: number }> }> = {
+const hairColors = ['Blonde', 'Brunette', 'Black', 'Red', 'Auburn', 'Silver', 'Pink', 'Blue', 'Purple', 'Multi-colored'];
+const eyeColors = ['Blue', 'Green', 'Brown', 'Hazel', 'Grey', 'Amber', 'Violet'];
+const bodyTypes = ['Slim', 'Athletic', 'Curvy', 'Petite', 'Tall', 'Average', 'Muscular'];
+const ethnicities = ['Caucasian', 'Asian', 'Black', 'Latina', 'Middle Eastern', 'Mixed', 'Other'];
+const styles = ['Casual', 'Elegant', 'Sporty', 'Gothic', 'Bohemian', 'Professional', 'Glamorous', 'Alternative'];
+
+const turnOnSuggestions = [
+  'Confidence', 'Intelligence', 'Humor', 'Romance', 'Adventure',
+  'Deep conversations', 'Teasing', 'Compliments', 'Mystery', 'Playfulness',
+  'Ambition', 'Creativity', 'Fitness', 'Good manners', 'Spontaneity',
+];
+
+const turnOffSuggestions = [
+  'Rudeness', 'Arrogance', 'Dishonesty', 'Impatience', 'Negativity',
+  'Being ignored', 'Bad hygiene', 'Disrespect', 'Boring conversations', 'Pushiness',
+];
+
+const statusConfig = {
   draft: { label: 'Draft', color: 'bg-zinc-500/20 text-zinc-400', icon: Clock },
   pending_review: { label: 'Pending Review', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock },
   approved: { label: 'Approved', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
   rejected: { label: 'Rejected', color: 'bg-red-500/20 text-red-400', icon: XCircle },
-};
+} as const;
 
 export default function EditModelPage() {
   const params = useParams();
@@ -70,10 +99,54 @@ export default function EditModelPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Partial<Model>>({});
+  const [newTurnOn, setNewTurnOn] = useState('');
+  const [newTurnOff, setNewTurnOff] = useState('');
 
   useEffect(() => {
     fetchModel();
   }, [modelId]);
+
+  const addTurnOn = (value: string) => {
+    if (!value.trim()) return;
+    const current = formData.turn_ons || [];
+    if (!current.includes(value.trim())) {
+      setFormData(prev => ({ ...prev, turn_ons: [...current, value.trim()] }));
+    }
+    setNewTurnOn('');
+  };
+
+  const removeTurnOn = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      turn_ons: (prev.turn_ons || []).filter(t => t !== value)
+    }));
+  };
+
+  const addTurnOff = (value: string) => {
+    if (!value.trim()) return;
+    const current = formData.turn_offs || [];
+    if (!current.includes(value.trim())) {
+      setFormData(prev => ({ ...prev, turn_offs: [...current, value.trim()] }));
+    }
+    setNewTurnOff('');
+  };
+
+  const removeTurnOff = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      turn_offs: (prev.turn_offs || []).filter(t => t !== value)
+    }));
+  };
+
+  const updatePhysicalTrait = (key: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      physical_traits: {
+        ...(prev.physical_traits || {}),
+        [key]: value
+      }
+    }));
+  };
 
   const fetchModel = async () => {
     try {
@@ -184,7 +257,7 @@ export default function EditModelPage() {
     );
   }
 
-  const statusInfo = statusConfig[model.status] || statusConfig.draft;
+  const statusInfo = statusConfig[model.status as keyof typeof statusConfig] || statusConfig.draft;
   const StatusIcon = statusInfo.icon;
   const canEdit = model.status === 'draft' || model.status === 'rejected';
   const canSubmit = canEdit && formData.name && formData.age && formData.age >= 18 &&
@@ -273,31 +346,64 @@ export default function EditModelPage() {
 
       {/* Form */}
       <div className="space-y-8">
+        {/* Images */}
+        <section className="bg-zinc-900 rounded-xl p-6">
+          <h2 className="text-lg font-semibold mb-4">Profile Images</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">Avatar</label>
+              <ImageUpload
+                value={formData.avatar_url}
+                onChange={(url) => setFormData(prev => ({ ...prev, avatar_url: url }))}
+                onRemove={() => setFormData(prev => ({ ...prev, avatar_url: '' }))}
+                aspectRatio="square"
+                placeholder="Upload avatar image"
+                disabled={!canEdit}
+                folder="avatars"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">Banner</label>
+              <ImageUpload
+                value={formData.banner_url}
+                onChange={(url) => setFormData(prev => ({ ...prev, banner_url: url }))}
+                onRemove={() => setFormData(prev => ({ ...prev, banner_url: '' }))}
+                aspectRatio="banner"
+                placeholder="Upload banner image"
+                disabled={!canEdit}
+                folder="banners"
+              />
+            </div>
+          </div>
+        </section>
+
         {/* Basic Info */}
         <section className="bg-zinc-900 rounded-xl p-6">
           <h2 className="text-lg font-semibold mb-4">Basic Information</h2>
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm text-zinc-400 mb-2">Name</label>
-              <input
-                type="text"
-                value={formData.name || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                disabled={!canEdit}
-                className="w-full px-4 py-3 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 focus:outline-none disabled:opacity-50"
-              />
-            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Name</label>
+                <input
+                  type="text"
+                  value={formData.name || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  disabled={!canEdit}
+                  className="w-full px-4 py-3 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 focus:outline-none disabled:opacity-50"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm text-zinc-400 mb-2">Age (18+)</label>
-              <input
-                type="number"
-                min={18}
-                value={formData.age || 18}
-                onChange={(e) => setFormData(prev => ({ ...prev, age: parseInt(e.target.value) }))}
-                disabled={!canEdit}
-                className="w-full px-4 py-3 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 focus:outline-none disabled:opacity-50"
-              />
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Age (18+)</label>
+                <input
+                  type="number"
+                  min={18}
+                  value={formData.age || 18}
+                  onChange={(e) => setFormData(prev => ({ ...prev, age: parseInt(e.target.value) }))}
+                  disabled={!canEdit}
+                  className="w-full px-4 py-3 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 focus:outline-none disabled:opacity-50"
+                />
+              </div>
             </div>
 
             <div>
@@ -308,16 +414,89 @@ export default function EditModelPage() {
                 disabled={!canEdit}
                 className="w-full px-4 py-3 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 focus:outline-none resize-none disabled:opacity-50"
                 rows={3}
+                placeholder="A compelling bio that describes your model's personality..."
               />
+            </div>
+          </div>
+        </section>
+
+        {/* Physical Traits */}
+        <section className="bg-zinc-900 rounded-xl p-6">
+          <h2 className="text-lg font-semibold mb-4">Physical Appearance</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">Hair Color</label>
+              <select
+                value={formData.physical_traits?.hair_color || ''}
+                onChange={(e) => updatePhysicalTrait('hair_color', e.target.value)}
+                disabled={!canEdit}
+                className="w-full px-4 py-3 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 focus:outline-none disabled:opacity-50"
+              >
+                <option value="">Select...</option>
+                {hairColors.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
 
             <div>
-              <label className="block text-sm text-zinc-400 mb-2">Avatar URL</label>
-              <input
-                type="url"
-                value={formData.avatar_url || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, avatar_url: e.target.value }))}
+              <label className="block text-sm text-zinc-400 mb-2">Eye Color</label>
+              <select
+                value={formData.physical_traits?.eye_color || ''}
+                onChange={(e) => updatePhysicalTrait('eye_color', e.target.value)}
                 disabled={!canEdit}
+                className="w-full px-4 py-3 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 focus:outline-none disabled:opacity-50"
+              >
+                <option value="">Select...</option>
+                {eyeColors.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">Body Type</label>
+              <select
+                value={formData.physical_traits?.body_type || ''}
+                onChange={(e) => updatePhysicalTrait('body_type', e.target.value)}
+                disabled={!canEdit}
+                className="w-full px-4 py-3 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 focus:outline-none disabled:opacity-50"
+              >
+                <option value="">Select...</option>
+                {bodyTypes.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">Ethnicity</label>
+              <select
+                value={formData.physical_traits?.ethnicity || ''}
+                onChange={(e) => updatePhysicalTrait('ethnicity', e.target.value)}
+                disabled={!canEdit}
+                className="w-full px-4 py-3 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 focus:outline-none disabled:opacity-50"
+              >
+                <option value="">Select...</option>
+                {ethnicities.map(e => <option key={e} value={e}>{e}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">Style</label>
+              <select
+                value={formData.physical_traits?.style || ''}
+                onChange={(e) => updatePhysicalTrait('style', e.target.value)}
+                disabled={!canEdit}
+                className="w-full px-4 py-3 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 focus:outline-none disabled:opacity-50"
+              >
+                <option value="">Select...</option>
+                {styles.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">Height</label>
+              <input
+                type="text"
+                value={formData.physical_traits?.height || ''}
+                onChange={(e) => updatePhysicalTrait('height', e.target.value)}
+                disabled={!canEdit}
+                placeholder="e.g., 5'6&quot; or 168cm"
                 className="w-full px-4 py-3 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 focus:outline-none disabled:opacity-50"
               />
             </div>
@@ -380,7 +559,150 @@ export default function EditModelPage() {
                 disabled={!canEdit}
                 className="w-full px-4 py-3 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 focus:outline-none resize-none disabled:opacity-50"
                 rows={4}
+                placeholder="Give your model a compelling backstory..."
               />
+            </div>
+
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">Speaking Style</label>
+              <input
+                type="text"
+                value={formData.speaking_style || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, speaking_style: e.target.value }))}
+                disabled={!canEdit}
+                placeholder="e.g., playful and teasing, uses lots of emojis"
+                className="w-full px-4 py-3 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 focus:outline-none disabled:opacity-50"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Turn Ons/Offs */}
+        <section className="bg-zinc-900 rounded-xl p-6">
+          <h2 className="text-lg font-semibold mb-4">Turn Ons & Turn Offs</h2>
+          <p className="text-sm text-zinc-500 mb-4">
+            Define what your model finds attractive or unappealing. This helps guide chat behavior.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Turn Ons */}
+            <div>
+              <label className="block text-sm text-zinc-400 mb-3">Turn Ons 💕</label>
+
+              {/* Selected turn ons */}
+              <div className="flex flex-wrap gap-2 mb-3 min-h-[40px]">
+                {(formData.turn_ons || []).map((item) => (
+                  <span
+                    key={item}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-pink-500/20 text-pink-400 rounded-full text-sm"
+                  >
+                    {item}
+                    {canEdit && (
+                      <button onClick={() => removeTurnOn(item)} className="hover:text-pink-300">
+                        <X size={14} />
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+
+              {/* Add custom */}
+              {canEdit && (
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={newTurnOn}
+                    onChange={(e) => setNewTurnOn(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTurnOn(newTurnOn))}
+                    placeholder="Add custom..."
+                    className="flex-1 px-3 py-2 bg-zinc-800 rounded-lg border border-zinc-700 text-sm focus:border-purple-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={() => addTurnOn(newTurnOn)}
+                    className="px-3 py-2 bg-pink-600 rounded-lg hover:bg-pink-700 transition-colors"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+              )}
+
+              {/* Suggestions */}
+              {canEdit && (
+                <div className="flex flex-wrap gap-1">
+                  {turnOnSuggestions
+                    .filter(s => !(formData.turn_ons || []).includes(s))
+                    .slice(0, 8)
+                    .map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        onClick={() => addTurnOn(suggestion)}
+                        className="px-2 py-1 bg-zinc-800 text-zinc-400 rounded text-xs hover:bg-zinc-700 hover:text-zinc-300 transition-colors"
+                      >
+                        + {suggestion}
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            {/* Turn Offs */}
+            <div>
+              <label className="block text-sm text-zinc-400 mb-3">Turn Offs 🚫</label>
+
+              {/* Selected turn offs */}
+              <div className="flex flex-wrap gap-2 mb-3 min-h-[40px]">
+                {(formData.turn_offs || []).map((item) => (
+                  <span
+                    key={item}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm"
+                  >
+                    {item}
+                    {canEdit && (
+                      <button onClick={() => removeTurnOff(item)} className="hover:text-red-300">
+                        <X size={14} />
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+
+              {/* Add custom */}
+              {canEdit && (
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={newTurnOff}
+                    onChange={(e) => setNewTurnOff(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTurnOff(newTurnOff))}
+                    placeholder="Add custom..."
+                    className="flex-1 px-3 py-2 bg-zinc-800 rounded-lg border border-zinc-700 text-sm focus:border-purple-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={() => addTurnOff(newTurnOff)}
+                    className="px-3 py-2 bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+              )}
+
+              {/* Suggestions */}
+              {canEdit && (
+                <div className="flex flex-wrap gap-1">
+                  {turnOffSuggestions
+                    .filter(s => !(formData.turn_offs || []).includes(s))
+                    .slice(0, 8)
+                    .map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        onClick={() => addTurnOff(suggestion)}
+                        className="px-2 py-1 bg-zinc-800 text-zinc-400 rounded text-xs hover:bg-zinc-700 hover:text-zinc-300 transition-colors"
+                      >
+                        + {suggestion}
+                      </button>
+                    ))}
+                </div>
+              )}
             </div>
           </div>
         </section>

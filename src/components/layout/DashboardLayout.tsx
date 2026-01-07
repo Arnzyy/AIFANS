@@ -23,6 +23,9 @@ import {
   Sparkles,
   Crown,
   X,
+  Image as ImageIcon,
+  UserCircle,
+  Lock,
 } from 'lucide-react';
 
 // ===========================================
@@ -57,6 +60,9 @@ const FAN_NAV_ITEMS = [
 
 const CREATOR_NAV_ITEMS = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Overview' },
+  { href: '/dashboard/models', icon: UserCircle, label: 'Models' },
+  { href: '/dashboard/content', icon: ImageIcon, label: 'Content' },
+  { href: '/dashboard/ppv', icon: Lock, label: 'PPV' },
   { href: '/dashboard/posts', icon: FileText, label: 'Posts' },
   { href: '/dashboard/subscribers', icon: Users, label: 'Subscribers' },
   { href: '/dashboard/messages', icon: MessageCircle, label: 'Messages' },
