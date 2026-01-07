@@ -10,7 +10,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/feed';
 
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(''); // Can be email or username
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -19,6 +19,26 @@ function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    let email = identifier.trim();
+
+    // If identifier doesn't look like an email, treat it as a username
+    if (!email.includes('@')) {
+      // Look up the email by username
+      const { data: profile, error: lookupError } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('username', email.toLowerCase())
+        .single();
+
+      if (lookupError || !profile?.email) {
+        setError('Username not found');
+        setLoading(false);
+        return;
+      }
+
+      email = profile.email;
+    }
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -66,17 +86,17 @@ function LoginForm() {
         )}
 
         <div>
-          <label htmlFor="email" className="block text-sm font-medium mb-2">
-            Email
+          <label htmlFor="identifier" className="block text-sm font-medium mb-2">
+            Email or Username
           </label>
           <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            id="identifier"
+            type="text"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             required
             className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors"
-            placeholder="you@example.com"
+            placeholder="you@example.com or username"
           />
         </div>
 

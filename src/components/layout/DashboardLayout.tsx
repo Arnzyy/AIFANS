@@ -181,6 +181,14 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
                   {/* Menu Items */}
                   <div className="p-2">
                     <Link
+                      href="/browse"
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 active:bg-white/10 transition"
+                    >
+                      <Search className="w-4 h-4" />
+                      Explore
+                    </Link>
+
+                    <Link
                       href={`/@${user.username}`}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 active:bg-white/10 transition"
                     >
@@ -267,8 +275,8 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
         transform transition-transform duration-200 ease-in-out
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
-        {/* Mode Switcher */}
-        {user.isVerifiedCreator && (
+        {/* Mode Switcher / Explore Link */}
+        {user.isVerifiedCreator ? (
           <div className="p-4 border-b border-white/10">
             <div className="p-1 bg-white/5 rounded-lg flex">
               <Link
@@ -292,6 +300,16 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
                 Creator
               </Link>
             </div>
+          </div>
+        ) : isCreatorSection && (
+          <div className="p-4 border-b border-white/10">
+            <Link
+              href="/browse"
+              className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-white font-medium transition hover:from-purple-500/30 hover:to-pink-500/30"
+            >
+              <Search className="w-4 h-4" />
+              Explore Creators
+            </Link>
           </div>
         )}
 

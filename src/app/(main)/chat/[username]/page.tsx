@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase/client';
 import { AI_CHAT_DISCLOSURE } from '@/lib/compliance/constants';
 import { getCreatorByUsername } from '@/lib/data/creators';
 import { formatDistanceToNow } from 'date-fns';
+import { Lock, Sparkles, LogIn, Heart } from 'lucide-react';
 import { TipButton } from '@/components/tokens/TipButton';
 import { ChatAccessGate } from '@/components/chat/ChatAccessGate';
 import { PurchaseSessionModal } from '@/components/chat/PurchaseSessionModal';
@@ -734,20 +735,81 @@ export default function AIChatPage() {
                   </button>
                 </form>
               </ChatAccessGate>
+            ) : !currentUser ? (
+              // Guest fallback - show login CTA
+              <div className="space-y-4">
+                <div className="relative">
+                  <div className="opacity-50 pointer-events-none">
+                    <div className="flex gap-2 md:gap-3">
+                      <input
+                        type="text"
+                        placeholder="Log in to chat..."
+                        className="flex-1 px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-white/5 border border-white/10 outline-none text-base"
+                        disabled
+                      />
+                      <button
+                        disabled
+                        className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 font-medium opacity-50 text-sm md:text-base"
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
+                    <Lock className="w-6 h-6 text-gray-400" />
+                  </div>
+                </div>
+                <div className="bg-zinc-900/80 border border-white/10 rounded-xl p-4 space-y-4">
+                  <div className="text-center">
+                    <div className="flex justify-center mb-2">
+                      <Sparkles className="w-6 h-6 text-purple-400" />
+                    </div>
+                    <h3 className="font-semibold text-white">Ready to chat?</h3>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Log in to start chatting or subscribe for full access
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Link
+                      href={`/login?redirect=/chat/${username}`}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:opacity-90 transition"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      Log in to chat
+                    </Link>
+                    <Link
+                      href={`/login?redirect=/chat/${username}&subscribe=true`}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium bg-white/10 text-white hover:bg-white/20 transition"
+                    >
+                      <Heart className="w-4 h-4" />
+                      Subscribe for unlimited access
+                    </Link>
+                  </div>
+                  <div className="text-center text-sm text-gray-500">
+                    <span>Don&apos;t have an account? </span>
+                    <Link
+                      href={`/register?redirect=/chat/${username}`}
+                      className="text-purple-400 hover:text-purple-300 font-medium"
+                    >
+                      Sign up free
+                    </Link>
+                  </div>
+                </div>
+              </div>
             ) : (
-              // Fallback when access not yet loaded
+              // Logged in but access not yet loaded
               <form onSubmit={sendMessage} className="flex gap-2 md:gap-3">
                 <input
                   type="text"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder={currentUser ? "Type a message..." : "Log in to chat..."}
+                  placeholder="Type a message..."
                   className="flex-1 px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors text-base"
-                  disabled={sending || !currentUser}
+                  disabled={sending}
                 />
                 <button
                   type="submit"
-                  disabled={!newMessage.trim() || sending || !currentUser}
+                  disabled={!newMessage.trim() || sending}
                   className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
                 >
                   {sending ? '...' : 'Send'}
