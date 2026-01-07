@@ -56,10 +56,8 @@ export default function NewModelPage() {
     backstory: '',
     speaking_style: '',
 
-    // Chat
-    nsfw_enabled: true,
-    sfw_enabled: true,
-    default_chat_mode: 'sfw' as 'nsfw' | 'sfw',
+    // Chat - only one mode can be selected
+    chat_mode: 'nsfw' as 'nsfw' | 'sfw',
     emoji_usage: 'moderate' as 'none' | 'minimal' | 'moderate' | 'heavy',
     response_length: 'medium' as 'short' | 'medium' | 'long',
     turn_ons: [] as string[],
@@ -102,10 +100,18 @@ export default function NewModelPage() {
     setSaving(true);
 
     try {
+      // Map chat_mode to nsfw_enabled/sfw_enabled for API
+      const submitData = {
+        ...formData,
+        nsfw_enabled: formData.chat_mode === 'nsfw',
+        sfw_enabled: formData.chat_mode === 'sfw',
+        default_chat_mode: formData.chat_mode,
+      };
+
       const res = await fetch('/api/creator/models', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submitData),
       });
 
       const data = await res.json();
@@ -129,7 +135,7 @@ export default function NewModelPage() {
       case 'persona':
         return formData.personality_traits.length >= 1;
       case 'chat':
-        return formData.nsfw_enabled || formData.sfw_enabled;
+        return formData.chat_mode === 'nsfw' || formData.chat_mode === 'sfw';
       case 'pricing':
         return formData.subscription_price >= 0;
       default:
@@ -326,51 +332,46 @@ export default function NewModelPage() {
             <h2 className="text-xl font-semibold">Chat Settings</h2>
 
             <div>
-              <label className="block text-sm text-zinc-400 mb-3">Chat Modes *</label>
+              <label className="block text-sm text-zinc-400 mb-3">Chat Mode * (select one)</label>
               <div className="space-y-3">
-                <label className="flex items-center gap-3 p-4 bg-zinc-800 rounded-lg cursor-pointer">
+                <label className={`flex items-center gap-3 p-4 rounded-lg cursor-pointer border-2 transition-colors ${
+                  formData.chat_mode === 'nsfw'
+                    ? 'bg-red-500/10 border-red-500/50'
+                    : 'bg-zinc-800 border-zinc-700 hover:border-zinc-600'
+                }`}>
                   <input
-                    type="checkbox"
-                    checked={formData.nsfw_enabled}
-                    onChange={(e) => setFormData(prev => ({ ...prev, nsfw_enabled: e.target.checked }))}
-                    className="w-5 h-5 rounded border-zinc-600 bg-zinc-700 text-purple-600 focus:ring-purple-500"
+                    type="radio"
+                    name="chat_mode"
+                    value="nsfw"
+                    checked={formData.chat_mode === 'nsfw'}
+                    onChange={() => setFormData(prev => ({ ...prev, chat_mode: 'nsfw' }))}
+                    className="w-5 h-5 border-zinc-600 bg-zinc-700 text-red-500 focus:ring-red-500"
                   />
                   <div>
                     <span className="font-medium">NSFW Mode</span>
-                    <p className="text-sm text-zinc-400">Adult-oriented flirty chat</p>
+                    <p className="text-sm text-zinc-400">Adult-oriented flirty chat (18+ content)</p>
                   </div>
                 </label>
-                <label className="flex items-center gap-3 p-4 bg-zinc-800 rounded-lg cursor-pointer">
+                <label className={`flex items-center gap-3 p-4 rounded-lg cursor-pointer border-2 transition-colors ${
+                  formData.chat_mode === 'sfw'
+                    ? 'bg-blue-500/10 border-blue-500/50'
+                    : 'bg-zinc-800 border-zinc-700 hover:border-zinc-600'
+                }`}>
                   <input
-                    type="checkbox"
-                    checked={formData.sfw_enabled}
-                    onChange={(e) => setFormData(prev => ({ ...prev, sfw_enabled: e.target.checked }))}
-                    className="w-5 h-5 rounded border-zinc-600 bg-zinc-700 text-purple-600 focus:ring-purple-500"
+                    type="radio"
+                    name="chat_mode"
+                    value="sfw"
+                    checked={formData.chat_mode === 'sfw'}
+                    onChange={() => setFormData(prev => ({ ...prev, chat_mode: 'sfw' }))}
+                    className="w-5 h-5 border-zinc-600 bg-zinc-700 text-blue-500 focus:ring-blue-500"
                   />
                   <div>
                     <span className="font-medium">SFW/Companion Mode</span>
-                    <p className="text-sm text-zinc-400">Friendly, supportive chat</p>
+                    <p className="text-sm text-zinc-400">Friendly, supportive chat (all ages appropriate)</p>
                   </div>
                 </label>
               </div>
             </div>
-
-            {formData.nsfw_enabled && formData.sfw_enabled && (
-              <div>
-                <label className="block text-sm text-zinc-400 mb-2">Default Mode</label>
-                <select
-                  value={formData.default_chat_mode}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    default_chat_mode: e.target.value as 'nsfw' | 'sfw'
-                  }))}
-                  className="w-full px-4 py-3 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 focus:outline-none"
-                >
-                  <option value="sfw">SFW/Companion</option>
-                  <option value="nsfw">NSFW</option>
-                </select>
-              </div>
-            )}
 
             <div>
               <label className="block text-sm text-zinc-400 mb-2">Emoji Usage</label>
@@ -481,12 +482,11 @@ export default function NewModelPage() {
                 </div>
 
                 <div className="p-4 bg-zinc-800 rounded-lg">
-                  <h4 className="text-sm text-zinc-400 mb-2">Chat Modes</h4>
+                  <h4 className="text-sm text-zinc-400 mb-2">Chat Mode</h4>
                   <div className="flex gap-2">
-                    {formData.nsfw_enabled && (
+                    {formData.chat_mode === 'nsfw' ? (
                       <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded text-xs">NSFW</span>
-                    )}
-                    {formData.sfw_enabled && (
+                    ) : (
                       <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">SFW</span>
                     )}
                   </div>

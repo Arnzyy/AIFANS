@@ -27,6 +27,7 @@ export class CreatorService {
   // ===========================================
 
   async getCreator(userId: string): Promise<Creator | null> {
+    // First check the creators table
     const { data, error } = await this.supabase
       .from('creators')
       .select('*')
@@ -38,7 +39,61 @@ export class CreatorService {
       throw error;
     }
 
-    return data;
+    if (data) {
+      return data;
+    }
+
+    // If not in creators table, check creator_profiles and auto-create if found
+    const { data: creatorProfile, error: profileError } = await this.supabase
+      .from('creator_profiles')
+      .select('*, profiles!inner(display_name, username)')
+      .eq('user_id', userId)
+      .single();
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      console.error('Error fetching creator profile:', profileError);
+      return null;
+    }
+
+    if (!creatorProfile) {
+      return null;
+    }
+
+    // Auto-create a creators record from creator_profiles
+    // Handle profiles which may be an array or object
+    const profileData = Array.isArray(creatorProfile.profiles)
+      ? creatorProfile.profiles[0]
+      : creatorProfile.profiles;
+
+    const displayName = profileData?.display_name || profileData?.username || 'Creator';
+
+    const { data: newCreator, error: createError } = await this.supabase
+      .from('creators')
+      .insert({
+        user_id: userId,
+        business_type: 'individual',
+        country: 'GB',
+        display_name: displayName,
+        bio: creatorProfile.bio,
+        status: creatorProfile.is_verified ? 'approved' : 'pending',
+        onboarding_step: 'complete',
+        onboarding_complete: true,
+        kyc_status: creatorProfile.is_verified ? 'approved' : 'not_started',
+        id_verified: creatorProfile.is_verified || false,
+        stripe_onboarding_complete: false,
+        stripe_charges_enabled: false,
+        stripe_payouts_enabled: false,
+        max_models: 3,
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      console.error('Error auto-creating creator record:', createError);
+      return null;
+    }
+
+    return newCreator;
   }
 
   async getCreatorById(creatorId: string): Promise<Creator | null> {
