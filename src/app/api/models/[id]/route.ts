@@ -26,10 +26,7 @@ export async function GET(
         nsfw_enabled,
         sfw_enabled,
         created_at,
-        creator_id,
-        personality,
-        physical_traits,
-        sfw_personality
+        creator_id
       `)
       .eq('id', id)
       .eq('status', 'approved')
