@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { Bot, BadgeCheck, MapPin, Heart, MessageCircle, Lock, Grid3X3, Play, Star, Sparkles, ArrowLeft } from 'lucide-react';
 import { AI_CHAT_DISCLOSURE, MODEL_TYPES, CATEGORY_DISCLAIMER } from '@/lib/compliance/constants';
 import { SubscribeModal } from '@/components/shared/SubscribeModal';
@@ -32,12 +32,9 @@ interface Model {
   tags: Tag[];
 }
 
-export default function ModelProfilePage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = use(params);
+export default function ModelProfilePage() {
+  const params = useParams();
+  const id = params.id as string;
   const router = useRouter();
   const [model, setModel] = useState<Model | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
