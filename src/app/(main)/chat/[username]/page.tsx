@@ -576,14 +576,14 @@ export default function AIChatPage() {
       <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
         <div className="flex items-center gap-3 px-3 md:px-4 h-14 md:h-16">
           <Link
-            href={`/${username}`}
+            href={isModelChat ? `/model/${username}` : `/${username}`}
             className="p-1.5 md:p-2 -ml-1 text-gray-400 hover:text-white transition-colors text-sm md:text-base"
           >
             ←
           </Link>
 
           {creator && (
-            <Link href={`/${creator.username}`} className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+            <Link href={isModelChat ? `/model/${username}` : `/${creator.username}`} className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
               <div className="relative flex-shrink-0">
                 <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/10 overflow-hidden">
                   {creator.avatar_url ? (
