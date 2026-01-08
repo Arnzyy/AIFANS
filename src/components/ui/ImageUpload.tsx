@@ -2,14 +2,13 @@
 
 import { useState, useRef } from 'react';
 import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 
 interface ImageUploadProps {
   value?: string;
   onChange: (url: string) => void;
   onRemove?: () => void;
-  bucket?: string;
   folder?: string;
+  uploadType?: 'avatar' | 'banner' | 'post' | 'message';
   accept?: string;
   maxSize?: number; // in MB
   className?: string;
@@ -22,8 +21,8 @@ export default function ImageUpload({
   value,
   onChange,
   onRemove,
-  bucket = 'content',
   folder = 'uploads',
+  uploadType = 'avatar',
   accept = 'image/*',
   maxSize = 10,
   className = '',
@@ -60,33 +59,42 @@ export default function ImageUpload({
     setUploading(true);
 
     try {
-      const supabase = createClient();
+      // Step 1: Get presigned upload URL from API
+      const presignRes = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          filename: file.name,
+          type: uploadType,
+        }),
+      });
 
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-      // Upload to Supabase Storage
-      const { data, error: uploadError } = await supabase.storage
-        .from(bucket)
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (uploadError) {
-        throw uploadError;
+      if (!presignRes.ok) {
+        const data = await presignRes.json();
+        throw new Error(data.error || 'Failed to get upload URL');
       }
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(data.path);
+      const { uploadUrl, publicUrl } = await presignRes.json();
 
-      onChange(urlData.publicUrl);
+      // Step 2: Upload file directly to R2 using presigned URL
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type,
+        },
+        body: file,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error('Failed to upload to storage');
+      }
+
+      // Step 3: Return the public URL
+      onChange(publicUrl);
     } catch (err) {
       console.error('Upload error:', err);
-      setError('Failed to upload file. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to upload file. Please try again.');
     } finally {
       setUploading(false);
     }

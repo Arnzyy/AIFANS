@@ -46,12 +46,19 @@ export async function GET() {
 // POST /api/creator/models - Create new model
 export async function POST(request: NextRequest) {
   try {
+    // Debug: Log cookies received
+    const cookieHeader = request.headers.get('cookie');
+    console.log('[API] /api/creator/models POST - cookies:', cookieHeader ? 'present' : 'missing');
+    console.log('[API] Cookie names:', cookieHeader?.split(';').map(c => c.trim().split('=')[0]).join(', '));
+
     const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    console.log('[API] /api/creator/models POST - user:', user?.id, 'authError:', authError?.message);
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Not authenticated' },
+        { error: 'Not authenticated', details: authError?.message },
         { status: 401 }
       );
     }

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase/client';
 import {
   ArrowLeft,
   User,
@@ -100,6 +101,18 @@ export default function NewModelPage() {
     setSaving(true);
 
     try {
+      // Check client-side auth first
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('[NewModel] Client session check:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        error: sessionError?.message,
+      });
+
+      if (!session) {
+        throw new Error('Session expired. Please log in again.');
+      }
+
       // Map chat_mode to nsfw_enabled/sfw_enabled for API
       const submitData = {
         ...formData,
@@ -111,12 +124,17 @@ export default function NewModelPage() {
       const res = await fetch('/api/creator/models', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(submitData),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
+        // If auth failed, suggest re-login
+        if (res.status === 401) {
+          throw new Error('Authentication failed. Please try logging out and back in.');
+        }
         throw new Error(data.error || 'Failed to create model');
       }
 

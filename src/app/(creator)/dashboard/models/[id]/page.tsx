@@ -359,7 +359,7 @@ export default function EditModelPage() {
                 aspectRatio="square"
                 placeholder="Upload avatar image"
                 disabled={!canEdit}
-                folder="avatars"
+                uploadType="avatar"
               />
             </div>
             <div>
@@ -371,7 +371,7 @@ export default function EditModelPage() {
                 aspectRatio="banner"
                 placeholder="Upload banner image"
                 disabled={!canEdit}
-                folder="banners"
+                uploadType="banner"
               />
             </div>
           </div>

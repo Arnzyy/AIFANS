@@ -4,15 +4,29 @@ import { getPresignedUploadUrl, getAvatarPath, getBannerPath, getPostMediaPath }
 
 // Get a presigned URL for direct upload to R2
 export async function POST(request: NextRequest) {
+  // Debug: Log R2 env vars (partial for security)
+  console.log('[API] /api/upload - R2 config check:', {
+    hasAccountId: !!process.env.R2_ACCOUNT_ID,
+    hasBucket: !!process.env.R2_BUCKET_NAME,
+    bucketName: process.env.R2_BUCKET_NAME,
+    hasAccessKey: !!process.env.R2_ACCESS_KEY_ID,
+    hasSecretKey: !!process.env.R2_SECRET_ACCESS_KEY,
+    hasPublicUrl: !!process.env.R2_PUBLIC_URL,
+  })
+
   try {
     const supabase = await createServerClient()
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    console.log('[API] /api/upload - user:', user?.id, 'error:', authError?.message)
+
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized', details: authError?.message }, { status: 401 })
     }
 
-    const { filename, type, postId } = await request.json()
+    const body = await request.json()
+    const { filename, type, postId } = body
+    console.log('[API] /api/upload - filename:', filename, 'type:', type)
 
     if (!filename || !type) {
       return NextResponse.json(
