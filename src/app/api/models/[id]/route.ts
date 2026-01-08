@@ -10,6 +10,8 @@ export async function GET(
     const supabase = await createServerClient();
     const { id } = await params;
 
+    console.log('[API /api/models/[id]] Fetching model:', id);
+
     // Get model - only approved models are public
     const { data: model, error } = await supabase
       .from('creator_models')
@@ -33,12 +35,23 @@ export async function GET(
       .eq('status', 'approved')
       .single();
 
-    if (error || !model) {
+    if (error) {
+      console.error('[API /api/models/[id]] Database error:', error);
+      return NextResponse.json(
+        { error: 'Model not found', details: error.message },
+        { status: 404 }
+      );
+    }
+
+    if (!model) {
+      console.log('[API /api/models/[id]] Model not found or not approved:', id);
       return NextResponse.json(
         { error: 'Model not found' },
         { status: 404 }
       );
     }
+
+    console.log('[API /api/models/[id]] Found model:', model.name, 'Status query was for approved only');
 
     // Get creator info
     const { data: creator } = await supabase

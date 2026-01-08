@@ -46,19 +46,24 @@ export default function ModelProfilePage({
 
   useEffect(() => {
     const fetchModel = async () => {
+      console.log('[ModelProfilePage] Fetching model with ID:', id);
       try {
         const res = await fetch(`/api/models/${id}`);
+        console.log('[ModelProfilePage] API response status:', res.status);
         if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          console.error('[ModelProfilePage] API error:', res.status, errorData);
           if (res.status === 404) {
             setModel(null);
           }
           return;
         }
         const data = await res.json();
+        console.log('[ModelProfilePage] Got model data:', data.model?.name);
         setModel(data.model);
         setIsSubscribed(data.isSubscribed);
       } catch (error) {
-        console.error('Error fetching model:', error);
+        console.error('[ModelProfilePage] Error fetching model:', error);
       } finally {
         setLoading(false);
       }
