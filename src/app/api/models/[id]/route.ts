@@ -26,7 +26,11 @@ export async function GET(
         nsfw_enabled,
         sfw_enabled,
         created_at,
-        creator_id
+        creator_id,
+        backstory,
+        speaking_style,
+        personality_traits,
+        emoji_usage
       `)
       .eq('id', id)
       .eq('status', 'approved')
@@ -83,6 +87,13 @@ export async function GET(
       isSubscribed = !!subscription;
     }
 
+    // Check if AI chat is actually configured (has persona data)
+    const hasAiChat = !!(
+      model.backstory ||
+      model.speaking_style ||
+      (model.personality_traits && model.personality_traits.length > 0)
+    );
+
     return NextResponse.json({
       model: {
         id: model.id,
@@ -95,11 +106,18 @@ export async function GET(
         subscriptionPrice: model.subscription_price,
         nsfw_enabled: model.nsfw_enabled,
         sfw_enabled: model.sfw_enabled,
-        hasAiChat: true,
+        hasAiChat,
         isNew: new Date(model.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
         creatorUsername: creator?.username,
         creatorDisplayName: creator?.display_name,
         tags,
+        // Persona data for AI chat
+        persona: hasAiChat ? {
+          backstory: model.backstory,
+          speakingStyle: model.speaking_style,
+          personalityTraits: model.personality_traits || [],
+          emojiUsage: model.emoji_usage || 'moderate',
+        } : null,
       },
       isSubscribed,
     });

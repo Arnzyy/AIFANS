@@ -112,6 +112,13 @@ export default function AIChatPage() {
             const model = modelData.model;
 
             if (model) {
+              // Check if AI chat is actually configured for this model
+              if (!model.hasAiChat) {
+                // No AI chat configured, redirect to model profile
+                router.push(`/model/${username}`);
+                return;
+              }
+
               const modelName = model.displayName || model.name;
               // Create a clean username from model name (lowercase, no spaces)
               const modelUsername = modelName.toLowerCase().replace(/\s+/g, '_');
@@ -129,8 +136,30 @@ export default function AIChatPage() {
               } as Creator);
               setIsModelChat(true); // This is a database model chat
 
-              // Set opening message for the model (engaging, subscription-focused)
-              setOpeningMessage(`Hey there... I'm ${modelName} 💋\n\nI've been waiting for someone like you to show up. There's so much I want to share with you - my thoughts, my day, maybe some things I don't tell just anyone...\n\nSubscribe to unlock our private conversations and get to know the real me 💕`);
+              // Generate personalized opening message based on persona
+              let openingMsg = `Hey there... I'm ${modelName} 💋\n\n`;
+
+              // Use persona data if available
+              if (model.persona?.backstory) {
+                // Extract key personality from backstory
+                const backstory = model.persona.backstory;
+                openingMsg = `Hey... I'm ${modelName}. ${backstory.slice(0, 100)}${backstory.length > 100 ? '...' : ''}\n\nI'd love to get to know you better. Subscribe to unlock our private conversations 💕`;
+              } else if (model.bio) {
+                // Use bio for personality
+                openingMsg = `Hey there, I'm ${modelName}... ${model.bio.slice(0, 80)}${model.bio.length > 80 ? '...' : ''}\n\nSubscribe to chat with me and discover more 💕`;
+              } else {
+                // Default engaging message
+                openingMsg = `Hey there... I'm ${modelName} 💋\n\nI've been waiting for someone like you. There's so much I want to share... Subscribe to unlock our private conversations and get to know the real me 💕`;
+              }
+
+              // Adjust emoji based on persona settings
+              if (model.persona?.emojiUsage === 'minimal') {
+                openingMsg = openingMsg.replace(/💋|💕/g, '');
+              } else if (model.persona?.emojiUsage === 'heavy') {
+                openingMsg = openingMsg.replace('💕', '💕✨💖');
+              }
+
+              setOpeningMessage(openingMsg);
 
               // For models: logged-in users get free access, guests see paywall
               if (user) {
