@@ -15,7 +15,6 @@ import {
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState({
     // Platform settings
-    platformName: 'LYRA',
     maintenanceMode: false,
     registrationOpen: true,
 
@@ -77,18 +76,6 @@ export default function AdminSettingsPage() {
           Platform Settings
         </h2>
         <div className="space-y-4">
-          <div className="flex items-center justify-between py-3 border-b border-zinc-800">
-            <div>
-              <p className="font-medium">Platform Name</p>
-              <p className="text-sm text-zinc-500">The name displayed across the platform</p>
-            </div>
-            <input
-              type="text"
-              value={settings.platformName}
-              onChange={(e) => setSettings({ ...settings, platformName: e.target.value })}
-              className="px-3 py-2 bg-zinc-800 rounded-lg border border-zinc-700 focus:border-purple-500 outline-none"
-            />
-          </div>
           <div className="flex items-center justify-between py-3 border-b border-zinc-800">
             <div>
               <p className="font-medium">Maintenance Mode</p>
