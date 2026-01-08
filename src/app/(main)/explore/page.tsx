@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Search, Sparkles, Clock, TrendingUp, Bot, Gift, Plus, ArrowRight, BadgeCheck, Star } from 'lucide-react';
+import { mockCreators } from '@/lib/data/creators';
 
 interface Model {
   id: string;
@@ -17,10 +18,11 @@ interface Model {
   subscriptionPrice: number;
   hasAiChat: boolean;
   isNew: boolean;
-  nsfw_enabled: boolean;
-  sfw_enabled: boolean;
+  nsfw_enabled?: boolean;
+  sfw_enabled?: boolean;
   modelType: 'lyra_original' | 'creator_model';
   creatorUsername?: string;
+  isRealModel?: boolean; // true for database models, false for mock
 }
 
 export default function ExplorePage() {
@@ -37,14 +39,62 @@ export default function ExplorePage() {
         if (searchQuery) params.set('search', searchQuery);
         if (category) params.set('category', category);
 
+        // Fetch real models from database
         const res = await fetch(`/api/models?${params.toString()}`);
         const data = await res.json();
 
-        if (data.models) {
-          setModels(data.models);
-        }
+        // Convert mock creators to Model format
+        const mockModels: Model[] = mockCreators
+          .filter(c => {
+            if (!searchQuery) return true;
+            const query = searchQuery.toLowerCase();
+            return c.displayName.toLowerCase().includes(query) ||
+                   c.username.toLowerCase().includes(query) ||
+                   c.bio.toLowerCase().includes(query);
+          })
+          .map(c => ({
+            id: c.id,
+            name: c.displayName,
+            username: c.username,
+            displayName: c.displayName,
+            age: c.age,
+            avatar: c.avatar,
+            bio: c.bio,
+            subscriberCount: c.subscriberCount,
+            subscriptionPrice: c.subscriptionPrice,
+            hasAiChat: c.hasAiChat,
+            isNew: c.isNew || false,
+            modelType: c.modelType,
+            isRealModel: false,
+          }));
+
+        // Real models from API
+        const realModels: Model[] = (data.models || []).map((m: any) => ({
+          ...m,
+          isRealModel: true,
+        }));
+
+        // Combine: real models first, then mock models
+        setModels([...realModels, ...mockModels]);
       } catch (error) {
         console.error('Error fetching models:', error);
+        // On error, still show mock models
+        const mockModels: Model[] = mockCreators.map(c => ({
+          id: c.id,
+          name: c.displayName,
+          username: c.username,
+          displayName: c.displayName,
+          age: c.age,
+          avatar: c.avatar,
+          bio: c.bio,
+          subscriberCount: c.subscriberCount,
+          subscriptionPrice: c.subscriptionPrice,
+          hasAiChat: c.hasAiChat,
+          isNew: c.isNew || false,
+          modelType: c.modelType,
+          isRealModel: false,
+        }));
+        setModels(mockModels);
       } finally {
         setLoading(false);
       }
@@ -160,9 +210,12 @@ export default function ExplorePage() {
 }
 
 function ModelCard({ model }: { model: Model }) {
+  // Real models link to /model/[id], mock models link to /[username]
+  const href = model.isRealModel ? `/model/${model.id}` : `/${model.username}`;
+
   return (
     <Link
-      href={`/model/${model.id}`}
+      href={href}
       className="group block rounded-xl overflow-hidden bg-white/5 border border-white/10 hover:border-purple-500/50 transition-all hover:scale-[1.02]"
     >
       {/* Avatar as main image */}
@@ -181,6 +234,12 @@ function ModelCard({ model }: { model: Model }) {
 
         {/* Badges - top-right corner */}
         <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+          {model.modelType === 'lyra_original' && (
+            <div className="px-2 py-1 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-[10px] md:text-xs font-medium shadow-lg flex items-center gap-1">
+              <Star className="w-3 h-3" />
+              Original
+            </div>
+          )}
           {model.nsfw_enabled && (
             <div className="px-2 py-1 rounded-full bg-red-500/90 text-[10px] md:text-xs font-medium shadow-lg">
               NSFW
