@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { Bot, BadgeCheck, MapPin, Heart, MessageCircle, Lock, Grid3X3, Play, Star, Sparkles, ArrowLeft } from 'lucide-react';
 import { AI_CHAT_DISCLOSURE, MODEL_TYPES, CATEGORY_DISCLAIMER } from '@/lib/compliance/constants';
 import { SubscribeModal } from '@/components/shared/SubscribeModal';
+import { supabase } from '@/lib/supabase/client';
 
 interface Tag {
   id: string;
@@ -37,12 +38,19 @@ export default function ModelProfilePage() {
   const router = useRouter();
   const [model, setModel] = useState<Model | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
 
   useEffect(() => {
     const fetchModel = async () => {
       console.log('[ModelProfilePage] Fetching model with ID:', id);
+
+      // Check if user is admin
+      const { data: { user } } = await supabase.auth.getUser();
+      const adminEmail = user?.email === 'example@gmail.com';
+      setIsAdmin(adminEmail);
+
       try {
         const res = await fetch(`/api/models/${id}`);
         console.log('[ModelProfilePage] API response status:', res.status);
@@ -93,13 +101,17 @@ export default function ModelProfilePage() {
 
   const modelTypeInfo = MODEL_TYPES['creator_model'];
 
+  // Check if user has access (subscribed or admin)
+  const hasFullAccess = isSubscribed || isAdmin;
+
   // Mock posts based on model (will be replaced with real content)
+  // First 2 posts are preview (free), rest require subscription
   const posts = Array.from({ length: 9 }, (_, i) => ({
     id: `${model.id}-${i}`,
     imageUrl: model.avatar,
     likes: Math.floor(Math.random() * 500) + 50,
     comments: Math.floor(Math.random() * 50) + 5,
-    isLocked: i > 2,
+    isLocked: i >= 2 && !hasFullAccess, // Lock content after first 2 unless subscribed/admin
     isVideo: i % 4 === 0,
   }));
 
@@ -116,6 +128,12 @@ export default function ModelProfilePage() {
   ];
 
   const handleMessage = () => {
+    // Check if user has access to chat (subscribed or admin)
+    if (!hasFullAccess) {
+      // Show subscribe modal if not subscribed
+      setShowSubscribeModal(true);
+      return;
+    }
     // Navigate to chat with the model (using model ID)
     const chatPath = `/chat/${model.id}`;
     console.log('[ModelProfilePage] Navigating to chat:', chatPath);
