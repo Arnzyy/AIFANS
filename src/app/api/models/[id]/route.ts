@@ -4,11 +4,11 @@ import { NextRequest, NextResponse } from 'next/server';
 // GET /api/models/[id] - Get public model profile
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerClient();
-    const { id } = params;
+    const { id } = await params;
 
     // Get model - only approved models are public
     const { data: model, error } = await supabase

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -35,8 +35,9 @@ interface Model {
 export default function ModelProfilePage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = use(params);
   const router = useRouter();
   const [model, setModel] = useState<Model | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -46,7 +47,7 @@ export default function ModelProfilePage({
   useEffect(() => {
     const fetchModel = async () => {
       try {
-        const res = await fetch(`/api/models/${params.id}`);
+        const res = await fetch(`/api/models/${id}`);
         if (!res.ok) {
           if (res.status === 404) {
             setModel(null);
@@ -64,7 +65,7 @@ export default function ModelProfilePage({
     };
 
     fetchModel();
-  }, [params.id]);
+  }, [id]);
 
   if (loading) {
     return (
