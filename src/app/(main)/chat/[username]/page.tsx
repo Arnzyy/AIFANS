@@ -112,11 +112,15 @@ export default function AIChatPage() {
             const model = modelData.model;
 
             if (model) {
+              const modelName = model.displayName || model.name;
+              // Create a clean username from model name (lowercase, no spaces)
+              const modelUsername = modelName.toLowerCase().replace(/\s+/g, '_');
+
               // Use model data as the "creator" for chat purposes
               setCreator({
                 id: model.id,
-                username: model.creatorUsername || model.id,
-                display_name: model.displayName || model.name,
+                username: modelUsername,
+                display_name: modelName,
                 avatar_url: model.avatar,
                 creator_profiles: {
                   ai_chat_enabled: true,
@@ -124,15 +128,11 @@ export default function AIChatPage() {
                 },
               } as Creator);
               setIsModelChat(true); // This is a database model chat
-              creatorId = model.id;
 
-              // Set opening message for the model
-              const modelName = model.displayName || model.name;
-              if (!user) {
-                setOpeningMessage(`Hey! I'm ${modelName}. I've been looking forward to meeting someone new... Something tells me we're going to get along really well 💕`);
-              }
+              // Set opening message for the model (for all users)
+              setOpeningMessage(`Hey! I'm ${modelName}. I've been looking forward to meeting someone new... Something tells me we're going to get along really well 💕`);
 
-              // For now, models get similar access logic as mock creators
+              // For models: logged-in users get free access, guests see paywall
               if (user) {
                 setChatAccess({
                   hasAccess: true,
@@ -144,6 +144,9 @@ export default function AIChatPage() {
                   isLowMessages: false,
                 });
               }
+              // Skip the creator chat start flow for models
+              setLoading(false);
+              return;
             } else {
               // Model not found
               router.push('/explore');
