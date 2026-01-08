@@ -4,16 +4,6 @@ import { getPresignedUploadUrl, getAvatarPath, getBannerPath, getPostMediaPath }
 
 // Get a presigned URL for direct upload to R2
 export async function POST(request: NextRequest) {
-  // Debug: Log R2 env vars (partial for security)
-  console.log('[API] /api/upload - R2 config check:', {
-    hasAccountId: !!process.env.R2_ACCOUNT_ID,
-    hasBucket: !!process.env.R2_BUCKET_NAME,
-    bucketName: process.env.R2_BUCKET_NAME,
-    hasAccessKey: !!process.env.R2_ACCESS_KEY_ID,
-    hasSecretKey: !!process.env.R2_SECRET_ACCESS_KEY,
-    hasPublicUrl: !!process.env.R2_PUBLIC_URL,
-  })
-
   try {
     const supabase = await createServerClient()
 
