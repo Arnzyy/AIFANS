@@ -174,35 +174,35 @@ export default function AdminModelDetailPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
           <Link
             href="/admin/models"
             className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
           >
             <ArrowLeft size={20} />
           </Link>
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center overflow-hidden">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center overflow-hidden flex-shrink-0">
               {model.avatar_url ? (
                 <img src={model.avatar_url} alt={model.name} className="w-full h-full object-cover" />
               ) : (
-                <span className="text-xl font-bold">{model.name.charAt(0)}</span>
+                <span className="text-lg sm:text-xl font-bold">{model.name.charAt(0)}</span>
               )}
             </div>
-            <div>
-              <h1 className="text-2xl font-bold">{model.name}</h1>
-              <p className="text-zinc-400">Age: {model.age} • by {creator?.display_name}</p>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold truncate">{model.name}</h1>
+              <p className="text-zinc-400 text-sm sm:text-base">Age: {model.age} • by {creator?.display_name}</p>
             </div>
           </div>
         </div>
 
         {model.status === 'pending_review' && (
-          <div className="flex gap-3">
+          <div className="flex gap-2 sm:gap-3">
             <button
               onClick={handleReject}
               disabled={actionLoading}
-              className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
             >
               <X size={18} />
               Reject
@@ -210,7 +210,7 @@ export default function AdminModelDetailPage() {
             <button
               onClick={handleApprove}
               disabled={actionLoading}
-              className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
             >
               <Check size={18} />
               Approve
