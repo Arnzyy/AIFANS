@@ -238,6 +238,47 @@ export default function AdminModelDetailPage() {
         )}
       </div>
 
+      {/* Model Images */}
+      <div className="bg-zinc-900 rounded-xl p-6">
+        <h2 className="font-semibold flex items-center gap-2 mb-4">
+          <Image size={18} className="text-zinc-400" />
+          Model Images
+        </h2>
+        <div className="space-y-4">
+          {/* Banner */}
+          {model.banner_url && (
+            <div>
+              <span className="text-zinc-400 text-sm block mb-2">Banner Image</span>
+              <a href={model.banner_url} target="_blank" rel="noopener noreferrer">
+                <img
+                  src={model.banner_url}
+                  alt="Banner"
+                  className="w-full max-h-64 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                />
+              </a>
+            </div>
+          )}
+
+          {/* Avatar */}
+          {model.avatar_url && (
+            <div>
+              <span className="text-zinc-400 text-sm block mb-2">Avatar Image</span>
+              <a href={model.avatar_url} target="_blank" rel="noopener noreferrer">
+                <img
+                  src={model.avatar_url}
+                  alt="Avatar"
+                  className="w-32 h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                />
+              </a>
+            </div>
+          )}
+
+          {!model.banner_url && !model.avatar_url && (
+            <p className="text-zinc-500 text-sm">No images uploaded</p>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Basic Info */}
         <div className="bg-zinc-900 rounded-xl p-6 space-y-4">
