@@ -136,30 +136,20 @@ export default function AIChatPage() {
               } as Creator);
               setIsModelChat(true); // This is a database model chat
 
-              // Generate personalized opening message based on persona
-              let openingMsg = `Hey there... I'm ${modelName} 💋\n\n`;
-
-              // Use persona data if available
-              if (model.persona?.backstory) {
-                // Extract key personality from backstory
-                const backstory = model.persona.backstory;
-                openingMsg = `Hey... I'm ${modelName}. ${backstory.slice(0, 100)}${backstory.length > 100 ? '...' : ''}\n\nI'd love to get to know you better. Subscribe to unlock our private conversations 💕`;
-              } else if (model.bio) {
-                // Use bio for personality
-                openingMsg = `Hey there, I'm ${modelName}... ${model.bio.slice(0, 80)}${model.bio.length > 80 ? '...' : ''}\n\nSubscribe to chat with me and discover more 💕`;
-              } else {
-                // Default engaging message
-                openingMsg = `Hey there... I'm ${modelName} 💋\n\nI've been waiting for someone like you. There's so much I want to share... Subscribe to unlock our private conversations and get to know the real me 💕`;
+              // Fetch AI-generated opening message (sanitized, no real locations)
+              try {
+                const openingRes = await fetch(`/api/models/${username}/opening-message`);
+                if (openingRes.ok) {
+                  const { openingMessage: aiMessage } = await openingRes.json();
+                  setOpeningMessage(aiMessage);
+                } else {
+                  // Fallback to generic message
+                  setOpeningMessage(`Hey there... I'm ${modelName}. I've been waiting to meet someone like you. Subscribe to unlock our private conversations 💕`);
+                }
+              } catch {
+                // Fallback if API fails
+                setOpeningMessage(`Hey there... I'm ${modelName}. I've been waiting to meet someone like you. Subscribe to unlock our private conversations 💕`);
               }
-
-              // Adjust emoji based on persona settings
-              if (model.persona?.emojiUsage === 'minimal') {
-                openingMsg = openingMsg.replace(/💋|💕/g, '');
-              } else if (model.persona?.emojiUsage === 'heavy') {
-                openingMsg = openingMsg.replace('💕', '💕✨💖');
-              }
-
-              setOpeningMessage(openingMsg);
 
               // For models: logged-in users get free access, guests see paywall
               if (user) {
