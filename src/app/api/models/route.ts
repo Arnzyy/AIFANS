@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get creator info for each model
-    const creatorIds = [...new Set(models?.map(m => m.creator_id) || [])];
+    const creatorIds = Array.from(new Set(models?.map(m => m.creator_id) || []));
 
     let creators: any[] = [];
     if (creatorIds.length > 0) {
