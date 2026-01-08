@@ -129,8 +129,8 @@ export default function AIChatPage() {
               } as Creator);
               setIsModelChat(true); // This is a database model chat
 
-              // Set opening message for the model (for all users)
-              setOpeningMessage(`Hey! I'm ${modelName}. I've been looking forward to meeting someone new... Something tells me we're going to get along really well 💕`);
+              // Set opening message for the model (engaging, subscription-focused)
+              setOpeningMessage(`Hey there... I'm ${modelName} 💋\n\nI've been waiting for someone like you to show up. There's so much I want to share with you - my thoughts, my day, maybe some things I don't tell just anyone...\n\nSubscribe to unlock our private conversations and get to know the real me 💕`);
 
               // For models: logged-in users get free access, guests see paywall
               if (user) {
@@ -190,7 +190,7 @@ export default function AIChatPage() {
           // Set a default opening message for guests while API loads
           const creatorName = creatorData.display_name || creatorData.username;
           if (!user) {
-            setOpeningMessage(`Hey! I'm ${creatorName}. I've been looking forward to meeting someone new... Something tells me we're going to get along really well 💕`);
+            setOpeningMessage(`Hey there... I'm ${creatorName} 💋\n\nI've been waiting for someone like you to show up. There's so much I want to share with you - my thoughts, my day, maybe some things I don't tell just anyone...\n\nSubscribe to unlock our private conversations and get to know the real me 💕`);
           }
         } else {
           // Try mock creators
@@ -225,7 +225,7 @@ export default function AIChatPage() {
             });
           } else {
             // Guests see the access gate (demo the paywall experience)
-            setOpeningMessage(`Hey! I'm ${mockCreator.displayName}. I've been looking forward to meeting someone new... Something tells me we're going to get along really well 💕`);
+            setOpeningMessage(`Hey there... I'm ${mockCreator.displayName} 💋\n\nI've been waiting for someone like you to show up. There's so much I want to share with you - my thoughts, my day, maybe some things I don't tell just anyone...\n\nSubscribe to unlock our private conversations and get to know the real me 💕`);
             // Guest access already set above, don't overwrite
           }
           setLoading(false);
