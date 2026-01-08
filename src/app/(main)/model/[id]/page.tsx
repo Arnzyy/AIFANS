@@ -116,9 +116,9 @@ export default function ModelProfilePage() {
   ];
 
   const handleMessage = () => {
-    // Navigate to chat with the model's creator
-    const chatPath = `/chat/${model.creatorUsername || model.id}`;
-    console.log('[ModelProfilePage] Navigating to chat:', chatPath, 'creatorUsername:', model.creatorUsername);
+    // Navigate to chat with the model (using model ID)
+    const chatPath = `/chat/${model.id}`;
+    console.log('[ModelProfilePage] Navigating to chat:', chatPath);
     router.push(chatPath);
   };
 

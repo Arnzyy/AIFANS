@@ -48,14 +48,16 @@ export async function GET(
       );
     }
 
-    console.log('[API /api/models/[id]] Found model:', model.name, 'Status query was for approved only');
+    console.log('[API /api/models/[id]] Found model:', model.name, 'creator_id:', model.creator_id);
 
     // Get creator info
-    const { data: creator } = await supabase
+    const { data: creator, error: creatorError } = await supabase
       .from('profiles')
       .select('id, username, display_name')
       .eq('id', model.creator_id)
       .single();
+
+    console.log('[API /api/models/[id]] Creator lookup:', creator ? `Found: ${creator.username}` : 'Not found', creatorError?.message || '');
 
     // Get tags
     const { data: modelTags } = await supabase

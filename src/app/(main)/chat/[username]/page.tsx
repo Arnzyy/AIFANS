@@ -34,6 +34,12 @@ interface Creator {
   } | null;
 }
 
+// Helper to check if a string is a UUID
+function isUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
 export default function AIChatPage() {
   const params = useParams();
   const router = useRouter();
@@ -42,6 +48,7 @@ export default function AIChatPage() {
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [creator, setCreator] = useState<Creator | null>(null);
+  const [isModelChat, setIsModelChat] = useState(false); // True if chatting with a database model
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -92,75 +99,135 @@ export default function AIChatPage() {
         });
       }
 
-      // Try to fetch the creator from database first
-      const { data: creatorData } = await supabase
-        .from('profiles')
-        .select(`
-          id, username, display_name, avatar_url,
-          creator_profiles(ai_chat_enabled, bio)
-        `)
-        .eq('username', username.toLowerCase())
-        .eq('role', 'creator')
-        .single();
-
-      // Handle creator_profiles which may be array or object from Supabase
-      const creatorProfiles = Array.isArray(creatorData?.creator_profiles)
-        ? creatorData.creator_profiles[0]
-        : creatorData?.creator_profiles;
-
       let creatorId: string;
 
-      if (creatorData && creatorProfiles?.ai_chat_enabled) {
-        // Real creator from database
-        setCreator({
-          ...creatorData,
-          creator_profiles: creatorProfiles,
-        } as Creator);
-        creatorId = creatorData.id;
+      // Check if the username is actually a model ID (UUID)
+      if (isUUID(username)) {
+        // This is a model ID, fetch the model directly
+        console.log('[AIChatPage] Detected UUID, fetching model:', username);
+        try {
+          const modelRes = await fetch(`/api/models/${username}`);
+          if (modelRes.ok) {
+            const modelData = await modelRes.json();
+            const model = modelData.model;
 
-        // Set a default opening message for guests while API loads
-        const creatorName = creatorData.display_name || creatorData.username;
-        if (!user) {
-          setOpeningMessage(`Hey! I'm ${creatorName}. I've been looking forward to meeting someone new... Something tells me we're going to get along really well 💕`);
-        }
-      } else {
-        // Try mock creators
-        const mockCreator = getCreatorByUsername(username.toLowerCase());
-        if (!mockCreator || !mockCreator.hasAiChat) {
-          router.push(`/${username}`);
+            if (model) {
+              // Use model data as the "creator" for chat purposes
+              setCreator({
+                id: model.id,
+                username: model.creatorUsername || model.id,
+                display_name: model.displayName || model.name,
+                avatar_url: model.avatar,
+                creator_profiles: {
+                  ai_chat_enabled: true,
+                  bio: model.bio,
+                },
+              } as Creator);
+              setIsModelChat(true); // This is a database model chat
+              creatorId = model.id;
+
+              // Set opening message for the model
+              const modelName = model.displayName || model.name;
+              if (!user) {
+                setOpeningMessage(`Hey! I'm ${modelName}. I've been looking forward to meeting someone new... Something tells me we're going to get along really well 💕`);
+              }
+
+              // For now, models get similar access logic as mock creators
+              if (user) {
+                setChatAccess({
+                  hasAccess: true,
+                  accessType: 'subscription',
+                  messagesRemaining: null,
+                  canSendMessage: true,
+                  requiresUnlock: false,
+                  unlockOptions: [],
+                  isLowMessages: false,
+                });
+              }
+            } else {
+              // Model not found
+              router.push('/explore');
+              return;
+            }
+          } else {
+            // API error, redirect to explore
+            router.push('/explore');
+            return;
+          }
+        } catch (err) {
+          console.error('[AIChatPage] Error fetching model:', err);
+          router.push('/explore');
           return;
         }
-        // Use mock creator data
-        setCreator({
-          id: mockCreator.id,
-          username: mockCreator.username,
-          display_name: mockCreator.displayName,
-          avatar_url: mockCreator.avatar,
-          creator_profiles: {
-            ai_chat_enabled: true,
-            bio: mockCreator.bio,
-          },
-        } as Creator);
+      } else {
+        // Try to fetch the creator from database first
+        const { data: creatorData } = await supabase
+          .from('profiles')
+          .select(`
+            id, username, display_name, avatar_url,
+            creator_profiles(ai_chat_enabled, bio)
+          `)
+          .eq('username', username.toLowerCase())
+          .eq('role', 'creator')
+          .single();
 
-        // For mock creators: logged-in users get free access, guests see paywall demo
-        if (user) {
-          // Logged-in users can chat freely with mock creators
-          setChatAccess({
-            hasAccess: true,
-            accessType: 'subscription',
-            messagesRemaining: null,
-            canSendMessage: true,
-            requiresUnlock: false,
-            unlockOptions: [],
-            isLowMessages: false,
-          });
+        // Handle creator_profiles which may be array or object from Supabase
+        const creatorProfiles = Array.isArray(creatorData?.creator_profiles)
+          ? creatorData.creator_profiles[0]
+          : creatorData?.creator_profiles;
+
+        if (creatorData && creatorProfiles?.ai_chat_enabled) {
+          // Real creator from database
+          setCreator({
+            ...creatorData,
+            creator_profiles: creatorProfiles,
+          } as Creator);
+          creatorId = creatorData.id;
+
+          // Set a default opening message for guests while API loads
+          const creatorName = creatorData.display_name || creatorData.username;
+          if (!user) {
+            setOpeningMessage(`Hey! I'm ${creatorName}. I've been looking forward to meeting someone new... Something tells me we're going to get along really well 💕`);
+          }
         } else {
-          // Guests see the access gate (demo the paywall experience)
-          setOpeningMessage(`Hey! I'm ${mockCreator.displayName}. I've been looking forward to meeting someone new... Something tells me we're going to get along really well 💕`);
-          // Guest access already set above, don't overwrite
+          // Try mock creators
+          const mockCreator = getCreatorByUsername(username.toLowerCase());
+          if (!mockCreator || !mockCreator.hasAiChat) {
+            router.push(`/${username}`);
+            return;
+          }
+          // Use mock creator data
+          setCreator({
+            id: mockCreator.id,
+            username: mockCreator.username,
+            display_name: mockCreator.displayName,
+            avatar_url: mockCreator.avatar,
+            creator_profiles: {
+              ai_chat_enabled: true,
+              bio: mockCreator.bio,
+            },
+          } as Creator);
+
+          // For mock creators: logged-in users get free access, guests see paywall demo
+          if (user) {
+            // Logged-in users can chat freely with mock creators
+            setChatAccess({
+              hasAccess: true,
+              accessType: 'subscription',
+              messagesRemaining: null,
+              canSendMessage: true,
+              requiresUnlock: false,
+              unlockOptions: [],
+              isLowMessages: false,
+            });
+          } else {
+            // Guests see the access gate (demo the paywall experience)
+            setOpeningMessage(`Hey! I'm ${mockCreator.displayName}. I've been looking forward to meeting someone new... Something tells me we're going to get along really well 💕`);
+            // Guest access already set above, don't overwrite
+          }
+          setLoading(false);
+          return; // Skip conversation creation for mock creators
         }
-        setLoading(false);
-        return; // Skip conversation creation for mock creators
       }
 
       // Call start chat endpoint to get opening message and access status
@@ -344,11 +411,11 @@ export default function AIChatPage() {
     setMessages(prev => [...prev, tempUserMsg]);
 
     try {
-      // Check if this is a mock creator (ID doesn't look like UUID)
+      // Check if this is a mock creator (ID doesn't look like UUID) or a database model
       const isMockCreator = !creator.id.includes('-') || creator.id.length < 30;
 
-      if (isMockCreator) {
-        // For mock creators, call the mock AI endpoint
+      if (isMockCreator || isModelChat) {
+        // For mock creators and database models, call the mock AI endpoint
         const response = await fetch('/api/ai-chat/mock', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
