@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { Bot, BadgeCheck, MapPin, Heart, MessageCircle, Lock, Grid3X3, Play, Star, Sparkles, ArrowLeft } from 'lucide-react';
@@ -78,7 +77,18 @@ export default function ModelProfilePage() {
   }
 
   if (!model) {
-    notFound();
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center">
+        <h1 className="text-2xl font-bold mb-2">Model Not Found</h1>
+        <p className="text-gray-400 mb-4">This model doesn't exist or hasn't been approved yet.</p>
+        <button
+          onClick={() => router.push('/explore')}
+          className="px-4 py-2 bg-purple-500 rounded-lg hover:bg-purple-600 transition-colors"
+        >
+          Back to Explore
+        </button>
+      </div>
+    );
   }
 
   const modelTypeInfo = MODEL_TYPES['creator_model'];
@@ -106,8 +116,10 @@ export default function ModelProfilePage() {
   ];
 
   const handleMessage = () => {
-    // Use model ID for chat with real creators
-    router.push(`/chat/${model.creatorUsername || model.id}`);
+    // Navigate to chat with the model's creator
+    const chatPath = `/chat/${model.creatorUsername || model.id}`;
+    console.log('[ModelProfilePage] Navigating to chat:', chatPath, 'creatorUsername:', model.creatorUsername);
+    router.push(chatPath);
   };
 
   return (
