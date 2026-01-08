@@ -108,12 +108,39 @@ export async function PUT(
 
     const body = await request.json();
 
+    // Fields that require re-approval if changed on an approved model
+    const majorFields = [
+      'avatar_url', 'banner_url', 'name', 'bio', 'backstory',
+      'personality_traits', 'nsfw_enabled', 'speaking_style'
+    ];
+
+    // Check if model was approved and major fields are being changed
+    let requiresReapproval = false;
+    if (model.status === 'approved') {
+      for (const field of majorFields) {
+        if (body[field] !== undefined && body[field] !== model[field as keyof typeof model]) {
+          requiresReapproval = true;
+          break;
+        }
+      }
+    }
+
+    // If major changes on approved model, reset status to pending
+    if (requiresReapproval) {
+      body.status = 'pending';
+      body.approved_at = null;
+    }
+
     // Update model
     const updatedModel = await creatorService.updateModel(params.id, body);
 
     return NextResponse.json({
       success: true,
       model: updatedModel,
+      requiresReapproval,
+      message: requiresReapproval
+        ? 'Model updated and sent for re-approval due to major changes'
+        : 'Model updated successfully',
     });
   } catch (error) {
     console.error('Error updating model:', error);
