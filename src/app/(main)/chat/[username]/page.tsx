@@ -151,8 +151,12 @@ export default function AIChatPage() {
                 setOpeningMessage(`Hey there... I'm ${modelName}. I've been waiting to meet someone like you. Subscribe to unlock our private conversations 💕`);
               }
 
-              // For models: logged-in users get free access, guests see paywall
-              if (user) {
+              // Check subscription status - admin email gets full access
+              const isAdmin = user?.email === 'example@gmail.com';
+              const isSubscribedToModel = modelData.isSubscribed || isAdmin;
+
+              if (user && isSubscribedToModel) {
+                // User is subscribed or admin - grant access
                 setChatAccess({
                   hasAccess: true,
                   accessType: 'subscription',
@@ -160,6 +164,19 @@ export default function AIChatPage() {
                   canSendMessage: true,
                   requiresUnlock: false,
                   unlockOptions: [],
+                  isLowMessages: false,
+                });
+              } else if (user) {
+                // User is logged in but NOT subscribed - show subscription paywall
+                setChatAccess({
+                  hasAccess: false,
+                  accessType: 'none',
+                  messagesRemaining: null,
+                  canSendMessage: false,
+                  requiresUnlock: true,
+                  unlockOptions: [
+                    { type: 'subscribe', label: `Subscribe to ${modelName}`, recommended: true },
+                  ],
                   isLowMessages: false,
                 });
               }
@@ -394,9 +411,14 @@ export default function AIChatPage() {
   // Subscribe handler
   const handleSubscribe = useCallback(() => {
     if (creator) {
-      router.push(`/${creator.username}?subscribe=true`);
+      // For model chats, go to model profile page; for creators, go to username profile
+      if (isModelChat) {
+        router.push(`/model/${username}?subscribe=true`);
+      } else {
+        router.push(`/${creator.username}?subscribe=true`);
+      }
     }
-  }, [creator, router]);
+  }, [creator, router, isModelChat, username]);
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
