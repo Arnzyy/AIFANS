@@ -3,13 +3,32 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Bot, Sparkles, Shield, Gem } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase/client';
 
 export default function HomePage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check if user is logged in - redirect to /explore if so
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // User is logged in, redirect to explore
+        router.replace('/explore');
+      } else {
+        setIsLoading(false);
+      }
+    };
+    checkAuth();
+  }, [router]);
 
   // Scroll to center the middle card on mobile
   useEffect(() => {
+    if (isLoading) return;
     const container = scrollContainerRef.current;
     if (container && window.innerWidth < 1024) {
       // Wait for images to potentially load
@@ -25,7 +44,16 @@ export default function HomePage() {
         }
       }, 100);
     }
-  }, []);
+  }, [isLoading]);
+
+  // Show loading state while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen lg:h-screen bg-black flex flex-col overflow-x-hidden">
