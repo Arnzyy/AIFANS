@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AIPersonalityFull, WIZARD_STEPS } from '@/lib/ai/personality/types';
 import { Step1Identity } from './steps/Step1Identity';
 import { Step2Personality } from './steps/Step2Personality';
@@ -10,9 +10,23 @@ import { Step5Voice } from './steps/Step5Voice';
 import { Step6Behavior } from './steps/Step6Behavior';
 import { Step7Preview } from './steps/Step7Preview';
 
+interface LinkedModel {
+  id: string;
+  name: string;
+  bio: string | null;
+  backstory: string | null;
+  speaking_style: string | null;
+  personality_traits: string[] | null;
+  emoji_usage: string | null;
+  interests: string[] | null;
+  avatar_url: string | null;
+}
+
 interface AIPersonalityWizardProps {
   creatorId: string;
   existingPersonality?: AIPersonalityFull;
+  linkedModel?: LinkedModel | null;
+  modelId?: string | null;
   onComplete: (personality: AIPersonalityFull) => void;
 }
 
@@ -56,13 +70,74 @@ const defaultPersonality: Omit<AIPersonalityFull, 'creator_id'> = {
 export function AIPersonalityWizard({
   creatorId,
   existingPersonality,
+  linkedModel,
+  modelId,
   onComplete
 }: AIPersonalityWizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [personality, setPersonality] = useState<AIPersonalityFull>(
-    existingPersonality || { ...defaultPersonality, creator_id: creatorId }
-  );
+
+  // Build initial personality - pre-fill from linked model if available
+  const getInitialPersonality = (): AIPersonalityFull => {
+    if (existingPersonality) {
+      return existingPersonality;
+    }
+
+    // Pre-fill from linked model data
+    const prefilled: AIPersonalityFull = {
+      ...defaultPersonality,
+      creator_id: creatorId,
+    };
+
+    if (linkedModel) {
+      // Use model name as persona name
+      if (linkedModel.name) {
+        prefilled.persona_name = linkedModel.name;
+      }
+
+      // Map model personality traits
+      if (linkedModel.personality_traits && linkedModel.personality_traits.length > 0) {
+        prefilled.personality_traits = linkedModel.personality_traits;
+      }
+
+      // Map interests
+      if (linkedModel.interests && linkedModel.interests.length > 0) {
+        prefilled.interests = linkedModel.interests;
+      }
+
+      // Map emoji usage
+      if (linkedModel.emoji_usage) {
+        prefilled.emoji_usage = linkedModel.emoji_usage as typeof prefilled.emoji_usage;
+      }
+
+      // Use backstory to inform occupation if present
+      if (linkedModel.bio) {
+        prefilled.occupation = linkedModel.bio.slice(0, 100); // Truncate for field
+      }
+    }
+
+    return prefilled;
+  };
+
+  const [personality, setPersonality] = useState<AIPersonalityFull>(getInitialPersonality);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Update personality when linkedModel data arrives (async timing fix)
+  useEffect(() => {
+    if (linkedModel && !existingPersonality && !personality.persona_name) {
+      setPersonality(prev => ({
+        ...prev,
+        persona_name: linkedModel.name || prev.persona_name,
+        personality_traits: linkedModel.personality_traits && linkedModel.personality_traits.length > 0
+          ? linkedModel.personality_traits
+          : prev.personality_traits,
+        interests: linkedModel.interests && linkedModel.interests.length > 0
+          ? linkedModel.interests
+          : prev.interests,
+        emoji_usage: (linkedModel.emoji_usage as typeof prev.emoji_usage) || prev.emoji_usage,
+        occupation: linkedModel.bio ? linkedModel.bio.slice(0, 100) : prev.occupation,
+      }));
+    }
+  }, [linkedModel, existingPersonality]);
 
   const updatePersonality = (updates: Partial<AIPersonalityFull>) => {
     setPersonality(prev => ({ ...prev, ...updates }));
@@ -87,10 +162,16 @@ export function AIPersonalityWizard({
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      // Include model_id if linked to a model
+      const payload = {
+        ...personality,
+        model_id: modelId || linkedModel?.id || null,
+      };
+
       const response = await fetch('/api/creator/ai-personality', {
         method: existingPersonality ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(personality),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) throw new Error('Failed to save');
@@ -137,6 +218,23 @@ export function AIPersonalityWizard({
           <p className="text-gray-400">
             Build your unique AI persona - make her one of a kind
           </p>
+
+          {/* Linked Model Indicator */}
+          {linkedModel && (
+            <div className="mt-4 flex items-center gap-3 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+              {linkedModel.avatar_url && (
+                <img
+                  src={linkedModel.avatar_url}
+                  alt={linkedModel.name}
+                  className="w-10 h-10 rounded-lg object-cover"
+                />
+              )}
+              <div>
+                <p className="text-sm text-purple-300">Linked to model:</p>
+                <p className="font-medium text-purple-400">{linkedModel.name}</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

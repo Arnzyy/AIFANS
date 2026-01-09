@@ -24,28 +24,56 @@ export function Step5Voice({ personality, onChange }: Step5Props) {
   const getExampleMessage = (): string => {
     let msg = '';
 
+    // Base message based on vocabulary level
     if (personality.vocabulary_level <= 3) {
-      msg = 'hey babe whats up';
+      msg = 'hey whats up';
     } else if (personality.vocabulary_level <= 6) {
-      msg = 'Hey! How are you doing today?';
+      msg = 'Hey there! How are you doing today?';
     } else {
-      msg = 'Hello darling, I hope this evening finds you well';
+      msg = 'Hello, I hope this evening finds you well';
     }
 
+    // Apply accent flavor first
+    if (personality.accent_flavor === 'southern_sweetness') {
+      msg = msg.replace('Hey there!', "Well hey there, sugar!");
+      msg = msg.replace('hey whats up', "hey darlin, how ya doin");
+    } else if (personality.accent_flavor === 'valley_girl') {
+      msg = msg.replace('Hey there!', 'Like, hey!');
+      msg = msg.replace('hey whats up', 'omg hey whats up');
+    } else if (personality.accent_flavor === 'cali_chill') {
+      msg = msg.replace('Hey there!', 'Hey, whats good!');
+    }
+
+    // Apply speech patterns
     if (personality.speech_patterns.includes('trailing')) {
-      msg = msg.replace('?', '...');
+      msg = msg.replace('?', '...').replace('!', '...');
     }
 
+    if (personality.speech_patterns.includes('pet_names') && !msg.includes('babe') && !msg.includes('darling') && !msg.includes('sugar')) {
+      if (personality.vocabulary_level <= 3) {
+        msg = 'hey babe, ' + msg.replace('hey ', '');
+      } else if (personality.vocabulary_level <= 6) {
+        msg = msg.replace('Hey there', 'Hey baby');
+      } else {
+        msg = msg.replace('Hello,', 'Hello darling,');
+      }
+    }
+
+    if (personality.speech_patterns.includes('playful_teasing')) {
+      msg += ' I was just thinking about you';
+    }
+
+    if (personality.speech_patterns.includes('expressive_reactions')) {
+      msg = msg.replace('Hello', 'Ooh, hello').replace('Hey', 'Ooh hey');
+    }
+
+    // Add emojis based on setting
     if (personality.emoji_usage === 'heavy') {
       msg += ' 💕😘✨🔥';
     } else if (personality.emoji_usage === 'moderate') {
       msg += ' 💕';
     } else if (personality.emoji_usage === 'minimal') {
       msg += ' 😊';
-    }
-
-    if (personality.speech_patterns.includes('pet_names') && !msg.includes('babe') && !msg.includes('darling')) {
-      msg = msg.replace('!', ', baby!').replace('?', ', hun?');
     }
 
     return msg;

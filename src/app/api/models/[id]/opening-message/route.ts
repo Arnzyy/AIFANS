@@ -1,8 +1,5 @@
 import { createServerClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
-
-const anthropic = new Anthropic();
 
 // GET /api/models/[id]/opening-message - Generate personalized opening message
 export async function GET(
@@ -62,7 +59,7 @@ async function generateOpeningMessage(model: {
   const interests = model.interests?.join(', ') || '';
   const emojiLevel = model.emoji_usage || 'moderate';
 
-  const prompt = `You are generating an opening message for an AI companion chatbot named "${model.name}".
+  const systemPrompt = `You are generating an opening message for an AI companion chatbot named "${model.name}".
 
 PERSONA INFORMATION (use for inspiration, DO NOT copy directly):
 - Personality traits: ${traits}
@@ -83,22 +80,41 @@ CRITICAL RULES - MUST FOLLOW:
 9. If the backstory mentions locations, IGNORE that information completely
 10. Focus on personality traits and creating an emotional connection
 
-GOAL: Make the user want to subscribe to chat more. Be playful, mysterious, and enticing.
+GOAL: Make the user want to subscribe to chat more. Be playful, mysterious, and enticing.`;
 
-Generate ONLY the opening message, nothing else:`;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return getDefaultOpeningMessage(model.name, emojiLevel);
+  }
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 150,
-      messages: [
-        { role: 'user', content: prompt }
-      ]
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 150,
+        system: systemPrompt,
+        messages: [
+          { role: 'user', content: 'Generate ONLY the opening message, nothing else:' }
+        ],
+      }),
     });
 
-    const textContent = response.content.find(c => c.type === 'text');
-    if (textContent && textContent.type === 'text') {
-      return textContent.text.trim();
+    if (!response.ok) {
+      console.error('Anthropic API error:', await response.text());
+      return getDefaultOpeningMessage(model.name, emojiLevel);
+    }
+
+    const data = await response.json();
+    const text = data.content?.[0]?.text;
+
+    if (text) {
+      return text.trim();
     }
 
     // Fallback if AI fails

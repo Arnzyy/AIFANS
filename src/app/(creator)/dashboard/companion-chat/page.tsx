@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import {
   Heart,
   Info,
@@ -24,6 +26,17 @@ import {
   DEFAULT_SFW_CONFIG,
   SFWPhysicalTraits,
 } from '@/lib/sfw-chat/types';
+
+interface LinkedModel {
+  id: string;
+  name: string;
+  bio: string | null;
+  backstory: string | null;
+  personality_traits: string[] | null;
+  emoji_usage: string | null;
+  interests: string[] | null;
+  avatar_url: string | null;
+}
 
 // ===========================================
 // OPTIONS (SFW-SAFE ONLY)
@@ -51,7 +64,13 @@ const AESTHETIC_OPTIONS = [
 // ===========================================
 
 export default function SFWChatSetupPage() {
+  const searchParams = useSearchParams();
+  const modelId = searchParams.get('model');
+  const supabase = createClient();
+
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [linkedModel, setLinkedModel] = useState<LinkedModel | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     identity: true,
     flirtLevel: true,
@@ -66,6 +85,47 @@ export default function SFWChatSetupPage() {
     ...DEFAULT_SFW_CONFIG,
     creator_id: '', // Will be set from auth
   });
+
+  // Fetch linked model data and pre-fill
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Set creator ID
+        setConfig(prev => ({ ...prev, creator_id: user.id }));
+
+        // Fetch linked model if provided
+        if (modelId) {
+          const { data: model } = await supabase
+            .from('creator_models')
+            .select('id, name, bio, backstory, personality_traits, emoji_usage, interests, avatar_url')
+            .eq('id', modelId)
+            .single();
+
+          if (model) {
+            setLinkedModel(model);
+
+            // Pre-fill config from model data
+            setConfig(prev => ({
+              ...prev,
+              persona_name: model.name || prev.persona_name,
+              backstory: model.backstory || prev.backstory,
+              interests: model.interests || prev.interests,
+              emoji_usage: (model.emoji_usage as any) || prev.emoji_usage,
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [modelId]);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -106,6 +166,14 @@ export default function SFWChatSetupPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl">
       {/* Header */}
@@ -118,6 +186,23 @@ export default function SFWChatSetupPage() {
           <p className="text-gray-400 mt-1">
             Configure your SFW AI companion for friendly, flirty conversations
           </p>
+
+          {/* Linked Model Indicator */}
+          {linkedModel && (
+            <div className="mt-4 flex items-center gap-3 p-3 bg-pink-500/10 border border-pink-500/30 rounded-lg">
+              {linkedModel.avatar_url && (
+                <img
+                  src={linkedModel.avatar_url}
+                  alt={linkedModel.name}
+                  className="w-10 h-10 rounded-lg object-cover"
+                />
+              )}
+              <div>
+                <p className="text-sm text-pink-300">Linked to model:</p>
+                <p className="font-medium text-pink-400">{linkedModel.name}</p>
+              </div>
+            </div>
+          )}
         </div>
         <button
           onClick={handleSave}

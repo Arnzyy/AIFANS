@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Bot,
@@ -11,6 +11,8 @@ import {
   ArrowRight,
   Shield,
   Flame,
+  AlertCircle,
+  Users,
 } from 'lucide-react';
 
 // Types
@@ -20,6 +22,14 @@ interface ChatModeSettings {
   nsfw_enabled: boolean;
   sfw_enabled: boolean;
   default_mode: ChatMode;
+  linked_model_id: string | null;
+}
+
+interface Model {
+  id: string;
+  name: string;
+  avatar_url: string;
+  status: string;
 }
 
 // ===========================================
@@ -28,11 +38,40 @@ interface ChatModeSettings {
 
 export default function ChatModesPage() {
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [models, setModels] = useState<Model[]>([]);
   const [settings, setSettings] = useState<ChatModeSettings>({
-    nsfw_enabled: true,  // Default: NSFW enabled (backwards compat)
-    sfw_enabled: false,  // Default: SFW disabled
+    nsfw_enabled: false,  // Default: disabled until model linked
+    sfw_enabled: false,
     default_mode: 'nsfw',
+    linked_model_id: null,
   });
+
+  // Fetch creator's approved models
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const res = await fetch('/api/creator/models');
+        if (res.ok) {
+          const data = await res.json();
+          // Only show approved models
+          const approvedModels = (data.models || []).filter(
+            (m: Model) => m.status === 'approved'
+          );
+          setModels(approvedModels);
+        }
+      } catch (error) {
+        console.error('Error fetching models:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchModels();
+  }, []);
+
+  // Check if user has approved models
+  const hasApprovedModels = models.length > 0;
+  const selectedModel = models.find(m => m.id === settings.linked_model_id);
 
   const handleSave = async () => {
     setSaving(true);
@@ -71,6 +110,68 @@ export default function ChatModesPage() {
         </button>
       </div>
 
+      {/* No Models Warning */}
+      {!loading && !hasApprovedModels && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6 flex gap-3">
+          <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-yellow-200">
+            <p className="font-medium text-yellow-300 mb-1">No Approved Models</p>
+            <p>
+              You need to create and get a model approved before you can enable AI chat.{' '}
+              <Link href="/dashboard/models" className="text-yellow-400 hover:text-yellow-300 underline">
+                Create a model
+              </Link>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Model Selector */}
+      {hasApprovedModels && (
+        <div className="bg-zinc-900 rounded-xl p-6 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+              <Users className="w-5 h-5 text-blue-400" />
+            </div>
+            <div>
+              <h3 className="font-bold">Link to Model</h3>
+              <p className="text-sm text-gray-400">Select which model this chat configuration is for</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {models.map((model) => (
+              <button
+                key={model.id}
+                onClick={() => setSettings(p => ({ ...p, linked_model_id: model.id }))}
+                className={`flex items-center gap-3 p-3 rounded-lg border-2 transition text-left ${
+                  settings.linked_model_id === model.id
+                    ? 'border-purple-500 bg-purple-500/10'
+                    : 'border-white/10 bg-zinc-800 hover:border-white/20'
+                }`}
+              >
+                <img
+                  src={model.avatar_url || '/default-avatar.png'}
+                  alt={model.name}
+                  className="w-12 h-12 rounded-lg object-cover"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{model.name}</p>
+                  <p className="text-xs text-green-400">Approved</p>
+                </div>
+                {settings.linked_model_id === model.id && (
+                  <div className="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Info Box */}
       <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-6 flex gap-3">
         <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
@@ -85,7 +186,12 @@ export default function ChatModesPage() {
       </div>
 
       {/* Mode Cards */}
-      <div className="space-y-4 mb-8">
+      <div className={`space-y-4 mb-8 ${!settings.linked_model_id ? 'opacity-50' : ''}`}>
+        {!settings.linked_model_id && hasApprovedModels && (
+          <div className="text-center text-yellow-400 text-sm py-2 bg-yellow-500/10 rounded-lg mb-2">
+            Select a model above to enable chat modes
+          </div>
+        )}
         {/* NSFW Mode */}
         <div className={`bg-zinc-900 rounded-xl p-6 border-2 transition ${
           settings.nsfw_enabled ? 'border-purple-500' : 'border-transparent'
@@ -101,10 +207,11 @@ export default function ChatModesPage() {
               </div>
             </div>
             <button
-              onClick={() => setSettings((p) => ({ ...p, nsfw_enabled: !p.nsfw_enabled }))}
+              onClick={() => settings.linked_model_id && setSettings((p) => ({ ...p, nsfw_enabled: !p.nsfw_enabled }))}
+              disabled={!settings.linked_model_id}
               className={`w-14 h-7 rounded-full transition-colors ${
                 settings.nsfw_enabled ? 'bg-purple-500' : 'bg-white/10'
-              }`}
+              } ${!settings.linked_model_id ? 'cursor-not-allowed' : ''}`}
             >
               <div
                 className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${
@@ -114,14 +221,14 @@ export default function ChatModesPage() {
             </button>
           </div>
 
-          {settings.nsfw_enabled && (
+          {settings.nsfw_enabled && settings.linked_model_id && (
             <div className="pt-4 border-t border-white/10">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-400">
                   Configure your NSFW AI personality and pricing
                 </p>
                 <Link
-                  href="/dashboard/ai-chat"
+                  href={`/dashboard/ai-chat?model=${settings.linked_model_id}`}
                   className="text-purple-400 hover:text-purple-300 flex items-center gap-1 text-sm"
                 >
                   Setup <ArrowRight className="w-4 h-4" />
@@ -146,10 +253,11 @@ export default function ChatModesPage() {
               </div>
             </div>
             <button
-              onClick={() => setSettings((p) => ({ ...p, sfw_enabled: !p.sfw_enabled }))}
+              onClick={() => settings.linked_model_id && setSettings((p) => ({ ...p, sfw_enabled: !p.sfw_enabled }))}
+              disabled={!settings.linked_model_id}
               className={`w-14 h-7 rounded-full transition-colors ${
                 settings.sfw_enabled ? 'bg-pink-500' : 'bg-white/10'
-              }`}
+              } ${!settings.linked_model_id ? 'cursor-not-allowed' : ''}`}
             >
               <div
                 className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${
@@ -159,14 +267,14 @@ export default function ChatModesPage() {
             </button>
           </div>
 
-          {settings.sfw_enabled && (
+          {settings.sfw_enabled && settings.linked_model_id && (
             <div className="pt-4 border-t border-white/10">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-400">
                   Configure your Companion AI personality and pricing
                 </p>
                 <Link
-                  href="/dashboard/companion-chat"
+                  href={`/dashboard/companion-chat?model=${settings.linked_model_id}`}
                   className="text-pink-400 hover:text-pink-300 flex items-center gap-1 text-sm"
                 >
                   Setup <ArrowRight className="w-4 h-4" />
@@ -177,8 +285,8 @@ export default function ChatModesPage() {
         </div>
       </div>
 
-      {/* Default Mode Selector (only if both enabled) */}
-      {bothEnabled && (
+      {/* Default Mode Selector (only if both enabled and model linked) */}
+      {bothEnabled && settings.linked_model_id && (
         <div className="bg-zinc-900 rounded-xl p-6">
           <h3 className="font-bold mb-2">Default Chat Mode</h3>
           <p className="text-sm text-gray-400 mb-4">
@@ -215,8 +323,8 @@ export default function ChatModesPage() {
         </div>
       )}
 
-      {/* Warning if none enabled */}
-      {!settings.nsfw_enabled && !settings.sfw_enabled && (
+      {/* Warning if model selected but none enabled */}
+      {settings.linked_model_id && !settings.nsfw_enabled && !settings.sfw_enabled && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex gap-3">
           <Shield className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-yellow-200">
