@@ -190,7 +190,7 @@ export function SubscribeModal({ creator, tiers, chatPrice = 999, onClose, onSuc
               </div>
               <div className="flex-1">
                 <p className="font-semibold">CHAT</p>
-                <p className="text-sm text-gray-400">Unlimited AI chat access</p>
+                <p className="text-sm text-gray-400">AI chat access</p>
               </div>
               <div className="text-right">
                 <p className="font-bold">£{chatMonthlyPrice.toFixed(2)}</p>

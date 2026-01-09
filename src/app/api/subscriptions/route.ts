@@ -216,8 +216,8 @@ export async function POST(request: NextRequest) {
     };
     const productDescriptions: Record<string, string> = {
       content: `Access to all posts and content from ${creator?.display_name || creator?.username}`,
-      chat: `Unlimited AI chat with ${creator?.display_name || creator?.username}`,
-      bundle: `Full access: posts, content, and unlimited AI chat`,
+      chat: `AI chat with ${creator?.display_name || creator?.username}`,
+      bundle: `Full access: posts, content, and AI chat`,
     };
 
     // Get or create Stripe customer
