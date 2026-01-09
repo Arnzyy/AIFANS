@@ -45,10 +45,11 @@ export function SubscribeModal({ creator, tiers, chatPrice = 999, onClose, onSuc
 
   // Update selectedTier when tiers prop changes (e.g., after async fetch)
   useEffect(() => {
-    if (tiers.length > 0 && !selectedTier) {
-      setSelectedTier(tiers.find(t => t.is_featured)?.id || tiers[0]?.id || '');
+    if (tiers.length > 0) {
+      const defaultTierId = tiers.find(t => t.is_featured)?.id || tiers[0]?.id || '';
+      setSelectedTier(defaultTierId);
     }
-  }, [tiers, selectedTier]);
+  }, [tiers]);
 
   const handleSubscribe = async () => {
     // For content/bundle, need a tier selected
