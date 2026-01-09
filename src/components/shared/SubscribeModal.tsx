@@ -122,17 +122,18 @@ export function SubscribeModal({ creator, tiers, chatPrice = 999, onClose, onSuc
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-zinc-900 rounded-2xl overflow-hidden">
-        {/* Header - gradient stops before avatar area */}
-        <div className="relative h-16 bg-gradient-to-br from-purple-500/30 to-pink-500/30">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center hover:bg-black/70 transition-colors z-10"
-          >
-            ✕
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="max-w-md w-full bg-zinc-900 rounded-2xl overflow-hidden relative" onClick={(e) => e.stopPropagation()}>
+        {/* Close button - positioned above everything */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/70 flex items-center justify-center hover:bg-black/90 transition-colors z-50 text-white"
+        >
+          ✕
+        </button>
+
+        {/* Header - gradient */}
+        <div className="h-16 bg-gradient-to-br from-purple-500/30 to-pink-500/30" />
 
         <div className="px-6 pb-6">
           {/* Avatar - positioned to overlap header cleanly */}
