@@ -6,6 +6,9 @@ ALTER TABLE ai_personalities ADD COLUMN IF NOT EXISTS persona_name VARCHAR(100);
 -- Copy existing name values to persona_name
 UPDATE ai_personalities SET persona_name = name WHERE persona_name IS NULL;
 
+-- Add age column (required field)
+ALTER TABLE ai_personalities ADD COLUMN IF NOT EXISTS age INTEGER DEFAULT 24;
+
 -- Step 1: Identity & Appearance
 ALTER TABLE ai_personalities ADD COLUMN IF NOT EXISTS height_cm INTEGER DEFAULT 165;
 ALTER TABLE ai_personalities ADD COLUMN IF NOT EXISTS body_type VARCHAR(20) DEFAULT 'slim';
