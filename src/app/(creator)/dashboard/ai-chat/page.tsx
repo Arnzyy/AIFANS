@@ -9,13 +9,24 @@ import { AIPersonalityFull } from '@/lib/ai/personality/types';
 interface ModelData {
   id: string;
   name: string;
+  age: number | null;
   bio: string | null;
   backstory: string | null;
   speaking_style: string | null;
   personality_traits: string[] | null;
   emoji_usage: string | null;
+  response_length: string | null;
   interests: string[] | null;
+  turn_ons: string[] | null;
   avatar_url: string | null;
+  physical_traits: {
+    hair_color?: string;
+    eye_color?: string;
+    body_type?: string;
+    ethnicity?: string;
+    style?: string;
+    height?: string;
+  } | null;
 }
 
 export default function AIChatSetupPage() {
@@ -46,12 +57,12 @@ export default function AIChatSetupPage() {
       if (modelId) {
         const { data: model } = await supabase
           .from('creator_models')
-          .select('id, name, bio, backstory, speaking_style, personality_traits, emoji_usage, interests, avatar_url')
+          .select('id, name, age, bio, backstory, speaking_style, personality_traits, emoji_usage, response_length, interests, turn_ons, avatar_url, physical_traits')
           .eq('id', modelId)
           .single();
 
         if (model) {
-          setLinkedModel(model);
+          setLinkedModel(model as ModelData);
         }
       }
 

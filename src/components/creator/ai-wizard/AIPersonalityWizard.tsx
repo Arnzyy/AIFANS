@@ -13,13 +13,24 @@ import { Step7Preview } from './steps/Step7Preview';
 interface LinkedModel {
   id: string;
   name: string;
+  age: number | null;
   bio: string | null;
   backstory: string | null;
   speaking_style: string | null;
   personality_traits: string[] | null;
   emoji_usage: string | null;
+  response_length: string | null;
   interests: string[] | null;
+  turn_ons: string[] | null;
   avatar_url: string | null;
+  physical_traits: {
+    hair_color?: string;
+    eye_color?: string;
+    body_type?: string;
+    ethnicity?: string;
+    style?: string;
+    height?: string;
+  } | null;
 }
 
 interface AIPersonalityWizardProps {
@@ -89,29 +100,89 @@ export function AIPersonalityWizard({
     };
 
     if (linkedModel) {
-      // Use model name as persona name
+      // Basic info
       if (linkedModel.name) {
         prefilled.persona_name = linkedModel.name;
       }
+      if (linkedModel.age) {
+        prefilled.age = linkedModel.age;
+      }
 
-      // Map model personality traits
+      // Personality
       if (linkedModel.personality_traits && linkedModel.personality_traits.length > 0) {
         prefilled.personality_traits = linkedModel.personality_traits;
       }
-
-      // Map interests
       if (linkedModel.interests && linkedModel.interests.length > 0) {
         prefilled.interests = linkedModel.interests;
       }
+      if (linkedModel.turn_ons && linkedModel.turn_ons.length > 0) {
+        prefilled.turn_ons = linkedModel.turn_ons;
+      }
 
-      // Map emoji usage
+      // Voice settings
       if (linkedModel.emoji_usage) {
         prefilled.emoji_usage = linkedModel.emoji_usage as typeof prefilled.emoji_usage;
       }
+      if (linkedModel.response_length) {
+        prefilled.response_length = linkedModel.response_length as typeof prefilled.response_length;
+      }
 
-      // Use backstory to inform occupation if present
+      // Background
       if (linkedModel.bio) {
-        prefilled.occupation = linkedModel.bio.slice(0, 100); // Truncate for field
+        prefilled.occupation = linkedModel.bio.slice(0, 100);
+      }
+      if (linkedModel.backstory) {
+        prefilled.backstory = linkedModel.backstory;
+      }
+
+      // Physical traits from JSONB
+      const traits = linkedModel.physical_traits;
+      if (traits) {
+        if (traits.hair_color) {
+          prefilled.hair_color = traits.hair_color;
+        }
+        if (traits.eye_color) {
+          prefilled.eye_color = traits.eye_color;
+        }
+        if (traits.body_type) {
+          // Map body type values to wizard options
+          const bodyTypeMap: Record<string, typeof prefilled.body_type> = {
+            'petite': 'petite',
+            'slim': 'slim',
+            'athletic': 'athletic',
+            'curvy': 'curvy',
+            'tall': 'tall',
+          };
+          prefilled.body_type = bodyTypeMap[traits.body_type.toLowerCase()] || 'slim';
+        }
+        if (traits.height) {
+          // Parse height string like "5'1" to cm
+          const heightMatch = traits.height.match(/(\d+)'(\d+)/);
+          if (heightMatch) {
+            const feet = parseInt(heightMatch[1]);
+            const inches = parseInt(heightMatch[2]);
+            prefilled.height_cm = Math.round((feet * 30.48) + (inches * 2.54));
+          }
+        }
+        if (traits.style) {
+          // Add style to style_vibes
+          prefilled.style_vibes = [traits.style];
+        }
+        if (traits.ethnicity) {
+          // Map ethnicity to skin tone
+          const skinToneMap: Record<string, typeof prefilled.skin_tone> = {
+            'caucasian': 'fair',
+            'white': 'fair',
+            'latina': 'olive',
+            'hispanic': 'olive',
+            'mediterranean': 'olive',
+            'asian': 'fair',
+            'middle eastern': 'tan',
+            'black': 'deep',
+            'african': 'deep',
+          };
+          prefilled.skin_tone = skinToneMap[traits.ethnicity.toLowerCase()] || 'olive';
+        }
       }
     }
 
@@ -124,17 +195,47 @@ export function AIPersonalityWizard({
   // Update personality when linkedModel data arrives (async timing fix)
   useEffect(() => {
     if (linkedModel && !existingPersonality && !personality.persona_name) {
+      const traits = linkedModel.physical_traits;
+
+      // Parse height from string like "5'1"
+      let heightCm: number | null = null;
+      if (traits?.height) {
+        const heightMatch = traits.height.match(/(\d+)'(\d+)/);
+        if (heightMatch) {
+          const feet = parseInt(heightMatch[1]);
+          const inches = parseInt(heightMatch[2]);
+          heightCm = Math.round((feet * 30.48) + (inches * 2.54));
+        }
+      }
+
+      // Map body type
+      const bodyTypeMap: Record<string, AIPersonalityFull['body_type']> = {
+        'petite': 'petite', 'slim': 'slim', 'athletic': 'athletic', 'curvy': 'curvy', 'tall': 'tall',
+      };
+
+      // Map skin tone from ethnicity
+      const skinToneMap: Record<string, AIPersonalityFull['skin_tone']> = {
+        'caucasian': 'fair', 'white': 'fair', 'latina': 'olive', 'hispanic': 'olive',
+        'mediterranean': 'olive', 'asian': 'fair', 'middle eastern': 'tan', 'black': 'deep', 'african': 'deep',
+      };
+
       setPersonality(prev => ({
         ...prev,
         persona_name: linkedModel.name || prev.persona_name,
-        personality_traits: linkedModel.personality_traits && linkedModel.personality_traits.length > 0
-          ? linkedModel.personality_traits
-          : prev.personality_traits,
-        interests: linkedModel.interests && linkedModel.interests.length > 0
-          ? linkedModel.interests
-          : prev.interests,
+        age: linkedModel.age || prev.age,
+        personality_traits: linkedModel.personality_traits?.length ? linkedModel.personality_traits : prev.personality_traits,
+        interests: linkedModel.interests?.length ? linkedModel.interests : prev.interests,
+        turn_ons: linkedModel.turn_ons?.length ? linkedModel.turn_ons : prev.turn_ons,
         emoji_usage: (linkedModel.emoji_usage as typeof prev.emoji_usage) || prev.emoji_usage,
+        response_length: (linkedModel.response_length as typeof prev.response_length) || prev.response_length,
         occupation: linkedModel.bio ? linkedModel.bio.slice(0, 100) : prev.occupation,
+        backstory: linkedModel.backstory || prev.backstory,
+        hair_color: traits?.hair_color || prev.hair_color,
+        eye_color: traits?.eye_color || prev.eye_color,
+        body_type: traits?.body_type ? (bodyTypeMap[traits.body_type.toLowerCase()] || prev.body_type) : prev.body_type,
+        height_cm: heightCm ?? prev.height_cm,
+        style_vibes: traits?.style ? [traits.style] : prev.style_vibes,
+        skin_tone: traits?.ethnicity ? (skinToneMap[traits.ethnicity.toLowerCase()] || prev.skin_tone) : prev.skin_tone,
       }));
     }
   }, [linkedModel, existingPersonality]);
