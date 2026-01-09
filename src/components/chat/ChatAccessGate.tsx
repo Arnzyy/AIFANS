@@ -278,28 +278,8 @@ function UnlockOptionButton({
     );
   }
 
-  // Subscribe button
+  // Subscribe button - always show modal first (modal handles guest redirect)
   if (option.type === 'subscribe') {
-    // If guest, this needs login first
-    if (isGuest) {
-      return (
-        <Link
-          href={`/login?redirect=${encodeURIComponent(loginRedirect)}&subscribe=true`}
-          className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition ${
-            option.recommended
-              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:opacity-90'
-              : 'bg-white/10 text-white hover:bg-white/20'
-          }`}
-        >
-          <Heart className="w-4 h-4" />
-          {option.label}
-          {option.recommended && (
-            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">Recommended</span>
-          )}
-        </Link>
-      );
-    }
-
     return (
       <button
         onClick={onSelect}
