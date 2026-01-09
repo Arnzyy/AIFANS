@@ -415,33 +415,28 @@ export default function AIChatPage() {
   const handleSubscribe = useCallback(async () => {
     if (!creator) return;
 
+    const defaultTier = {
+      id: 'default',
+      name: 'Fan Access',
+      description: 'Access to all posts and content',
+      price: 999, // £9.99 in cents
+      duration_months: 1,
+      is_featured: true,
+    };
+
     // Fetch subscription tiers for this creator
     try {
       const tiersRes = await fetch(`/api/creators/${creator.id}/tiers`);
       if (tiersRes.ok) {
         const tiersData = await tiersRes.json();
-        setSubscriptionTiers(tiersData.tiers || []);
+        const fetchedTiers = tiersData.tiers || [];
+        // Use default tier if none found
+        setSubscriptionTiers(fetchedTiers.length > 0 ? fetchedTiers : [defaultTier]);
       } else {
-        // Create a default tier if none exist
-        setSubscriptionTiers([{
-          id: 'default',
-          name: 'Fan Access',
-          description: 'Access to all posts and content',
-          price: 999, // £9.99 in cents
-          duration_months: 1,
-          is_featured: true,
-        }]);
+        setSubscriptionTiers([defaultTier]);
       }
     } catch (err) {
-      // Fallback to default tier
-      setSubscriptionTiers([{
-        id: 'default',
-        name: 'Fan Access',
-        description: 'Access to all posts and content',
-        price: 999,
-        duration_months: 1,
-        is_featured: true,
-      }]);
+      setSubscriptionTiers([defaultTier]);
     }
 
     setShowSubscribeModal(true);
