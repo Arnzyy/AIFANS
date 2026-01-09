@@ -12,6 +12,7 @@ import { TipButton } from '@/components/tokens/TipButton';
 import { ChatAccessGate } from '@/components/chat/ChatAccessGate';
 import { PurchaseSessionModal } from '@/components/chat/PurchaseSessionModal';
 import { InlineTokenBalance } from '@/components/chat/ChatTokenBalance';
+import { SubscribeModal } from '@/components/shared/SubscribeModal';
 import type { ChatAccess, UnlockOption, MessagePack } from '@/lib/chat';
 
 interface Message {
@@ -62,6 +63,8 @@ export default function AIChatPage() {
   const [tokenBalance, setTokenBalance] = useState(0);
   const [openingMessage, setOpeningMessage] = useState<string | null>(null);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [subscriptionTiers, setSubscriptionTiers] = useState<any[]>([]);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [accessLoading, setAccessLoading] = useState(false);
 
@@ -92,7 +95,7 @@ export default function AIChatPage() {
           requiresUnlock: true,
           unlockOptions: [
             { type: 'login', label: 'Log in to chat', recommended: true },
-            { type: 'subscribe', label: 'Subscribe for unlimited access' },
+            { type: 'subscribe', label: 'Subscribe' },
             { type: 'paid_session', label: 'Try 5 messages', cost: 125, costDisplay: '£0.50', messages: 5 },
           ],
           isLowMessages: false,
@@ -289,7 +292,7 @@ export default function AIChatPage() {
             requiresUnlock: true,
             unlockOptions: [
               { type: 'login', label: 'Log in to chat', recommended: true },
-              { type: 'subscribe', label: 'Subscribe for unlimited access' },
+              { type: 'subscribe', label: 'Subscribe' },
               { type: 'paid_session', label: 'Try 5 messages', cost: 125, costDisplay: '£0.50', messages: 5 },
             ],
             isLowMessages: false,
@@ -327,7 +330,7 @@ export default function AIChatPage() {
             requiresUnlock: true,
             unlockOptions: [
               { type: 'login', label: 'Log in to chat', recommended: true },
-              { type: 'subscribe', label: 'Subscribe for unlimited access' },
+              { type: 'subscribe', label: 'Subscribe' },
               { type: 'paid_session', label: 'Try 5 messages', cost: 125, costDisplay: '£0.50', messages: 5 },
             ],
             isLowMessages: false,
@@ -408,17 +411,41 @@ export default function AIChatPage() {
     }
   }, [creator]);
 
-  // Subscribe handler
-  const handleSubscribe = useCallback(() => {
-    if (creator) {
-      // For model chats, go to model profile page; for creators, go to username profile
-      if (isModelChat) {
-        router.push(`/model/${username}?subscribe=true`);
+  // Subscribe handler - show modal with FAN/CHAT/BUNDLE options
+  const handleSubscribe = useCallback(async () => {
+    if (!creator) return;
+
+    // Fetch subscription tiers for this creator
+    try {
+      const tiersRes = await fetch(`/api/creators/${creator.id}/tiers`);
+      if (tiersRes.ok) {
+        const tiersData = await tiersRes.json();
+        setSubscriptionTiers(tiersData.tiers || []);
       } else {
-        router.push(`/${creator.username}?subscribe=true`);
+        // Create a default tier if none exist
+        setSubscriptionTiers([{
+          id: 'default',
+          name: 'Fan Access',
+          description: 'Access to all posts and content',
+          price: 999, // £9.99 in cents
+          duration_months: 1,
+          is_featured: true,
+        }]);
       }
+    } catch (err) {
+      // Fallback to default tier
+      setSubscriptionTiers([{
+        id: 'default',
+        name: 'Fan Access',
+        description: 'Access to all posts and content',
+        price: 999,
+        duration_months: 1,
+        is_featured: true,
+      }]);
     }
-  }, [creator, router, isModelChat, username]);
+
+    setShowSubscribeModal(true);
+  }, [creator]);
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -893,7 +920,7 @@ export default function AIChatPage() {
                       className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium bg-white/10 text-white hover:bg-white/20 transition"
                     >
                       <Heart className="w-4 h-4" />
-                      Subscribe for unlimited access
+                      Subscribe
                     </Link>
                   </div>
                   <div className="text-center text-sm text-gray-500">
@@ -947,6 +974,27 @@ export default function AIChatPage() {
         isLoading={accessLoading}
         error={purchaseError}
       />
+
+      {/* Subscribe Modal with FAN/CHAT/BUNDLE options */}
+      {showSubscribeModal && creator && (
+        <SubscribeModal
+          creator={{
+            id: creator.id,
+            username: creator.username,
+            display_name: creator.display_name || undefined,
+            avatar_url: creator.avatar_url || undefined,
+          }}
+          tiers={subscriptionTiers}
+          chatPrice={999} // £9.99 for chat
+          onClose={() => setShowSubscribeModal(false)}
+          onSuccess={() => {
+            setShowSubscribeModal(false);
+            // Reload to refresh access
+            loadChat();
+          }}
+          defaultType="chat"
+        />
+      )}
     </div>
   );
 }

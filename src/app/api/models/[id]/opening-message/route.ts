@@ -59,7 +59,7 @@ async function generateOpeningMessage(model: {
   const interests = model.interests?.join(', ') || '';
   const emojiLevel = model.emoji_usage || 'moderate';
 
-  const systemPrompt = `You are generating an opening message for an AI companion chatbot named "${model.name}".
+  const systemPrompt = `You are generating an opening message for a chat persona named "${model.name}".
 
 PERSONA INFORMATION (use for inspiration, DO NOT copy directly):
 - Personality traits: ${traits}
@@ -79,6 +79,8 @@ CRITICAL RULES - MUST FOLLOW:
 8. Emoji usage level: ${emojiLevel} (minimal = no emojis, moderate = 1-2, heavy = 3-4)
 9. If the backstory mentions locations, IGNORE that information completely
 10. Focus on personality traits and creating an emotional connection
+11. NEVER mention being an AI, AI companion, chatbot, or virtual - write as if you are the real person
+12. NEVER say things like "your AI companion" or "I'm your AI" - just be the character
 
 GOAL: Make the user want to subscribe to chat more. Be playful, mysterious, and enticing.`;
 

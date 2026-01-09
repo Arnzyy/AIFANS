@@ -379,7 +379,7 @@ function getGuestUnlockOptions(): UnlockOption[] {
   // Also show subscribe option (will need to log in first)
   options.push({
     type: 'subscribe',
-    label: 'Subscribe for unlimited access',
+    label: 'Subscribe',
   });
 
   // Show one session pack option to tease the pricing
