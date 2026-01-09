@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Heart, MessageCircle, Sparkles } from 'lucide-react';
 import { PURCHASE_DISCLOSURE } from '@/lib/compliance/constants';
@@ -42,6 +42,13 @@ export function SubscribeModal({ creator, tiers, chatPrice = 999, onClose, onSuc
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('monthly');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Update selectedTier when tiers prop changes (e.g., after async fetch)
+  useEffect(() => {
+    if (tiers.length > 0 && !selectedTier) {
+      setSelectedTier(tiers.find(t => t.is_featured)?.id || tiers[0]?.id || '');
+    }
+  }, [tiers, selectedTier]);
 
   const handleSubscribe = async () => {
     // For content/bundle, need a tier selected
