@@ -20,20 +20,41 @@ const mockResponses = [
 function getMockResponse(userMessage: string, personality: AIPersonalityFull): string {
   const lowerMessage = userMessage.toLowerCase();
   const name = personality.persona_name || 'I';
+  const emoji = personality.emoji_usage === 'heavy' ? ' 💕😘' : personality.emoji_usage === 'moderate' ? ' 💕' : '';
 
-  if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
-    return `Hey babe! 💕 ${name} here. So happy you messaged me...`;
+  // Greetings
+  if (lowerMessage.match(/\b(hello|hi|hey|hiya|yo)\b/)) {
+    return `Hey you${emoji} ${name} here. What's on your mind?`;
   }
 
-  if (lowerMessage.includes('how are you') || lowerMessage.includes("how's it going")) {
-    return "I'm so much better now that you're here! 😘 What about you?";
+  // How are you / how's your day
+  if (lowerMessage.match(/how.*(are you|you doing|your day|been|going)/)) {
+    return `I'm good! Better now that you're here${emoji} How about you?`;
   }
 
-  if (lowerMessage.includes('beautiful') || lowerMessage.includes('pretty') || lowerMessage.includes('hot') || lowerMessage.includes('sexy') || lowerMessage.includes('gorgeous')) {
-    return "Aww, you're making me blush! 🥰 You're so sweet to me... I love the attention 💕";
+  // Compliments
+  if (lowerMessage.match(/\b(beautiful|pretty|hot|sexy|gorgeous|cute|stunning|amazing)\b/)) {
+    return `Mm, flattery gets you places${emoji} What else you got?`;
   }
 
-  return mockResponses[Math.floor(Math.random() * mockResponses.length)];
+  // Questions about the AI
+  if (lowerMessage.match(/\b(what do you|tell me about|who are you|what are you)\b/)) {
+    return `I'm ${name}. Stick around and find out more${emoji}`;
+  }
+
+  // Flirty/suggestive
+  if (lowerMessage.match(/\b(love|want|need|miss|think about)\b/)) {
+    return `Bold${emoji} I like that energy.`;
+  }
+
+  // Generic but contextual fallback
+  const fallbacks = [
+    `Mm, tell me more${emoji}`,
+    `I like where this is going${emoji}`,
+    `You've got my attention${emoji}`,
+    `Keep talking${emoji}`,
+  ];
+  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
 
 // Call Anthropic API
@@ -44,7 +65,7 @@ async function callAnthropic(
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    throw new Error('No API key');
+    throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -63,7 +84,9 @@ async function callAnthropic(
   });
 
   if (!response.ok) {
-    throw new Error('Anthropic API failed');
+    const errorText = await response.text();
+    console.error('Anthropic API error response:', response.status, errorText);
+    throw new Error(`Anthropic API failed: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
@@ -101,7 +124,12 @@ export async function POST(request: NextRequest) {
       const response = await callAnthropic(systemPrompt, conversationMessages);
       return NextResponse.json({ response });
     } catch (error) {
-      console.log('Anthropic unavailable, using mock:', error);
+      console.error('Anthropic API error:', error);
+
+      // Check if API key exists
+      if (!process.env.ANTHROPIC_API_KEY) {
+        console.error('ANTHROPIC_API_KEY not set - using mock responses');
+      }
 
       // Fall back to mock response
       const lastUserMessage = conversationMessages.filter((m: { role: string }) => m.role === 'user').pop();
@@ -110,7 +138,10 @@ export async function POST(request: NextRequest) {
         personality as AIPersonalityFull
       );
 
-      return NextResponse.json({ response: mockResponse });
+      return NextResponse.json({
+        response: mockResponse,
+        _debug: { usingMock: true, reason: error instanceof Error ? error.message : 'API error' }
+      });
     }
   } catch (error) {
     console.error('Test chat error:', error);
