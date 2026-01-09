@@ -198,7 +198,7 @@ async function callAnthropicAPI(
       },
       body: JSON.stringify({
         model: 'claude-3-haiku-20240307',
-        max_tokens: 300,
+        max_tokens: 150, // Keep responses SHORT - this is texting, not email
         system: systemPrompt,
         messages: messages.map(m => ({
           role: m.role,
@@ -275,19 +275,55 @@ Try again:`;
 // ===========================================
 
 /**
- * Strip asterisk roleplay actions from response
- * Converts "*chuckles softly* Hey there" → "Hey there"
+ * Post-process AI response to enforce natural texting
  */
-function stripAsteriskActions(text: string): string {
-  // Remove all *action* patterns
-  let cleaned = text.replace(/\*[^*]+\*/g, '');
-  // Clean up extra whitespace
+function postProcessResponse(text: string): string {
+  let cleaned = text;
+
+  // 1. Remove all *action* patterns
+  cleaned = cleaned.replace(/\*[^*]+\*/g, '');
+
+  // 2. Clean up extra whitespace
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
-  // If we stripped everything, return a fallback
-  if (!cleaned) {
+
+  // 3. Remove robotic openers
+  cleaned = cleaned.replace(/^(Oh,?\s*|Well,?\s*|Hmm,?\s*|Ahh?,?\s*)/i, '');
+
+  // 4. Remove multiple questions - keep only the last one if there are many
+  const sentences = cleaned.split(/(?<=[.!?])\s+/);
+  const questions = sentences.filter(s => s.endsWith('?'));
+  if (questions.length > 1) {
+    // Keep non-questions + only last question
+    const nonQuestions = sentences.filter(s => !s.endsWith('?'));
+    cleaned = [...nonQuestions, questions[questions.length - 1]].join(' ');
+  }
+
+  // 5. Trim if too long (max ~100 chars for natural texting feel)
+  if (cleaned.length > 120) {
+    // Find a good break point
+    const breakPoints = ['. ', '! ', '? ', '... '];
+    let bestBreak = 120;
+    for (const bp of breakPoints) {
+      const idx = cleaned.lastIndexOf(bp, 100);
+      if (idx > 40) {
+        bestBreak = idx + bp.length - 1;
+        break;
+      }
+    }
+    cleaned = cleaned.substring(0, bestBreak).trim();
+  }
+
+  // 6. If we stripped everything, return a fallback
+  if (!cleaned || cleaned.length < 2) {
     return "Hey you 😏";
   }
+
   return cleaned;
+}
+
+// Alias for backwards compatibility
+function stripAsteriskActions(text: string): string {
+  return postProcessResponse(text);
 }
 
 async function updateMemoryInBackground(
