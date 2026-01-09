@@ -67,15 +67,28 @@ export default function AIChatSetupPage() {
       }
 
       // Try to load existing personality for this model
-      const { data: personality } = await supabase
-        .from('ai_personalities')
-        .select('*')
-        .eq('creator_id', user.id)
-        .eq('model_id', modelId || '')
-        .single();
+      if (modelId) {
+        const { data: personality } = await supabase
+          .from('ai_personalities')
+          .select('*')
+          .eq('creator_id', user.id)
+          .eq('model_id', modelId)
+          .single();
 
-      if (personality) {
-        setExistingPersonality(personality as AIPersonalityFull);
+        if (personality) {
+          setExistingPersonality(personality as AIPersonalityFull);
+        }
+      } else {
+        // No model_id - check for any existing personality
+        const { data: personality } = await supabase
+          .from('ai_personalities')
+          .select('*')
+          .eq('creator_id', user.id)
+          .single();
+
+        if (personality) {
+          setExistingPersonality(personality as AIPersonalityFull);
+        }
       }
     } catch (err) {
       console.error('Failed to load:', err);
@@ -91,8 +104,8 @@ export default function AIChatSetupPage() {
       .update({ ai_chat_enabled: personality.is_active })
       .eq('user_id', userId);
 
-    // Redirect to dashboard
-    router.push('/dashboard');
+    // Redirect back to chat modes
+    router.push('/dashboard/chat-modes');
   };
 
   if (loading) {

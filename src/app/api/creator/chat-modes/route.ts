@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { nsfw_enabled, sfw_enabled, default_mode } = body;
+    const { nsfw_enabled, sfw_enabled, default_mode, linked_model_id } = body;
 
     // Validate
     if (typeof nsfw_enabled !== 'boolean' || typeof sfw_enabled !== 'boolean') {
@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
         nsfw_enabled,
         sfw_enabled,
         default_mode: validDefaultMode,
+        linked_model_id: linked_model_id || null,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'creator_id',

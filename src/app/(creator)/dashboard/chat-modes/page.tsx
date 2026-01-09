@@ -47,26 +47,55 @@ export default function ChatModesPage() {
     linked_model_id: null,
   });
 
-  // Fetch creator's approved models
+  const [aiPersonalities, setAiPersonalities] = useState<Record<string, boolean>>({});
+
+  // Fetch creator's approved models, chat mode settings, and AI personalities
   useEffect(() => {
-    const fetchModels = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch('/api/creator/models');
-        if (res.ok) {
-          const data = await res.json();
-          // Only show approved models
+        // Fetch models
+        const modelsRes = await fetch('/api/creator/models');
+        if (modelsRes.ok) {
+          const data = await modelsRes.json();
           const approvedModels = (data.models || []).filter(
             (m: Model) => m.status === 'approved'
           );
           setModels(approvedModels);
         }
+
+        // Fetch chat mode settings
+        const settingsRes = await fetch('/api/creator/chat-modes');
+        if (settingsRes.ok) {
+          const data = await settingsRes.json();
+          setSettings(prev => ({
+            ...prev,
+            nsfw_enabled: data.nsfw_enabled ?? false,
+            sfw_enabled: data.sfw_enabled ?? false,
+            default_mode: data.default_mode ?? 'nsfw',
+            linked_model_id: data.linked_model_id ?? null,
+          }));
+        }
+
+        // Fetch AI personalities to see which models have them configured
+        const personalitiesRes = await fetch('/api/creator/ai-personality');
+        if (personalitiesRes.ok) {
+          const data = await personalitiesRes.json();
+          const personalities = data.personalities || [];
+          const configuredModels: Record<string, boolean> = {};
+          personalities.forEach((p: { model_id?: string; is_active?: boolean }) => {
+            if (p.model_id) {
+              configuredModels[p.model_id] = p.is_active ?? false;
+            }
+          });
+          setAiPersonalities(configuredModels);
+        }
       } catch (error) {
-        console.error('Error fetching models:', error);
+        console.error('Error fetching data:', error);
       } finally {
         setLoading(false);
       }
     };
-    fetchModels();
+    fetchData();
   }, []);
 
   // Check if user has approved models
@@ -76,9 +105,25 @@ export default function ChatModesPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // TODO: API call to save chat mode settings
-      await new Promise((r) => setTimeout(r, 1000));
+      const res = await fetch('/api/creator/chat-modes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nsfw_enabled: settings.nsfw_enabled,
+          sfw_enabled: settings.sfw_enabled,
+          default_mode: settings.default_mode,
+          linked_model_id: settings.linked_model_id,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to save');
+      }
+
       alert('Chat mode settings saved!');
+    } catch (error) {
+      console.error('Save error:', error);
+      alert('Failed to save settings');
     } finally {
       setSaving(false);
     }
@@ -224,14 +269,19 @@ export default function ChatModesPage() {
           {settings.nsfw_enabled && settings.linked_model_id && (
             <div className="pt-4 border-t border-white/10">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-400">
-                  Configure your NSFW AI personality and pricing
-                </p>
+                <div>
+                  <p className="text-sm text-gray-400">
+                    Configure your NSFW AI personality and pricing
+                  </p>
+                  {aiPersonalities[settings.linked_model_id] && (
+                    <p className="text-xs text-green-400 mt-1">✓ AI personality configured</p>
+                  )}
+                </div>
                 <Link
                   href={`/dashboard/ai-chat?model=${settings.linked_model_id}`}
                   className="text-purple-400 hover:text-purple-300 flex items-center gap-1 text-sm"
                 >
-                  Setup <ArrowRight className="w-4 h-4" />
+                  {aiPersonalities[settings.linked_model_id] ? 'Edit' : 'Setup'} <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </div>

@@ -2,7 +2,7 @@ import { createServerClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { AIPersonalityFull } from '@/lib/ai/personality/types';
 
-// GET /api/creator/ai-personality - Get creator's AI personality
+// GET /api/creator/ai-personality - Get creator's AI personalities
 export async function GET() {
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -11,17 +11,17 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: personality, error } = await supabase
+  // Return all personalities for this creator
+  const { data: personalities, error } = await supabase
     .from('ai_personalities')
     .select('*')
-    .eq('creator_id', user.id)
-    .single();
+    .eq('creator_id', user.id);
 
-  if (error && error.code !== 'PGRST116') {
+  if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(personality || null);
+  return NextResponse.json({ personalities: personalities || [] });
 }
 
 // POST /api/creator/ai-personality - Create new AI personality
@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
     .from('ai_personalities')
     .insert({
       creator_id: user.id,
+      model_id: body.model_id || null,
       persona_name: body.persona_name,
       age: body.age,
       height_cm: body.height_cm,
@@ -149,6 +150,7 @@ export async function PUT(request: NextRequest) {
   const { data: personality, error } = await supabase
     .from('ai_personalities')
     .update({
+      model_id: body.model_id || null,
       persona_name: body.persona_name,
       age: body.age,
       height_cm: body.height_cm,
