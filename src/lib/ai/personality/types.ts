@@ -5,6 +5,7 @@
 export interface AIPersonalityFull {
   id?: string;
   creator_id: string;
+  model_id?: string; // Links to creator_models
 
   // Step 1: Identity & Appearance
   persona_name: string;

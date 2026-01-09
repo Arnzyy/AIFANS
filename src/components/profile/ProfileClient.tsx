@@ -27,10 +27,12 @@ export function ProfileActions({
   creator,
   tiers,
   isSubscribed: initialSubscribed,
+  chatPrice = 999, // Default £9.99 in pence
 }: {
   creator: Creator;
   tiers: Tier[];
   isSubscribed: boolean;
+  chatPrice?: number;
 }) {
   const router = useRouter();
   const [isSubscribed, setIsSubscribed] = useState(initialSubscribed);
@@ -114,6 +116,7 @@ export function ProfileActions({
         <SubscribeModal
           creator={creator}
           tiers={tiers}
+          chatPrice={chatPrice}
           onClose={() => setShowSubscribeModal(false)}
           onSuccess={handleSubscribeSuccess}
         />

@@ -388,6 +388,7 @@ export default function ModelProfilePage() {
             avatar_url: model.avatar,
           }}
           tiers={tiers}
+          chatPrice={999} // £9.99 default chat price
           onClose={() => setShowSubscribeModal(false)}
           onSuccess={() => {
             setShowSubscribeModal(false);

@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { creatorId, tierId, billingPeriod = 'monthly' } = await request.json();
+    const { creatorId, tierId, billingPeriod = 'monthly', subscriptionType = 'content' } = await request.json();
 
     if (!creatorId) {
       return NextResponse.json(
@@ -70,29 +70,65 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if already subscribed
-    const { data: existingSub } = await supabase
-      .from('subscriptions')
-      .select('id')
-      .eq('subscriber_id', user.id)
-      .eq('creator_id', creatorId)
-      .eq('status', 'active')
-      .single();
-
-    if (existingSub) {
+    // Validate subscription type
+    if (!['content', 'chat', 'bundle'].includes(subscriptionType)) {
       return NextResponse.json(
-        { error: 'Already subscribed to this creator' },
+        { error: 'Invalid subscription type' },
         { status: 400 }
       );
+    }
+
+    // Check if already subscribed based on type
+    const { data: existingSubs } = await supabase
+      .from('subscriptions')
+      .select('id, subscription_type')
+      .eq('subscriber_id', user.id)
+      .eq('creator_id', creatorId)
+      .eq('status', 'active');
+
+    const existingTypes = (existingSubs || []).map(s => s.subscription_type || 'content');
+
+    // Check for conflicts
+    if (subscriptionType === 'bundle') {
+      if (existingTypes.includes('content') || existingTypes.includes('chat') || existingTypes.includes('bundle')) {
+        return NextResponse.json(
+          { error: 'You already have an active subscription to this creator' },
+          { status: 400 }
+        );
+      }
+    } else if (subscriptionType === 'content') {
+      if (existingTypes.includes('content') || existingTypes.includes('bundle')) {
+        return NextResponse.json(
+          { error: 'You already have content access for this creator' },
+          { status: 400 }
+        );
+      }
+    } else if (subscriptionType === 'chat') {
+      if (existingTypes.includes('chat') || existingTypes.includes('bundle')) {
+        return NextResponse.json(
+          { error: 'You already have chat access for this creator' },
+          { status: 400 }
+        );
+      }
     }
 
     // Detect currency from request geo
     const country = request.geo?.country;
     const currency = getCurrency(country);
 
-    // Fetch tier details
+    // Fetch creator profile for chat pricing
+    const { data: creatorProfile } = await supabase
+      .from('creator_profiles')
+      .select('ai_chat_price_per_message')
+      .eq('user_id', creatorId)
+      .single();
+
+    // Chat monthly price (default £9.99 if not set)
+    const chatMonthlyPriceGBP = 9.99; // Fixed monthly chat price
+
+    // Fetch tier details (for content subscriptions)
     let tier = null;
-    if (tierId) {
+    if (subscriptionType !== 'chat' && tierId) {
       const { data } = await supabase
         .from('subscription_tiers')
         .select('*')
@@ -101,7 +137,7 @@ export async function POST(request: NextRequest) {
         .eq('is_active', true)
         .single();
       tier = data;
-    } else {
+    } else if (subscriptionType !== 'chat') {
       // Get default tier (lowest price)
       const { data } = await supabase
         .from('subscription_tiers')
@@ -114,55 +150,49 @@ export async function POST(request: NextRequest) {
       tier = data;
     }
 
-    if (!tier) {
-      // Free subscription - no payment required
-      const periodEnd = new Date();
-      periodEnd.setMonth(periodEnd.getMonth() + 1);
-
-      const { data: subscription, error } = await supabase
-        .from('subscriptions')
-        .insert({
-          subscriber_id: user.id,
-          creator_id: creatorId,
-          tier_id: null,
-          status: 'active',
-          price_paid: 0,
-          billing_period: 'monthly',
-          started_at: new Date().toISOString(),
-          current_period_start: new Date().toISOString(),
-          current_period_end: periodEnd.toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
-
-      // Increment subscriber count
-      await supabase.rpc('increment_subscriber_count', { p_creator_id: creatorId });
-
-      return NextResponse.json({ subscription, paymentRequired: false });
+    // For content/bundle, we need a tier
+    if ((subscriptionType === 'content' || subscriptionType === 'bundle') && !tier) {
+      return NextResponse.json(
+        { error: 'No subscription tier available for this creator' },
+        { status: 400 }
+      );
     }
 
-    // Get price based on billing period
-    let priceGBP: number;
+    // Calculate pricing based on subscription type
     let interval: 'month' | 'year' = 'month';
     let intervalCount = 1;
+    let monthlyPriceGBP = 0;
 
+    const contentMonthlyPrice = tier?.price_monthly || 0;
+
+    switch (subscriptionType) {
+      case 'content':
+        monthlyPriceGBP = contentMonthlyPrice;
+        break;
+      case 'chat':
+        monthlyPriceGBP = chatMonthlyPriceGBP;
+        break;
+      case 'bundle':
+        // 15% discount on combined price
+        monthlyPriceGBP = (contentMonthlyPrice + chatMonthlyPriceGBP) * 0.85;
+        break;
+    }
+
+    // Apply billing period multiplier and discounts
+    let priceGBP: number;
     switch (billingPeriod) {
       case '3_month':
-        priceGBP = tier.price_3_month || tier.price_monthly * 3;
+        priceGBP = monthlyPriceGBP * 3 * 0.9; // 10% discount
         interval = 'month';
         intervalCount = 3;
         break;
       case 'yearly':
-        priceGBP = tier.price_yearly || tier.price_monthly * 12;
+        priceGBP = monthlyPriceGBP * 12 * 0.75; // 25% discount
         interval = 'year';
         intervalCount = 1;
         break;
       default:
-        priceGBP = tier.price_monthly;
+        priceGBP = monthlyPriceGBP;
         interval = 'month';
         intervalCount = 1;
     }
@@ -177,6 +207,18 @@ export async function POST(request: NextRequest) {
       .select('username, display_name')
       .eq('id', creatorId)
       .single();
+
+    // Build product name based on subscription type
+    const productNames: Record<string, string> = {
+      content: `${creator?.display_name || creator?.username} - Fan Access`,
+      chat: `${creator?.display_name || creator?.username} - AI Chat`,
+      bundle: `${creator?.display_name || creator?.username} - Fan + Chat Bundle`,
+    };
+    const productDescriptions: Record<string, string> = {
+      content: `Access to all posts and content from ${creator?.display_name || creator?.username}`,
+      chat: `Unlimited AI chat with ${creator?.display_name || creator?.username}`,
+      bundle: `Full access: posts, content, and unlimited AI chat`,
+    };
 
     // Get or create Stripe customer
     const { data: profile } = await supabase
@@ -213,8 +255,8 @@ export async function POST(request: NextRequest) {
           price_data: {
             currency: currency,
             product_data: {
-              name: `${creator?.display_name || creator?.username} - ${tier.name}`,
-              description: tier.description || `Subscription to ${creator?.display_name || creator?.username}`,
+              name: productNames[subscriptionType],
+              description: productDescriptions[subscriptionType],
             },
             unit_amount: convertedPriceInCents,
             recurring: {
@@ -228,16 +270,18 @@ export async function POST(request: NextRequest) {
       metadata: {
         user_id: user.id,
         creator_id: creatorId,
-        tier_id: tier.id,
+        tier_id: tier?.id || '',
         billing_period: billingPeriod,
         type: 'subscription',
+        subscription_type: subscriptionType,
       },
       subscription_data: {
         metadata: {
           user_id: user.id,
           creator_id: creatorId,
-          tier_id: tier.id,
+          tier_id: tier?.id || '',
           billing_period: billingPeriod,
+          subscription_type: subscriptionType,
         },
       },
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,

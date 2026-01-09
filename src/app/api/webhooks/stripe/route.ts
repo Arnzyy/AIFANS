@@ -102,7 +102,7 @@ async function handleCheckoutCompleted(session: any) {
 }
 
 async function createSubscription(session: any) {
-  const { user_id, creator_id, tier_id, billing_period } = session.metadata || {};
+  const { user_id, creator_id, tier_id, billing_period, subscription_type = 'content' } = session.metadata || {};
 
   if (!user_id || !creator_id) {
     console.error('Missing metadata for subscription');
@@ -149,6 +149,7 @@ async function createSubscription(session: any) {
       status: 'active',
       price_paid: pricePaid,
       billing_period: billing_period || 'monthly',
+      subscription_type: subscription_type,
       started_at: new Date().toISOString(),
       current_period_start: currentPeriodStart.toISOString(),
       current_period_end: currentPeriodEnd.toISOString(),
@@ -162,6 +163,14 @@ async function createSubscription(session: any) {
     return;
   }
 
+  // Subscription type labels for display
+  const typeLabels: Record<string, string> = {
+    content: 'Fan',
+    chat: 'Chat',
+    bundle: 'Fan + Chat',
+  };
+  const typeLabel = typeLabels[subscription_type] || 'Fan';
+
   // Create transaction record
   await supabase.from('transactions').insert({
     user_id: user_id,
@@ -173,27 +182,35 @@ async function createSubscription(session: any) {
     net_amount: fromCents(fees.netAmount),
     subscription_id: subscription.id,
     external_transaction_id: session.payment_intent as string,
-    description: `New subscription`,
+    description: `New ${typeLabel} subscription`,
     completed_at: new Date().toISOString(),
   });
 
-  // Increment subscriber count
-  await supabase.rpc('increment_subscriber_count', { p_creator_id: creator_id });
+  // Increment subscriber count (only for content or bundle, as they access content)
+  if (subscription_type === 'content' || subscription_type === 'bundle') {
+    await supabase.rpc('increment_subscriber_count', { p_creator_id: creator_id });
+  }
 
   // Create notification for creator
   try {
+    const notificationBody = subscription_type === 'chat'
+      ? 'Someone subscribed to chat with you!'
+      : subscription_type === 'bundle'
+      ? 'Someone subscribed to your full package (content + chat)!'
+      : 'Someone subscribed to your content!';
+
     await supabase.from('notifications').insert({
       user_id: creator_id,
       type: 'new_subscriber',
       title: 'New Subscriber!',
-      body: 'Someone subscribed to your content!',
+      body: notificationBody,
       actor_id: user_id,
     });
   } catch (e) {
     // Notifications table might not exist
   }
 
-  console.log('Subscription created:', subscription.id);
+  console.log('Subscription created:', subscription.id, 'type:', subscription_type);
 }
 
 async function createTipTransaction(session: any) {
