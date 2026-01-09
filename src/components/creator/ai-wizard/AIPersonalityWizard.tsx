@@ -108,9 +108,12 @@ export function AIPersonalityWizard({
         prefilled.age = linkedModel.age;
       }
 
-      // Personality
+      // Personality - normalize to lowercase IDs to match wizard options
       if (linkedModel.personality_traits && linkedModel.personality_traits.length > 0) {
-        prefilled.personality_traits = linkedModel.personality_traits;
+        // Convert to lowercase and limit to 5
+        prefilled.personality_traits = linkedModel.personality_traits
+          .map(t => t.toLowerCase())
+          .slice(0, 5);
       }
       if (linkedModel.interests && linkedModel.interests.length > 0) {
         prefilled.interests = linkedModel.interests;
@@ -223,7 +226,9 @@ export function AIPersonalityWizard({
         ...prev,
         persona_name: linkedModel.name || prev.persona_name,
         age: linkedModel.age || prev.age,
-        personality_traits: linkedModel.personality_traits?.length ? linkedModel.personality_traits : prev.personality_traits,
+        personality_traits: linkedModel.personality_traits?.length
+          ? linkedModel.personality_traits.map(t => t.toLowerCase()).slice(0, 5)
+          : prev.personality_traits,
         interests: linkedModel.interests?.length ? linkedModel.interests : prev.interests,
         turn_ons: linkedModel.turn_ons?.length ? linkedModel.turn_ons : prev.turn_ons,
         emoji_usage: (linkedModel.emoji_usage as typeof prev.emoji_usage) || prev.emoji_usage,
