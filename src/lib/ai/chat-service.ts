@@ -106,11 +106,14 @@ export async function generateChatResponse(
 
   // 8. Compliance check
   const complianceResult = checkCompliance(aiResponse);
-  
+
   if (!complianceResult.passed) {
     console.warn('Compliance issues:', complianceResult.issues);
     aiResponse = await regenerateCompliant(systemPrompt, messages, complianceResult.issues);
   }
+
+  // 8.5. Post-processing: Strip any remaining asterisk actions as failsafe
+  aiResponse = stripAsteriskActions(aiResponse);
 
   // 9. Save AI response
   await (supabase as any).from('chat_messages').insert({
@@ -270,6 +273,22 @@ Try again:`;
 // ===========================================
 // HELPERS
 // ===========================================
+
+/**
+ * Strip asterisk roleplay actions from response
+ * Converts "*chuckles softly* Hey there" → "Hey there"
+ */
+function stripAsteriskActions(text: string): string {
+  // Remove all *action* patterns
+  let cleaned = text.replace(/\*[^*]+\*/g, '');
+  // Clean up extra whitespace
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  // If we stripped everything, return a fallback
+  if (!cleaned) {
+    return "Hey you 😏";
+  }
+  return cleaned;
+}
 
 async function updateMemoryInBackground(
   supabase: ReturnType<typeof createClient>,
