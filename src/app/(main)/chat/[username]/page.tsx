@@ -915,13 +915,13 @@ export default function AIChatPage() {
                       <LogIn className="w-4 h-4" />
                       Log in to chat
                     </Link>
-                    <Link
-                      href={`/login?redirect=/chat/${username}&subscribe=true`}
+                    <button
+                      onClick={handleSubscribe}
                       className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium bg-white/10 text-white hover:bg-white/20 transition"
                     >
                       <Heart className="w-4 h-4" />
                       Subscribe
-                    </Link>
+                    </button>
                   </div>
                   <div className="text-center text-sm text-gray-500">
                     <span>Don&apos;t have an account? </span>
@@ -993,6 +993,8 @@ export default function AIChatPage() {
             loadChat();
           }}
           defaultType="chat"
+          isGuest={!currentUser}
+          redirectPath={`/chat/${username}`}
         />
       )}
     </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Heart, MessageCircle, Sparkles } from 'lucide-react';
 import { PURCHASE_DISCLOSURE } from '@/lib/compliance/constants';
 
@@ -25,12 +26,15 @@ interface SubscribeModalProps {
   onClose: () => void;
   onSuccess?: () => void;
   defaultType?: 'content' | 'chat' | 'bundle';
+  isGuest?: boolean; // If true, redirect to login when subscribing
+  redirectPath?: string; // Where to redirect after login
 }
 
 type BillingPeriod = 'monthly' | '3_month' | 'yearly';
 type SubscriptionType = 'content' | 'chat' | 'bundle';
 
-export function SubscribeModal({ creator, tiers, chatPrice = 999, onClose, onSuccess, defaultType = 'content' }: SubscribeModalProps) {
+export function SubscribeModal({ creator, tiers, chatPrice = 999, onClose, onSuccess, defaultType = 'content', isGuest = false, redirectPath }: SubscribeModalProps) {
+  const router = useRouter();
   const [subscriptionType, setSubscriptionType] = useState<SubscriptionType>(defaultType);
   const [selectedTier, setSelectedTier] = useState<string>(
     tiers.find(t => t.is_featured)?.id || tiers[0]?.id || ''
@@ -42,6 +46,13 @@ export function SubscribeModal({ creator, tiers, chatPrice = 999, onClose, onSuc
   const handleSubscribe = async () => {
     // For content/bundle, need a tier selected
     if ((subscriptionType === 'content' || subscriptionType === 'bundle') && !selectedTier) return;
+
+    // If guest, redirect to login with subscription intent
+    if (isGuest) {
+      const redirect = redirectPath || `/chat/${creator.username}`;
+      router.push(`/login?redirect=${encodeURIComponent(redirect)}&subscribe=true`);
+      return;
+    }
 
     setLoading(true);
     setError('');
