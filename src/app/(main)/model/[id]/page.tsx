@@ -128,13 +128,8 @@ export default function ModelProfilePage() {
   ];
 
   const handleMessage = () => {
-    // Check if user has access to chat (subscribed or admin)
-    if (!hasFullAccess) {
-      // Show subscribe modal if not subscribed
-      setShowSubscribeModal(true);
-      return;
-    }
-    // Navigate to chat with the model (using model ID)
+    // Always navigate to chat - the chat page will show the welcome message
+    // and handle access/subscribe prompts there (better UX to draw users in)
     const chatPath = `/chat/${model.id}`;
     console.log('[ModelProfilePage] Navigating to chat:', chatPath);
     router.push(chatPath);
