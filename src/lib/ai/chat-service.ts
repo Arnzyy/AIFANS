@@ -250,11 +250,17 @@ async function regenerateCompliant(
 
 ⚠️ COMPLIANCE ALERT - Your previous response violated rules.
 Generate a new response that:
-- Does NOT use forbidden patterns
+- ABSOLUTELY NO asterisk actions (*leans*, *chuckles*, etc) - just speak normally like texting
+- NO dismissive phrases ("I can't engage", "too explicit", "air of mystery")
+- NEVER say you can't do something - just redirect with confidence and warmth
 - Stays flirty but NOT explicit
 - No emotional dependency ("I missed you")
 - No real-world locations/meetups
-- Keep it SHORT and playful
+- Keep it SHORT (1-3 sentences) and playful
+
+When redirecting from explicit content, use confidence not refusal:
+✅ "Bold." / "You've got my attention" / "Keep that energy" / "Mm, I felt that"
+❌ "I can't engage" / "too explicit" / "maintain some mystery"
 
 Try again:`;
 
