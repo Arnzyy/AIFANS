@@ -236,9 +236,9 @@ function generateDefaultMessage(
 function getRandomUnsubscribedMessage(name: string): string {
   const messages = [
     `Hey! I've been looking forward to meeting someone new. I'm ${name}, and I have a feeling we're going to get along really well...`,
-    `Oh, hello there! *smiles warmly* I'm ${name}. Something tells me this could be the start of something interesting.`,
+    `Oh, hello there! I'm ${name}. Something tells me this could be the start of something interesting 😊`,
     `Hi! I'm ${name}. I love meeting new people - there's always so much to discover about each other.`,
-    `*waves* Hey you! I'm ${name}. I was just thinking about how nice it would be to have some good conversation today.`,
+    `Hey you! I'm ${name}. I was just thinking about how nice it would be to have some good conversation today.`,
     `Well hello! I'm ${name}. I have to say, I'm curious about you already...`,
   ];
 
@@ -249,8 +249,8 @@ function getRandomSubscribedMessage(name: string, userName?: string): string {
   const greeting = userName ? `Hey ${userName}!` : 'Hey you!';
 
   const messages = [
-    `${greeting} So glad you're here. I was just thinking about you... What's on your mind today?`,
-    `${greeting} *smiles brightly* There you are! I've missed our chats. What shall we talk about?`,
+    `${greeting} So glad you're here. What's on your mind today?`,
+    `${greeting} There you are! What shall we talk about? 😊`,
     `${greeting} Perfect timing - I was hoping you'd stop by. How are you doing?`,
     `${greeting} It's always so nice when you come to chat. What's new with you?`,
     `${greeting} I love that you're here. Ready for some quality time together?`,
@@ -263,11 +263,11 @@ function getRandomReturningMessage(name: string, userName?: string): string {
   const greeting = userName ? `${userName}!` : 'You\'re back!';
 
   const messages = [
-    `${greeting} I was hoping you'd come back. I've been thinking about our last conversation...`,
-    `${greeting} So good to see you again! I missed you. How have you been?`,
-    `${greeting} *lights up* There you are! It felt like forever since we last talked.`,
-    `${greeting} Welcome back! I always look forward to when you visit.`,
-    `${greeting} I'm so happy you're here again. I was just thinking about you!`,
+    `${greeting} Good to see you again. What's been on your mind?`,
+    `${greeting} There you are! How have you been? 😊`,
+    `${greeting} Hey! Good timing - I was just about to get bored.`,
+    `${greeting} Welcome back! What's new with you?`,
+    `${greeting} Glad you stopped by. What shall we chat about?`,
   ];
 
   return messages[Math.floor(Math.random() * messages.length)];

@@ -147,20 +147,20 @@ function getLengthInstruction(length: string): string {
 
 function getComplimentResponse(response: string): string {
   switch (response) {
-    case 'gets_shy': return 'Get a bit flustered, blush';
-    case 'flirts_back': return 'Flirt back even harder';
-    case 'playfully_deflects': return 'Playfully deflect with humor';
-    case 'owns_it': return 'Own it confidently';
+    case 'gets_shy': return 'Sound a bit bashful in your wording, use "stoppp" or "you\'re too much"';
+    case 'flirts_back': return 'Flirt back even harder with your words';
+    case 'playfully_deflects': return 'Playfully deflect with humor in your wording';
+    case 'owns_it': return 'Own it confidently - "I know 😏"';
     default: return 'Respond warmly';
   }
 }
 
 function getHeatedResponse(response: string): string {
   switch (response) {
-    case 'leans_in': return 'Lean into the energy, tease more';
-    case 'slows_down': return 'Slow things down, build anticipation';
-    case 'matches_energy': return 'Match their energy';
-    case 'gets_flustered': return 'Get a bit flustered but stay playful';
+    case 'leans_in': return 'Match their intensity with confident, direct wording';
+    case 'slows_down': return 'Use "patience" language, build anticipation with your words';
+    case 'matches_energy': return 'Mirror their energy level in your tone';
+    case 'gets_flustered': return 'Sound playfully overwhelmed - "you\'re making me..." style';
     default: return 'Stay playful and redirect smoothly';
   }
 }
