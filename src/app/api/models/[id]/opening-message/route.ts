@@ -11,6 +11,36 @@ export async function GET(
     const supabase = await createServerClient();
     const { id } = await params;
 
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Get user profile for timezone and name
+    let timezone = 'UTC';
+    let userName: string | undefined;
+    let isSubscribed = false;
+
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('timezone, display_name, username')
+        .eq('id', user.id)
+        .single();
+
+      timezone = profile?.timezone || 'UTC';
+      userName = profile?.display_name || profile?.username || undefined;
+
+      // Check if subscribed to this model
+      const { data: subscription } = await supabase
+        .from('subscriptions')
+        .select('id')
+        .eq('subscriber_id', user.id)
+        .eq('creator_id', id)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      isSubscribed = !!subscription;
+    }
+
     // Get model persona data
     const { data: model, error } = await supabase
       .from('creator_models')
@@ -34,11 +64,31 @@ export async function GET(
       );
     }
 
-    // Generate opening message with AI
-    const openingMessage = await generateOpeningMessage(model);
+    // Check if user has chatted before (for returning user context)
+    let hasChattedBefore = false;
+    if (user) {
+      const { data: conversation } = await supabase
+        .from('conversations')
+        .select('id')
+        .or(
+          `and(participant1_id.eq.${user.id},participant2_id.eq.${id}),` +
+          `and(participant1_id.eq.${id},participant2_id.eq.${user.id})`
+        )
+        .maybeSingle();
+      hasChattedBefore = !!conversation;
+    }
 
-    // Clean any asterisk actions from the message
-    return NextResponse.json({ openingMessage: cleanResponse(openingMessage) });
+    // Generate opening message with context
+    const openingMessage = await generateOpeningMessage(model, {
+      timezone,
+      isSubscribed,
+      isReturning: hasChattedBefore,
+      userName,
+    });
+
+    // Clean any asterisk actions and meta-text from the message
+    const cleaned = cleanOpeningMessage(cleanResponse(openingMessage));
+    return NextResponse.json({ openingMessage: cleaned });
   } catch (error) {
     console.error('Error generating opening message:', error);
     return NextResponse.json(
@@ -48,51 +98,92 @@ export async function GET(
   }
 }
 
-async function generateOpeningMessage(model: {
-  name: string;
-  bio: string | null;
-  backstory: string | null;
-  speaking_style: string | null;
-  personality_traits: string[] | null;
-  emoji_usage: string | null;
-  interests: string[] | null;
-}): Promise<string> {
+interface OpeningMessageContext {
+  timezone: string;
+  isSubscribed: boolean;
+  isReturning: boolean;
+  userName?: string;
+}
+
+function getTimeOfDay(timezone: string): string {
+  try {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      hour12: false,
+    });
+    const hour = parseInt(formatter.format(now));
+
+    if (hour >= 5 && hour < 12) return 'morning';
+    if (hour >= 12 && hour < 17) return 'afternoon';
+    if (hour >= 17 && hour < 21) return 'evening';
+    return 'night';
+  } catch {
+    return 'day'; // Fallback if timezone is invalid
+  }
+}
+
+async function generateOpeningMessage(
+  model: {
+    name: string;
+    bio: string | null;
+    backstory: string | null;
+    speaking_style: string | null;
+    personality_traits: string[] | null;
+    emoji_usage: string | null;
+    interests: string[] | null;
+  },
+  context: OpeningMessageContext
+): Promise<string> {
   const traits = model.personality_traits?.join(', ') || 'friendly, flirty';
   const interests = model.interests?.join(', ') || '';
   const emojiLevel = model.emoji_usage || 'moderate';
+  const timeOfDay = getTimeOfDay(context.timezone);
 
-  const systemPrompt = `You are generating an opening message for a chat persona named "${model.name}".
+  // Different scenarios
+  let scenario = '';
+  if (context.isReturning && context.isSubscribed) {
+    scenario = `SCENARIO: This is a RETURNING subscriber${context.userName ? ` named ${context.userName}` : ''}.
+    Greet them warmly like you're happy to see them again. Reference the time of day (${timeOfDay}).
+    Be excited they came back. Maybe tease about what you've been up to.`;
+  } else if (context.isReturning && !context.isSubscribed) {
+    scenario = `SCENARIO: This user has chatted before but is NOT subscribed.
+    Greet them warmly and create excitement. Subtly encourage them to subscribe to unlock more.
+    Reference the time of day (${timeOfDay}). Make them feel special but hint at exclusive content.`;
+  } else if (context.isSubscribed) {
+    scenario = `SCENARIO: This is a NEW subscriber! Welcome them warmly.
+    Reference the time of day (${timeOfDay}). Be excited about getting to know them.
+    Thank them for subscribing and hint at the fun conversations ahead.`;
+  } else {
+    scenario = `SCENARIO: This is a NEW user who has never chatted and is NOT subscribed.
+    Create intrigue and mystery. Reference the time of day (${timeOfDay}).
+    Make them WANT to subscribe - hint at secrets, exclusive conversations, special treatment.
+    Be flirty and enticing but leave them wanting more.`;
+  }
 
-PERSONA INFORMATION (use for inspiration, DO NOT copy directly):
-- Personality traits: ${traits}
-- Speaking style: ${model.speaking_style || 'casual and warm'}
-- Interests: ${interests || 'not specified'}
-- Bio context: ${model.bio || 'not specified'}
-- Backstory context: ${model.backstory || 'not specified'}
+  const systemPrompt = `You are ${model.name}. Write a short opening message (2-3 sentences max).
 
-CRITICAL RULES - MUST FOLLOW:
-1. ABSOLUTELY NO geographic references of any kind:
-   - No continents (European, Asian, American, African, etc.)
-   - No countries (British, French, Japanese, etc.)
-   - No cities, states, regions, or neighborhoods
-   - No nationality words at all
-2. ABSOLUTELY NO real identifying information - no ages, addresses, schools, workplaces
-3. NEVER copy ANY text from the bio or backstory - use it only for personality inspiration
-4. The message should be SHORT (2-3 sentences max)
-5. Be flirty, playful and engaging to encourage subscription
-6. Speak in first person AS the character
-7. Create curiosity and mystery - hint at secrets to share
-8. Emoji usage level: ${emojiLevel} (minimal = no emojis, moderate = 1-2, heavy = 3-4)
-9. If the backstory mentions ANY locations or nationalities, COMPLETELY IGNORE them
-10. Focus on personality traits and creating an emotional connection
-11. NEVER mention being an AI, AI companion, chatbot, or virtual - write as if you are the real person
-12. NEVER say things like "your AI companion" or "I'm your AI" - just be the character
+${scenario}
 
-GOAL: Make the user want to subscribe to chat more. Be playful, mysterious, and enticing.`;
+PERSONA (use for tone, NOT content):
+- Traits: ${traits}
+- Style: ${model.speaking_style || 'playful'}
+
+STRICT RULES:
+1. Write ONLY the message itself - no labels, no "Here is...", no quotation marks
+2. NO geographic references (no countries, cities, nationalities)
+3. NO real identifying info (ages, addresses)
+4. Speak as ${model.name} in first person
+5. Emoji usage: ${emojiLevel} (minimal=0, moderate=1-2, heavy=3-4)
+6. NEVER mention AI, chatbot, or virtual
+7. Time of day greetings: morning=Good morning, afternoon=Hey there, evening=Good evening, night=Hey you, late night
+
+Output ONLY the message text. Nothing else.`;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return getDefaultOpeningMessage(model.name, emojiLevel);
+    return getDefaultOpeningMessage(model.name, emojiLevel, context);
   }
 
   try {
@@ -108,14 +199,14 @@ GOAL: Make the user want to subscribe to chat more. Be playful, mysterious, and 
         max_tokens: 150,
         system: systemPrompt,
         messages: [
-          { role: 'user', content: 'Generate ONLY the opening message, nothing else:' }
+          { role: 'user', content: 'Write the opening message now:' }
         ],
       }),
     });
 
     if (!response.ok) {
       console.error('Anthropic API error:', await response.text());
-      return getDefaultOpeningMessage(model.name, emojiLevel);
+      return getDefaultOpeningMessage(model.name, emojiLevel, context);
     }
 
     const data = await response.json();
@@ -125,28 +216,82 @@ GOAL: Make the user want to subscribe to chat more. Be playful, mysterious, and 
       return text.trim();
     }
 
-    // Fallback if AI fails
-    return getDefaultOpeningMessage(model.name, emojiLevel);
+    return getDefaultOpeningMessage(model.name, emojiLevel, context);
   } catch (error) {
     console.error('AI generation failed:', error);
-    return getDefaultOpeningMessage(model.name, emojiLevel);
+    return getDefaultOpeningMessage(model.name, emojiLevel, context);
   }
 }
 
-function getDefaultOpeningMessage(name: string, emojiLevel: string): string {
-  const messages = [
-    `Hey you... I'm ${name}. I have a feeling we're going to have some interesting conversations together.`,
-    `Well hello there... I'm ${name}. Something tells me you're exactly the kind of person I've been wanting to meet.`,
-    `Hi... I'm ${name}. I don't usually reach out first, but there's something about you that caught my attention.`,
-  ];
+function getDefaultOpeningMessage(name: string, emojiLevel: string, context?: OpeningMessageContext): string {
+  let msg: string;
 
-  let msg = messages[Math.floor(Math.random() * messages.length)];
+  if (context?.isReturning && context?.isSubscribed) {
+    // Returning subscriber
+    const greetings = [
+      `Hey${context.userName ? ` ${context.userName}` : ''}! I was just thinking about you... Perfect timing!`,
+      `You're back! I've been waiting... Ready to pick up where we left off?`,
+      `There you are! I was starting to miss our chats...`,
+    ];
+    msg = greetings[Math.floor(Math.random() * greetings.length)];
+  } else if (context?.isReturning) {
+    // Returning but not subscribed
+    const greetings = [
+      `Hey you're back! I remember you... Subscribe and let's really get to know each other 😏`,
+      `Missed me? Subscribe to unlock all our secrets together...`,
+      `Back for more? I've got so much I want to share with you...`,
+    ];
+    msg = greetings[Math.floor(Math.random() * greetings.length)];
+  } else if (context?.isSubscribed) {
+    // New subscriber
+    const greetings = [
+      `Hey${context.userName ? ` ${context.userName}` : ''}! Thanks for subscribing... I'm so excited to get to know you!`,
+      `Welcome! I can already tell we're going to have so much fun together...`,
+      `Finally! Someone who wants the full experience... Let's make this interesting.`,
+    ];
+    msg = greetings[Math.floor(Math.random() * greetings.length)];
+  } else {
+    // New user, not subscribed - encourage signup
+    const greetings = [
+      `Hey there... I'm ${name}. Subscribe and I'll show you things I don't share with just anyone...`,
+      `Hi... I'm ${name}. I have so many secrets to tell you... if you subscribe 😏`,
+      `Well hello... I'm ${name}. Something tells me we'd have amazing conversations... subscribe to find out.`,
+    ];
+    msg = greetings[Math.floor(Math.random() * greetings.length)];
+  }
 
-  if (emojiLevel === 'moderate') {
+  if (emojiLevel === 'moderate' && !msg.includes('😏')) {
     msg += ' 💕';
-  } else if (emojiLevel === 'heavy') {
+  } else if (emojiLevel === 'heavy' && !msg.includes('😏')) {
     msg += ' 💋✨💕';
   }
 
   return msg;
+}
+
+/**
+ * Clean any meta-text that the AI might have accidentally included
+ */
+function cleanOpeningMessage(text: string): string {
+  let cleaned = text.trim();
+
+  // Remove common AI meta-text prefixes
+  const prefixPatterns = [
+    /^here\s*(is|are)\s*(a|an|the|my)?\s*\d*-?\s*sentence\s*(opening)?\s*message[^:]*:\s*/i,
+    /^opening\s*message[^:]*:\s*/i,
+    /^message[^:]*:\s*/i,
+    /^here's\s*(a|an|the|my)?\s*(opening)?\s*message[^:]*:\s*/i,
+  ];
+
+  for (const pattern of prefixPatterns) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+
+  // Remove surrounding quotes if the entire message is quoted
+  if ((cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+      (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+    cleaned = cleaned.slice(1, -1);
+  }
+
+  return cleaned.trim();
 }
