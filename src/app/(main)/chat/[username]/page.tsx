@@ -186,6 +186,17 @@ export default function AIChatPage() {
                   isLowMessages: false,
                 });
 
+                // Fetch token balance for header display
+                try {
+                  const walletRes = await fetch('/api/wallet');
+                  if (walletRes.ok) {
+                    const walletData = await walletRes.json();
+                    setTokenBalance(walletData.balance || 0);
+                  }
+                } catch (walletErr) {
+                  console.error('[AIChatPage] Error fetching wallet:', walletErr);
+                }
+
                 // Get or create conversation for this model chat
                 let hasExistingMessages = false;
                 try {

@@ -53,6 +53,14 @@ export async function processJobQueue(): Promise<{
       break;
     }
 
+    // Skip jobs with null/undefined target_type (corrupt entries)
+    if (!job.target_type) {
+      console.warn(`Skipping job ${job.id} with null target_type`);
+      await markJobCompleted(job.id, false, 'Invalid job: null target_type');
+      failed++;
+      continue;
+    }
+
     try {
       await processJobWithTimeout(job);
       await markJobCompleted(job.id, true);
