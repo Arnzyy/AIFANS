@@ -489,6 +489,7 @@ export default function AIChatPage() {
             creatorUsername: creator.username,
             creatorName: creator.display_name,
             message: messageContent,
+            modelId: isModelChat ? creator.id : undefined,
             conversationHistory: messages.slice(-10).map(m => ({
               role: m.sender_id === currentUser.id ? 'user' : 'assistant',
               content: m.content
@@ -615,12 +616,12 @@ export default function AIChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen max-h-screen bg-black overflow-hidden">
+    <div className="flex flex-col h-dvh max-h-dvh bg-black overflow-hidden">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
         <div className="flex items-center gap-3 px-3 md:px-4 h-14 md:h-16">
           <Link
-            href={isModelChat ? `/model/${username}` : `/${username}`}
+            href="/explore"
             className="p-1.5 md:p-2 -ml-1 text-gray-400 hover:text-white transition-colors text-sm md:text-base"
           >
             ←
@@ -797,7 +798,7 @@ export default function AIChatPage() {
       </div>
 
       {/* Input Area with Tip Bar */}
-      <div className="sticky bottom-0 border-t border-white/10 bg-black flex-shrink-0">
+      <div className="sticky bottom-0 border-t border-white/10 bg-black flex-shrink-0 pb-[env(safe-area-inset-bottom)]">
         {/* Quick Tip Bar - Mobile Optimized */}
         {creator && creator.id.includes('-') && creator.id.length >= 30 && (
           <div className="px-2 md:px-4 py-1.5 md:py-2 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border-b border-white/5">
@@ -831,7 +832,7 @@ export default function AIChatPage() {
         )}
 
         {/* Message Input with Access Gate */}
-        <div className="p-3 md:p-4">
+        <div className="p-2 md:p-4">
           <div className="max-w-2xl mx-auto">
             {chatAccess ? (
               <ChatAccessGate

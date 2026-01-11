@@ -1,5 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { cleanResponse } from '@/lib/ai/chat';
 
 // GET /api/models/[id]/opening-message - Generate personalized opening message
 export async function GET(
@@ -36,7 +37,8 @@ export async function GET(
     // Generate opening message with AI
     const openingMessage = await generateOpeningMessage(model);
 
-    return NextResponse.json({ openingMessage });
+    // Clean any asterisk actions from the message
+    return NextResponse.json({ openingMessage: cleanResponse(openingMessage) });
   } catch (error) {
     console.error('Error generating opening message:', error);
     return NextResponse.json(

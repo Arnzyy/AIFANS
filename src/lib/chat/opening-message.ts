@@ -3,6 +3,7 @@
 // ===========================================
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import { cleanResponse } from '@/lib/ai/chat';
 
 // ===========================================
 // TYPES
@@ -61,7 +62,7 @@ export async function generateOpeningMessage(
 
   if (customMessage) {
     return {
-      content: customMessage,
+      content: cleanResponse(customMessage),
       type: messageType,
       isCustom: true,
     };
@@ -71,7 +72,7 @@ export async function generateOpeningMessage(
   const defaultMessage = generateDefaultMessage(messageType, modelName, context.userName);
 
   return {
-    content: defaultMessage,
+    content: cleanResponse(defaultMessage),
     type: messageType,
     isCustom: false,
   };

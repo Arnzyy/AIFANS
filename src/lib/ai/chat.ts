@@ -16,7 +16,7 @@ interface ChatCompletionOptions {
 }
 
 // Post-process response to remove asterisk actions
-function cleanResponse(text: string): string {
+export function cleanResponse(text: string): string {
   let cleaned = text;
   // Remove all *action* patterns (asterisk roleplay actions)
   cleaned = cleaned.replace(/\*[^*]+\*/g, '');
