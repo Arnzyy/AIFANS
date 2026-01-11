@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { cleanResponse } from '@/lib/ai/chat';
+import { isAdminUser } from '@/lib/auth/admin';
 
 // GET /api/models/[id]/opening-message - Generate personalized opening message
 export async function GET(
@@ -18,6 +19,7 @@ export async function GET(
     let timezone = 'UTC';
     let userName: string | undefined;
     let isSubscribed = false;
+    const isAdmin = isAdminUser(user?.email);
 
     if (user) {
       const { data: profile } = await supabase
@@ -29,16 +31,21 @@ export async function GET(
       timezone = profile?.timezone || 'UTC';
       userName = profile?.display_name || profile?.username || undefined;
 
-      // Check if subscribed to this model
-      const { data: subscription } = await supabase
-        .from('subscriptions')
-        .select('id')
-        .eq('subscriber_id', user.id)
-        .eq('creator_id', id)
-        .eq('status', 'active')
-        .maybeSingle();
+      // Admin users have full access
+      if (isAdmin) {
+        isSubscribed = true;
+      } else {
+        // Check if subscribed to this model
+        const { data: subscription } = await supabase
+          .from('subscriptions')
+          .select('id')
+          .eq('subscriber_id', user.id)
+          .eq('creator_id', id)
+          .eq('status', 'active')
+          .maybeSingle();
 
-      isSubscribed = !!subscription;
+        isSubscribed = !!subscription;
+      }
     }
 
     // Get model persona data
@@ -141,45 +148,45 @@ async function generateOpeningMessage(
   const emojiLevel = model.emoji_usage || 'moderate';
   const timeOfDay = getTimeOfDay(context.timezone);
 
-  // Different scenarios
+  // Different scenarios - natural, conversational tone
   let scenario = '';
   if (context.isReturning && context.isSubscribed) {
-    scenario = `SCENARIO: This is a RETURNING subscriber${context.userName ? ` named ${context.userName}` : ''}.
-    Greet them warmly like you're happy to see them again. Reference the time of day (${timeOfDay}).
-    Be excited they came back. Maybe tease about what you've been up to.`;
+    scenario = `SCENARIO: Returning friend you're happy to see again.
+    Greet them casually like catching up with someone you know. Reference ${timeOfDay} naturally.
+    Be warm and playful - maybe tease or ask what they've been up to.`;
   } else if (context.isReturning && !context.isSubscribed) {
-    scenario = `SCENARIO: This user has chatted before but is NOT subscribed.
-    Greet them warmly and create excitement. Subtly encourage them to subscribe to unlock more.
-    Reference the time of day (${timeOfDay}). Make them feel special but hint at exclusive content.`;
+    scenario = `SCENARIO: Someone you've talked to before who came back.
+    Be warm and intriguing. Reference ${timeOfDay}. Create curiosity about getting to know each other better.
+    DO NOT say "subscribe" - just be interesting enough that they want more.`;
   } else if (context.isSubscribed) {
-    scenario = `SCENARIO: This is a NEW subscriber! Welcome them warmly.
-    Reference the time of day (${timeOfDay}). Be excited about getting to know them.
-    Thank them for subscribing and hint at the fun conversations ahead.`;
+    scenario = `SCENARIO: Meeting someone new who wants to chat.
+    Welcome them warmly. Reference ${timeOfDay}. Be excited and curious about them.
+    Ask something to start conversation or hint at fun times ahead.`;
   } else {
-    scenario = `SCENARIO: This is a NEW user who has never chatted and is NOT subscribed.
-    Create intrigue and mystery. Reference the time of day (${timeOfDay}).
-    Make them WANT to subscribe - hint at secrets, exclusive conversations, special treatment.
-    Be flirty and enticing but leave them wanting more.`;
+    scenario = `SCENARIO: A new visitor checking you out.
+    Be intriguing and mysterious. Reference ${timeOfDay} (evening/night = more intimate vibe).
+    Make them curious. End with a question or invitation to stay and chat.
+    NEVER say "subscribe" or be salesy - just be captivating and leave them wanting more.`;
   }
 
-  const systemPrompt = `You are ${model.name}. Write a short opening message (2-3 sentences max).
+  const systemPrompt = `You are ${model.name}. Write a short, natural opening message (2-3 sentences).
 
 ${scenario}
 
-PERSONA (use for tone, NOT content):
-- Traits: ${traits}
-- Style: ${model.speaking_style || 'playful'}
+PERSONA VIBES: ${traits}, ${model.speaking_style || 'playful'}
 
-STRICT RULES:
-1. Write ONLY the message itself - no labels, no "Here is...", no quotation marks
-2. NO geographic references (no countries, cities, nationalities)
-3. NO real identifying info (ages, addresses)
-4. Speak as ${model.name} in first person
-5. Emoji usage: ${emojiLevel} (minimal=0, moderate=1-2, heavy=3-4)
-6. NEVER mention AI, chatbot, or virtual
-7. Time of day greetings: morning=Good morning, afternoon=Hey there, evening=Good evening, night=Hey you, late night
+CRITICAL RULES:
+1. Output ONLY the message - no labels, quotes, or "Here is..."
+2. Sound like a real person texting, not a sales pitch
+3. NEVER say "subscribe", "exclusive access", "unlock", or anything salesy
+4. ${timeOfDay === 'night' || timeOfDay === 'evening' ? 'Late night = more intimate, mysterious vibe' : 'Keep it light and warm'}
+5. Emoji: ${emojiLevel} (minimal=0-1, moderate=1-2, heavy=2-3)
+6. End with engagement - question, tease, or invitation to chat
 
-Output ONLY the message text. Nothing else.`;
+EXAMPLE VIBE (don't copy, match the tone):
+"Hey you 💫 There's something about late nights that makes conversations feel… different. Want to stay a little longer and see where this goes?"
+
+Now write YOUR message:`;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -225,45 +232,41 @@ Output ONLY the message text. Nothing else.`;
 
 function getDefaultOpeningMessage(name: string, emojiLevel: string, context?: OpeningMessageContext): string {
   let msg: string;
+  const timeOfDay = context?.timezone ? getTimeOfDay(context.timezone) : 'day';
+  const isNight = timeOfDay === 'night' || timeOfDay === 'evening';
 
   if (context?.isReturning && context?.isSubscribed) {
-    // Returning subscriber
+    // Returning friend
     const greetings = [
-      `Hey${context.userName ? ` ${context.userName}` : ''}! I was just thinking about you... Perfect timing!`,
-      `You're back! I've been waiting... Ready to pick up where we left off?`,
-      `There you are! I was starting to miss our chats...`,
+      `Hey${context.userName ? ` ${context.userName}` : ''} 💫 I was hoping you'd come back... What's on your mind tonight?`,
+      `There you are! I've been thinking about our last chat... Ready to pick up where we left off?`,
+      `${isNight ? 'Late night visitor' : 'Hey you'}... I like when you stop by. What should we talk about?`,
     ];
     msg = greetings[Math.floor(Math.random() * greetings.length)];
   } else if (context?.isReturning) {
-    // Returning but not subscribed
+    // Returning visitor (not subscribed)
     const greetings = [
-      `Hey you're back! I remember you... Subscribe and let's really get to know each other 😏`,
-      `Missed me? Subscribe to unlock all our secrets together...`,
-      `Back for more? I've got so much I want to share with you...`,
+      `Hey, you came back 💫 I was wondering if I'd see you again... Stay a while?`,
+      `Well well... couldn't stay away? I don't blame you. What brings you back?`,
+      `${isNight ? 'Late night and you\'re thinking of me' : 'Back again'}... I like that. Want to chat?`,
     ];
     msg = greetings[Math.floor(Math.random() * greetings.length)];
   } else if (context?.isSubscribed) {
-    // New subscriber
+    // New person who wants to chat
     const greetings = [
-      `Hey${context.userName ? ` ${context.userName}` : ''}! Thanks for subscribing... I'm so excited to get to know you!`,
-      `Welcome! I can already tell we're going to have so much fun together...`,
-      `Finally! Someone who wants the full experience... Let's make this interesting.`,
+      `Hey${context.userName ? ` ${context.userName}` : ''} 💕 I've been looking forward to meeting you... What should I know about you?`,
+      `Hi there... I have a feeling we're going to have some interesting conversations. Ready?`,
+      `${isNight ? 'Good evening' : 'Hey'} 💫 So glad you're here. Tell me something about yourself?`,
     ];
     msg = greetings[Math.floor(Math.random() * greetings.length)];
   } else {
-    // New user, not subscribed - encourage signup
+    // New visitor - be intriguing without being salesy
     const greetings = [
-      `Hey there... I'm ${name}. Subscribe and I'll show you things I don't share with just anyone...`,
-      `Hi... I'm ${name}. I have so many secrets to tell you... if you subscribe 😏`,
-      `Well hello... I'm ${name}. Something tells me we'd have amazing conversations... subscribe to find out.`,
+      `Hey you 💫 ${isNight ? 'There\'s something about late nights that makes conversations feel... different.' : 'I don\'t usually say hi first, but something about you caught my eye.'} Want to stay a while?`,
+      `Hi... I'm ${name}. ${isNight ? 'Can\'t sleep either?' : 'Curious about me?'} I promise I'm more interesting than I look 😏`,
+      `${isNight ? 'Late night thoughts?' : 'Hey there'}... I've got stories that might keep you up. Want to hear one?`,
     ];
     msg = greetings[Math.floor(Math.random() * greetings.length)];
-  }
-
-  if (emojiLevel === 'moderate' && !msg.includes('😏')) {
-    msg += ' 💕';
-  } else if (emojiLevel === 'heavy' && !msg.includes('😏')) {
-    msg += ' 💋✨💕';
   }
 
   return msg;
