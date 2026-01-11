@@ -31,6 +31,17 @@ export async function processJobQueue(): Promise<{
   failed: number;
   remaining: number;
 }> {
+  // Check if table exists first
+  const tableCheck = await getDb()
+    .from('moderation_jobs')
+    .select('id')
+    .limit(1);
+
+  if (tableCheck.error?.code === 'PGRST205' || tableCheck.error?.message?.includes('not found')) {
+    // Table doesn't exist - moderation system not set up yet
+    return { processed: 0, failed: 0, remaining: 0 };
+  }
+
   let processed = 0;
   let failed = 0;
 
@@ -125,6 +136,17 @@ async function markJobCompleted(
 // ============================================
 
 export async function recoverStaleJobs(): Promise<number> {
+  // Check if table exists first
+  const tableCheck = await getDb()
+    .from('moderation_jobs')
+    .select('id')
+    .limit(1);
+
+  if (tableCheck.error?.code === 'PGRST205' || tableCheck.error?.message?.includes('not found')) {
+    // Table doesn't exist - moderation system not set up yet
+    return 0;
+  }
+
   // Find jobs that have been processing for too long (stuck)
   const staleTimeout = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes
 
@@ -160,6 +182,23 @@ export async function getQueueStats(): Promise<{
   failed_today: number;
   avg_wait_time_ms: number;
 }> {
+  // Check if table exists first
+  const tableCheck = await getDb()
+    .from('moderation_jobs')
+    .select('id')
+    .limit(1);
+
+  if (tableCheck.error?.code === 'PGRST205' || tableCheck.error?.message?.includes('not found')) {
+    // Table doesn't exist - moderation system not set up yet
+    return {
+      queued: 0,
+      processing: 0,
+      completed_today: 0,
+      failed_today: 0,
+      avg_wait_time_ms: 0,
+    };
+  }
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 

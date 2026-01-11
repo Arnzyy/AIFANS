@@ -115,15 +115,15 @@ export async function generateChatResponse(
     { role: 'user', content: message },
   ];
 
-  // 7. Generate AI response
-  let aiResponse = await callAnthropicAPI(systemPrompt, messages);
+  // 7. Generate AI response (use personality's response_length setting)
+  let aiResponse = await callAnthropicAPI(systemPrompt, messages, personality.response_length);
 
   // 8. Compliance check
   const complianceResult = checkCompliance(aiResponse);
 
   if (!complianceResult.passed) {
     console.warn('Compliance issues:', complianceResult.issues);
-    aiResponse = await regenerateCompliant(systemPrompt, messages, complianceResult.issues);
+    aiResponse = await regenerateCompliant(systemPrompt, messages, complianceResult.issues, personality.response_length);
   }
 
   // 8.5. Post-processing: Strip any remaining asterisk actions as failsafe
@@ -192,15 +192,30 @@ function buildFullSystemPrompt(
 // ANTHROPIC API
 // ===========================================
 
+/**
+ * Get max tokens based on response_length setting
+ */
+function getMaxTokensForLength(responseLength: 'short' | 'medium' | 'long' = 'medium'): number {
+  switch (responseLength) {
+    case 'short': return 100;  // 1-2 sentences
+    case 'medium': return 250; // 2-4 sentences
+    case 'long': return 500;   // Detailed responses
+    default: return 250;
+  }
+}
+
 async function callAnthropicAPI(
   systemPrompt: string,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  responseLength: 'short' | 'medium' | 'long' = 'medium'
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  
+
   if (!apiKey) {
     return getFallbackResponse();
   }
+
+  const maxTokens = getMaxTokensForLength(responseLength);
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -212,7 +227,7 @@ async function callAnthropicAPI(
       },
       body: JSON.stringify({
         model: 'claude-3-haiku-20240307',
-        max_tokens: 150, // Keep responses SHORT - this is texting, not email
+        max_tokens: maxTokens,
         system: systemPrompt,
         messages: messages.map(m => ({
           role: m.role,
@@ -261,7 +276,8 @@ function checkCompliance(response: string): ComplianceResult {
 async function regenerateCompliant(
   systemPrompt: string,
   messages: ChatMessage[],
-  issues: string[]
+  issues: string[],
+  responseLength: 'short' | 'medium' | 'long' = 'medium'
 ): Promise<string> {
   const stricterPrompt = systemPrompt + `
 
@@ -273,7 +289,7 @@ Generate a new response that:
 - Stays flirty but NOT explicit
 - No emotional dependency ("I missed you")
 - No real-world locations/meetups
-- Keep it SHORT (1-3 sentences) and playful
+- Keep it playful
 
 When redirecting from explicit content, use confidence not refusal:
 ✅ "Bold." / "You've got my attention" / "Keep that energy" / "Mm, I felt that"
@@ -281,7 +297,7 @@ When redirecting from explicit content, use confidence not refusal:
 
 Try again:`;
 
-  return await callAnthropicAPI(stricterPrompt, messages);
+  return await callAnthropicAPI(stricterPrompt, messages, responseLength);
 }
 
 // ===========================================
@@ -300,34 +316,12 @@ function postProcessResponse(text: string): string {
   // 2. Clean up extra whitespace
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
-  // 3. Remove robotic openers
-  cleaned = cleaned.replace(/^(Oh,?\s*|Well,?\s*|Hmm,?\s*|Ahh?,?\s*)/i, '');
-
-  // 4. Remove multiple questions - keep only the last one if there are many
-  const sentences = cleaned.split(/(?<=[.!?])\s+/);
-  const questions = sentences.filter(s => s.endsWith('?'));
-  if (questions.length > 1) {
-    // Keep non-questions + only last question
-    const nonQuestions = sentences.filter(s => !s.endsWith('?'));
-    cleaned = [...nonQuestions, questions[questions.length - 1]].join(' ');
+  // 3. Remove robotic openers (only if followed by more content)
+  if (cleaned.length > 20) {
+    cleaned = cleaned.replace(/^(Oh,?\s*|Well,?\s*|Hmm,?\s*|Ahh?,?\s*)/i, '');
   }
 
-  // 5. Trim if too long (max ~100 chars for natural texting feel)
-  if (cleaned.length > 120) {
-    // Find a good break point
-    const breakPoints = ['. ', '! ', '? ', '... '];
-    let bestBreak = 120;
-    for (const bp of breakPoints) {
-      const idx = cleaned.lastIndexOf(bp, 100);
-      if (idx > 40) {
-        bestBreak = idx + bp.length - 1;
-        break;
-      }
-    }
-    cleaned = cleaned.substring(0, bestBreak).trim();
-  }
-
-  // 6. If we stripped everything, return a fallback
+  // 4. If we stripped everything, return a fallback
   if (!cleaned || cleaned.length < 2) {
     return "Hey you 😏";
   }
@@ -398,6 +392,65 @@ NEVER use asterisks for actions like *giggles* or *smiles*. Express yourself nat
   } catch (error) {
     console.error('Mock response generation failed:', error);
     return getFallbackResponse();
+  }
+}
+
+// ===========================================
+// WELCOME BACK MESSAGE GENERATOR
+// ===========================================
+
+/**
+ * Generate a natural "welcome back" message for returning users
+ * References their previous conversation to feel like a real person
+ */
+export async function generateWelcomeBackMessage(
+  creatorName: string,
+  recentMessages: ChatMessage[],
+  responseLength: 'short' | 'medium' | 'long' = 'medium'
+): Promise<string> {
+  if (recentMessages.length === 0) {
+    return ''; // No history, no welcome back needed
+  }
+
+  // Get the last few messages for context
+  const lastMessages = recentMessages.slice(-6);
+  const lastUserMessage = lastMessages.filter(m => m.role === 'user').pop();
+
+  try {
+    const systemPrompt = `You are ${creatorName}, greeting a user who just came back to chat.
+
+CRITICAL RULES:
+- Keep it SHORT - one casual sentence, like a text from a friend
+- Reference what they were talking about last time (if relevant)
+- Sound natural and happy to see them, not formal
+- NO asterisks (*action*) - just natural speech
+- NO formal greetings like "Welcome back!" or "Hello again!"
+- Think: how would a flirty friend text you when you come back online?
+
+GOOD examples (short, casual):
+- "Hey! How was the gym? 💪"
+- "You're back! Miss me? 😏"
+- "There you are... was just thinking about you"
+- "Hey you 💕 How'd it go?"
+
+BAD examples (too formal/long):
+- "Welcome back! I'm so glad you decided to return to our conversation!"
+- "Hello again! It's wonderful to see you!"`;
+
+    const contextMessages: ChatMessage[] = [
+      ...lastMessages,
+      {
+        role: 'user',
+        content: `[User just returned to the chat after being away. Generate a SHORT, casual welcome back message referencing our last conversation. Last thing they said: "${lastUserMessage?.content || 'chatting with me'}"]`
+      }
+    ];
+
+    const response = await callAnthropicAPI(systemPrompt, contextMessages, 'short');
+    return stripAsteriskActions(response);
+  } catch (error) {
+    console.error('Welcome back message generation failed:', error);
+    // Fallback to simple greeting
+    return "Hey, you're back! 💕";
   }
 }
 

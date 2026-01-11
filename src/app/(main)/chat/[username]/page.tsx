@@ -237,6 +237,44 @@ export default function AIChatPage() {
                       setMessages(msgs);
                       setShowDisclosure(false); // Already chatted before
                       setOpeningMessage(''); // Clear opening message for returning users
+
+                      // Check if we should generate a welcome back message
+                      // Only if the last message was more than 5 mins ago
+                      const lastMsg = existingMessages[existingMessages.length - 1];
+                      const lastMsgTime = new Date(lastMsg.created_at).getTime();
+                      const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+
+                      if (lastMsgTime < fiveMinutesAgo) {
+                        // Generate welcome back message
+                        try {
+                          const welcomeRes = await fetch(`/api/chat/${model.id}/welcome-back`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              conversationId: conv.id,
+                              creatorName: modelName,
+                            }),
+                          });
+
+                          if (welcomeRes.ok) {
+                            const { welcomeMessage } = await welcomeRes.json();
+                            if (welcomeMessage) {
+                              // Add welcome back message to the conversation
+                              const welcomeMsg: Message = {
+                                id: `welcome-${Date.now()}`,
+                                content: welcomeMessage,
+                                sender_id: model.id,
+                                receiver_id: user.id,
+                                created_at: new Date().toISOString(),
+                                is_ai_generated: true,
+                              };
+                              setMessages(prev => [...prev, welcomeMsg]);
+                            }
+                          }
+                        } catch (welcomeErr) {
+                          console.error('[AIChatPage] Welcome back error:', welcomeErr);
+                        }
+                      }
                     }
                   }
                 } catch (convErr) {
