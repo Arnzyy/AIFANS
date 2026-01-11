@@ -14,7 +14,9 @@
       "Bash(while read f)",
       "Bash(do cp \"$f\" \"c:\\\\Users\\\\Billy\\\\Documents\\\\GitHub\\\\AIFANS\\\\src\\\\components\\\\tokens$f\")",
       "Bash(done)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(git diff:*)",
+      "Bash(git restore:*)"
     ]
   }
 }
