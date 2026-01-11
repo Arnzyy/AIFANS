@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase/client';
 import { AI_CHAT_DISCLOSURE } from '@/lib/compliance/constants';
 import { getCreatorByUsername } from '@/lib/data/creators';
 import { formatDistanceToNow } from 'date-fns';
-import { Lock, Sparkles, LogIn, Heart } from 'lucide-react';
+import { Lock, Sparkles, LogIn, Heart, RotateCcw } from 'lucide-react';
 import { TipButton } from '@/components/tokens/TipButton';
 import { ChatAccessGate } from '@/components/chat/ChatAccessGate';
 import { PurchaseSessionModal } from '@/components/chat/PurchaseSessionModal';
@@ -227,12 +227,16 @@ export default function AIChatPage() {
                   if (conv?.id) {
                     setConversationId(conv.id);
 
-                    // Load existing messages
+                    // Load existing messages (limit to last 50 for performance)
                     const { data: existingMessages } = await supabase
                       .from('chat_messages')
                       .select('*')
                       .eq('conversation_id', conv.id)
-                      .order('created_at', { ascending: true });
+                      .order('created_at', { ascending: false })
+                      .limit(50);
+
+                    // Reverse to show in chronological order (oldest first)
+                    if (existingMessages) existingMessages.reverse();
 
                     if (existingMessages && existingMessages.length > 0) {
                       hasExistingMessages = true;
@@ -837,6 +841,20 @@ export default function AIChatPage() {
               variant="icon"
               onTipSent={handleTipSent}
             />
+          )}
+
+          {/* Clear chat button (visual only - keeps history) */}
+          {messages.length > 0 && (
+            <button
+              onClick={() => {
+                setMessages([]);
+                setOpeningMessage('');
+              }}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition"
+              title="Clear chat window (history is saved)"
+            >
+              <RotateCcw className="w-4 h-4 text-gray-400" />
+            </button>
           )}
         </div>
       </header>
