@@ -71,16 +71,17 @@ export async function GET(
 
     const tags = modelTags?.map((mt: any) => mt.tags).filter(Boolean) || [];
 
-    // Check if current user is subscribed
+    // Check if current user is subscribed to this model
     const { data: { user } } = await supabase.auth.getUser();
     let isSubscribed = false;
 
     if (user) {
+      // Subscriptions are stored with model.id as creator_id (not the human creator's ID)
       const { data: subscription } = await supabase
         .from('subscriptions')
         .select('id')
-        .eq('user_id', user.id)
-        .eq('creator_id', model.creator_id)
+        .eq('subscriber_id', user.id)
+        .eq('creator_id', model.id)
         .eq('status', 'active')
         .single();
 
