@@ -140,21 +140,6 @@ export default function AIChatPage() {
               } as Creator);
               setIsModelChat(true); // This is a database model chat
 
-              // Fetch AI-generated opening message (sanitized, no real locations)
-              try {
-                const openingRes = await fetch(`/api/models/${username}/opening-message`);
-                if (openingRes.ok) {
-                  const { openingMessage: aiMessage } = await openingRes.json();
-                  setOpeningMessage(aiMessage);
-                } else {
-                  // Fallback to generic message
-                  setOpeningMessage(`Hey there... I'm ${modelName}. I've been waiting to meet someone like you. Subscribe to unlock our private conversations 💕`);
-                }
-              } catch {
-                // Fallback if API fails
-                setOpeningMessage(`Hey there... I'm ${modelName}. I've been waiting to meet someone like you. Subscribe to unlock our private conversations 💕`);
-              }
-
               // Check subscription status - admin email gets full access
               const isAdmin = isAdminUser(user?.email);
               const isSubscribedToModel = modelData.isSubscribed || isAdmin;
@@ -172,6 +157,7 @@ export default function AIChatPage() {
                 });
 
                 // Get or create conversation for this model chat
+                let hasExistingMessages = false;
                 try {
                   // First check if conversation exists
                   const { data: existingConv } = await supabase
@@ -208,6 +194,7 @@ export default function AIChatPage() {
                       .order('created_at', { ascending: true });
 
                     if (existingMessages && existingMessages.length > 0) {
+                      hasExistingMessages = true;
                       // Transform to Message format
                       const msgs = existingMessages.map((m: any) => ({
                         id: m.id,
@@ -219,10 +206,26 @@ export default function AIChatPage() {
                       }));
                       setMessages(msgs);
                       setShowDisclosure(false); // Already chatted before
+                      setOpeningMessage(''); // Clear opening message for returning users
                     }
                   }
                 } catch (convErr) {
                   console.error('[AIChatPage] Error loading conversation:', convErr);
+                }
+
+                // Only fetch opening message for NEW conversations (no history)
+                if (!hasExistingMessages) {
+                  try {
+                    const openingRes = await fetch(`/api/models/${username}/opening-message`);
+                    if (openingRes.ok) {
+                      const { openingMessage: aiMessage } = await openingRes.json();
+                      setOpeningMessage(aiMessage);
+                    } else {
+                      setOpeningMessage(`Hey there... I'm ${modelName}. What's on your mind? 💕`);
+                    }
+                  } catch {
+                    setOpeningMessage(`Hey there... I'm ${modelName}. What's on your mind? 💕`);
+                  }
                 }
               } else if (user) {
                 // User is logged in but NOT subscribed - show subscription paywall
@@ -237,6 +240,31 @@ export default function AIChatPage() {
                   ],
                   isLowMessages: false,
                 });
+                // Show opening message as preview for non-subscribers
+                try {
+                  const openingRes = await fetch(`/api/models/${username}/opening-message`);
+                  if (openingRes.ok) {
+                    const { openingMessage: aiMessage } = await openingRes.json();
+                    setOpeningMessage(aiMessage);
+                  } else {
+                    setOpeningMessage(`Hey there... I'm ${modelName}. Want to chat? 💕`);
+                  }
+                } catch {
+                  setOpeningMessage(`Hey there... I'm ${modelName}. Want to chat? 💕`);
+                }
+              } else {
+                // Guest user (not logged in) - show opening message as teaser
+                try {
+                  const openingRes = await fetch(`/api/models/${username}/opening-message`);
+                  if (openingRes.ok) {
+                    const { openingMessage: aiMessage } = await openingRes.json();
+                    setOpeningMessage(aiMessage);
+                  } else {
+                    setOpeningMessage(`Hey there... I'm ${modelName}. Want to chat? 💕`);
+                  }
+                } catch {
+                  setOpeningMessage(`Hey there... I'm ${modelName}. Want to chat? 💕`);
+                }
               }
               // For model chats, we're done loading
               setLoading(false);
