@@ -15,6 +15,16 @@ interface ChatCompletionOptions {
   maxTokens?: number;
 }
 
+// Post-process response to remove asterisk actions
+function cleanResponse(text: string): string {
+  let cleaned = text;
+  // Remove all *action* patterns (asterisk roleplay actions)
+  cleaned = cleaned.replace(/\*[^*]+\*/g, '');
+  // Clean up extra whitespace
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  return cleaned;
+}
+
 // Main Anthropic API call
 async function callAnthropic(
   systemPrompt: string,
@@ -48,7 +58,8 @@ async function callAnthropic(
   }
 
   const data = await response.json();
-  return data.content[0].text;
+  // Clean response to remove any asterisk actions
+  return cleanResponse(data.content[0].text);
 }
 
 // ===========================================

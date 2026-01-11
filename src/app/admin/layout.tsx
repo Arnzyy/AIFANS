@@ -13,12 +13,14 @@ import {
   LogOut,
   Menu,
   X,
+  Shield,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/admin/creators', icon: Users, label: 'Creators' },
   { href: '/admin/models', icon: Sparkles, label: 'Models' },
+  { href: '/admin/moderation', icon: Shield, label: 'Moderation' },
   { href: '/admin/reports', icon: AlertTriangle, label: 'Reports' },
   { href: '/admin/audit-log', icon: ScrollText, label: 'Audit Log' },
   { href: '/admin/settings', icon: Settings, label: 'Settings' },
