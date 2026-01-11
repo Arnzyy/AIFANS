@@ -245,9 +245,9 @@ export async function generateAIResponse(
   } catch (error) {
     console.log('Anthropic unavailable, using mock response:', error);
 
-    // Fall back to mock response
+    // Fall back to mock response (also clean it)
     const lastUserMessage = conversationHistory.filter(m => m.role === 'user').pop();
-    return getMockResponse(lastUserMessage?.content || '');
+    return cleanResponse(getMockResponse(lastUserMessage?.content || ''));
   }
 }
 
@@ -275,9 +275,9 @@ export async function createChatCompletion(options: ChatCompletionOptions): Prom
   } catch (error) {
     console.log('Anthropic unavailable:', error);
 
-    // Mock fallback
+    // Mock fallback (also clean it)
     const lastUserMessage = conversationMessages.filter(m => m.role === 'user').pop();
-    return getMockResponse(lastUserMessage?.content || '');
+    return cleanResponse(getMockResponse(lastUserMessage?.content || ''));
   }
 }
 
