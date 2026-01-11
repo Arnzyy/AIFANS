@@ -49,17 +49,32 @@ export async function POST(request: NextRequest) {
 
       // For database models, save messages to persist conversation
       // Get or create conversation
-      const { data: conv } = await supabase
-        .from('conversations')
-        .upsert({
-          subscriber_id: user.id,
-          creator_id: modelId,
-          last_message_at: new Date().toISOString(),
-        }, { onConflict: 'creator_id,subscriber_id' })
-        .select('id')
-        .single();
+      let conversationId: string | undefined;
 
-      const conversationId = conv?.id;
+      // First check if conversation exists
+      const { data: existingConv } = await supabase
+        .from('conversations')
+        .select('id')
+        .or(
+          `and(participant1_id.eq.${user.id},participant2_id.eq.${modelId}),` +
+          `and(participant1_id.eq.${modelId},participant2_id.eq.${user.id})`
+        )
+        .maybeSingle();
+
+      if (existingConv) {
+        conversationId = existingConv.id;
+      } else {
+        // Create new conversation
+        const { data: newConv } = await supabase
+          .from('conversations')
+          .insert({
+            participant1_id: user.id,
+            participant2_id: modelId,
+          })
+          .select('id')
+          .single();
+        conversationId = newConv?.id;
+      }
 
       // Format conversation history
       const history: ChatMessage[] = (conversationHistory || []).map((m: { role: string; content: string }) => ({

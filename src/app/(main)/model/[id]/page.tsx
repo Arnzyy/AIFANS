@@ -7,6 +7,7 @@ import { Bot, BadgeCheck, MapPin, Heart, MessageCircle, Lock, Grid3X3, Play, Sta
 import { AI_CHAT_DISCLOSURE, MODEL_TYPES, CATEGORY_DISCLAIMER } from '@/lib/compliance/constants';
 import { SubscribeModal } from '@/components/shared/SubscribeModal';
 import { supabase } from '@/lib/supabase/client';
+import { isAdminUser } from '@/lib/auth/admin';
 
 interface Tag {
   id: string;
@@ -46,10 +47,9 @@ export default function ModelProfilePage() {
     const fetchModel = async () => {
       console.log('[ModelProfilePage] Fetching model with ID:', id);
 
-      // Check if user is admin
+      // Check if user is admin (full access to all content)
       const { data: { user } } = await supabase.auth.getUser();
-      const adminEmail = user?.email === 'example@gmail.com';
-      setIsAdmin(adminEmail);
+      setIsAdmin(isAdminUser(user?.email));
 
       try {
         const res = await fetch(`/api/models/${id}`);

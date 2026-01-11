@@ -172,15 +172,29 @@ export default function AIChatPage() {
 
                 // Get or create conversation for this model chat
                 try {
-                  const { data: conv } = await supabase
+                  // First check if conversation exists
+                  const { data: existingConv } = await supabase
                     .from('conversations')
-                    .upsert({
-                      subscriber_id: user.id,
-                      creator_id: model.id,
-                      last_message_at: new Date().toISOString(),
-                    }, { onConflict: 'creator_id,subscriber_id' })
                     .select('id')
-                    .single();
+                    .or(
+                      `and(participant1_id.eq.${user.id},participant2_id.eq.${model.id}),` +
+                      `and(participant1_id.eq.${model.id},participant2_id.eq.${user.id})`
+                    )
+                    .maybeSingle();
+
+                  let conv = existingConv;
+                  if (!conv) {
+                    // Create new conversation
+                    const { data: newConv } = await supabase
+                      .from('conversations')
+                      .insert({
+                        participant1_id: user.id,
+                        participant2_id: model.id,
+                      })
+                      .select('id')
+                      .single();
+                    conv = newConv;
+                  }
 
                   if (conv?.id) {
                     setConversationId(conv.id);
