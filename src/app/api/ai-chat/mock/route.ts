@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { generateMockResponse, ChatMessage } from '@/lib/ai/chat-service';
 import { getCreatorByUsername } from '@/lib/data/creators';
+import { cleanResponse } from '@/lib/ai/chat';
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,8 +46,61 @@ export async function POST(request: NextRequest) {
       }
 
       displayName = model.name || creatorName;
+
+      // For database models, save messages to persist conversation
+      // Get or create conversation
+      const { data: conv } = await supabase
+        .from('conversations')
+        .upsert({
+          subscriber_id: user.id,
+          creator_id: modelId,
+          last_message_at: new Date().toISOString(),
+        }, { onConflict: 'creator_id,subscriber_id' })
+        .select('id')
+        .single();
+
+      const conversationId = conv?.id;
+
+      // Format conversation history
+      const history: ChatMessage[] = (conversationHistory || []).map((m: { role: string; content: string }) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+
+      // Save user message
+      if (conversationId) {
+        await supabase.from('chat_messages').insert({
+          conversation_id: conversationId,
+          creator_id: modelId,
+          subscriber_id: user.id,
+          role: 'user',
+          content: message,
+        });
+      }
+
+      // Generate response
+      const response = await generateMockResponse(displayName, message, history);
+      const cleanedResponse = cleanResponse(response);
+
+      // Save AI response
+      if (conversationId) {
+        await supabase.from('chat_messages').insert({
+          conversation_id: conversationId,
+          creator_id: modelId,
+          subscriber_id: user.id,
+          role: 'assistant',
+          content: cleanedResponse,
+        });
+      }
+
+      return NextResponse.json({
+        response: cleanedResponse,
+        mock: true,
+        conversationId,
+      });
     }
 
+    // For mock creators (not database models), don't persist messages
     // Format conversation history
     const history: ChatMessage[] = (conversationHistory || []).map((m: { role: string; content: string }) => ({
       role: m.role as 'user' | 'assistant',
@@ -61,7 +115,7 @@ export async function POST(request: NextRequest) {
     );
 
     return NextResponse.json({
-      response,
+      response: cleanResponse(response),
       mock: true,
     });
 

@@ -169,6 +169,46 @@ export default function AIChatPage() {
                   unlockOptions: [],
                   isLowMessages: false,
                 });
+
+                // Get or create conversation for this model chat
+                try {
+                  const { data: conv } = await supabase
+                    .from('conversations')
+                    .upsert({
+                      subscriber_id: user.id,
+                      creator_id: model.id,
+                      last_message_at: new Date().toISOString(),
+                    }, { onConflict: 'creator_id,subscriber_id' })
+                    .select('id')
+                    .single();
+
+                  if (conv?.id) {
+                    setConversationId(conv.id);
+
+                    // Load existing messages
+                    const { data: existingMessages } = await supabase
+                      .from('chat_messages')
+                      .select('*')
+                      .eq('conversation_id', conv.id)
+                      .order('created_at', { ascending: true });
+
+                    if (existingMessages && existingMessages.length > 0) {
+                      // Transform to Message format
+                      const msgs = existingMessages.map((m: any) => ({
+                        id: m.id,
+                        content: m.content,
+                        sender_id: m.role === 'user' ? user.id : model.id,
+                        receiver_id: m.role === 'user' ? model.id : user.id,
+                        created_at: m.created_at,
+                        is_ai_generated: m.role === 'assistant',
+                      }));
+                      setMessages(msgs);
+                      setShowDisclosure(false); // Already chatted before
+                    }
+                  }
+                } catch (convErr) {
+                  console.error('[AIChatPage] Error loading conversation:', convErr);
+                }
               } else if (user) {
                 // User is logged in but NOT subscribed - show subscription paywall
                 setChatAccess({
@@ -183,7 +223,7 @@ export default function AIChatPage() {
                   isLowMessages: false,
                 });
               }
-              // Skip the creator chat start flow for models
+              // For model chats, we're done loading
               setLoading(false);
               return;
             } else {
@@ -621,7 +661,7 @@ export default function AIChatPage() {
       <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
         <div className="flex items-center gap-3 px-3 md:px-4 h-14 md:h-16">
           <Link
-            href="/explore"
+            href={isModelChat ? `/model/${creator?.id}` : `/${creator?.username}`}
             className="p-1.5 md:p-2 -ml-1 text-gray-400 hover:text-white transition-colors text-sm md:text-base"
           >
             ←
@@ -687,8 +727,8 @@ export default function AIChatPage() {
         </div>
       )}
 
-      {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
+      {/* Messages - pb-32 accounts for fixed input area */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 pb-32">
         <div className="max-w-2xl mx-auto space-y-4">
           {messages.length === 0 && !openingMessage ? (
             <div className="text-center py-6 md:py-12">
@@ -797,8 +837,8 @@ export default function AIChatPage() {
         </div>
       </div>
 
-      {/* Input Area with Tip Bar */}
-      <div className="sticky bottom-0 border-t border-white/10 bg-black flex-shrink-0 pb-[env(safe-area-inset-bottom)]">
+      {/* Input Area with Tip Bar - Fixed positioning for mobile keyboard */}
+      <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black pb-[env(safe-area-inset-bottom)] z-40">
         {/* Quick Tip Bar - Mobile Optimized */}
         {creator && creator.id.includes('-') && creator.id.length >= 30 && (
           <div className="px-2 md:px-4 py-1.5 md:py-2 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border-b border-white/5">

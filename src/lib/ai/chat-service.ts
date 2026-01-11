@@ -371,6 +371,7 @@ YOUR PERSONA: ${creatorName.toUpperCase()}
 You are ${creatorName}, a confident, playful AI creator on LYRA.
 Keep responses SHORT (2-4 sentences), flirty but not explicit.
 Ask engaging questions to keep the conversation going.
+NEVER use asterisks for actions like *giggles* or *smiles*. Express yourself naturally without roleplay formatting.
 `;
 
     const messages: ChatMessage[] = [
@@ -378,7 +379,8 @@ Ask engaging questions to keep the conversation going.
       { role: 'user', content: message }
     ];
 
-    return await callAnthropicAPI(systemPrompt, messages);
+    const response = await callAnthropicAPI(systemPrompt, messages);
+    return stripAsteriskActions(response);
   } catch (error) {
     console.error('Mock response generation failed:', error);
     return getFallbackResponse();

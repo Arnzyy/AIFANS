@@ -137,14 +137,14 @@ export default function ModelProfilePage() {
 
   return (
     <div className="min-h-screen bg-black">
-      {/* Back button */}
-      <div className="fixed top-4 left-4 z-50">
-        <button
-          onClick={() => router.back()}
-          className="p-2 bg-black/50 backdrop-blur-xl rounded-full hover:bg-black/70 transition-colors"
+      {/* Back button - positioned below header to avoid overlap with logo */}
+      <div className="fixed top-20 left-4 z-40">
+        <Link
+          href="/explore"
+          className="p-2 bg-black/50 backdrop-blur-xl rounded-full hover:bg-black/70 transition-colors inline-flex"
         >
           <ArrowLeft className="w-5 h-5" />
-        </button>
+        </Link>
       </div>
 
       {/* Banner */}
