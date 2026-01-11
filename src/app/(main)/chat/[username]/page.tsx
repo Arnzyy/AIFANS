@@ -42,6 +42,36 @@ function isUUID(str: string): boolean {
   return uuidRegex.test(str);
 }
 
+// Random fallback opening messages (used when API fails)
+function getRandomFallbackOpener(name: string): string {
+  const hour = new Date().getHours();
+  const isNight = hour >= 21 || hour < 6;
+  const isEvening = hour >= 18 && hour < 21;
+
+  const nightOpeners = [
+    `Can't sleep either? 🌙 I was hoping someone interesting would show up...`,
+    `Late night thoughts hitting different... want to keep me company?`,
+    `There's something about these quiet hours... glad you're here 💫`,
+    `Mmm, a night owl like me? I like that already...`,
+  ];
+
+  const eveningOpeners = [
+    `Perfect timing... I was just thinking about having some company 💕`,
+    `The evening's young and so are we... what's on your mind?`,
+    `I had a feeling someone interesting would show up tonight...`,
+  ];
+
+  const dayOpeners = [
+    `Well well... you caught my attention 😏 What brings you here?`,
+    `I don't usually say hi first, but something about you... 💫`,
+    `Curiosity got the better of you? Same... tell me something about yourself`,
+    `Finally, someone worth talking to. What's your story?`,
+  ];
+
+  const openers = isNight ? nightOpeners : isEvening ? eveningOpeners : dayOpeners;
+  return openers[Math.floor(Math.random() * openers.length)];
+}
+
 export default function AIChatPage() {
   const params = useParams();
   const router = useRouter();
@@ -221,10 +251,11 @@ export default function AIChatPage() {
                       const { openingMessage: aiMessage } = await openingRes.json();
                       setOpeningMessage(aiMessage);
                     } else {
-                      setOpeningMessage(`Hey there... I'm ${modelName}. What's on your mind? 💕`);
+                      // Fallback if API fails - still varied by time of day
+                      setOpeningMessage(getRandomFallbackOpener(modelName));
                     }
                   } catch {
-                    setOpeningMessage(`Hey there... I'm ${modelName}. What's on your mind? 💕`);
+                    setOpeningMessage(getRandomFallbackOpener(modelName));
                   }
                 }
               } else if (user) {
@@ -240,30 +271,30 @@ export default function AIChatPage() {
                   ],
                   isLowMessages: false,
                 });
-                // Show opening message as preview for non-subscribers
+                // Show AI-generated opening message as preview
                 try {
                   const openingRes = await fetch(`/api/models/${username}/opening-message`);
                   if (openingRes.ok) {
                     const { openingMessage: aiMessage } = await openingRes.json();
                     setOpeningMessage(aiMessage);
                   } else {
-                    setOpeningMessage(`Hey there... I'm ${modelName}. Want to chat? 💕`);
+                    setOpeningMessage(getRandomFallbackOpener(modelName));
                   }
                 } catch {
-                  setOpeningMessage(`Hey there... I'm ${modelName}. Want to chat? 💕`);
+                  setOpeningMessage(getRandomFallbackOpener(modelName));
                 }
               } else {
-                // Guest user (not logged in) - show opening message as teaser
+                // Guest user (not logged in) - show AI-generated opening as teaser
                 try {
                   const openingRes = await fetch(`/api/models/${username}/opening-message`);
                   if (openingRes.ok) {
                     const { openingMessage: aiMessage } = await openingRes.json();
                     setOpeningMessage(aiMessage);
                   } else {
-                    setOpeningMessage(`Hey there... I'm ${modelName}. Want to chat? 💕`);
+                    setOpeningMessage(getRandomFallbackOpener(modelName));
                   }
                 } catch {
-                  setOpeningMessage(`Hey there... I'm ${modelName}. Want to chat? 💕`);
+                  setOpeningMessage(getRandomFallbackOpener(modelName));
                 }
               }
               // For model chats, we're done loading
