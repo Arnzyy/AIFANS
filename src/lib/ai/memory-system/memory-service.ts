@@ -271,15 +271,15 @@ export async function buildChatContext(
       .single();
 
     if (conversation) {
-      // Try chat_messages first (new schema)
+      // Try chat_messages first (new schema) - uses 'role' field
       let { data: messages } = await supabase
         .from('chat_messages')
-        .select('sender_id, content')
+        .select('role, content')
         .eq('conversation_id', conversation.id)
         .order('created_at', { ascending: false })
         .limit(maxRecentMessages);
 
-      // If no chat_messages, try messages table (old schema)
+      // If no chat_messages, try messages table (old schema) - uses 'sender_id'
       if (!messages || messages.length === 0) {
         const { data: oldMessages } = await supabase
           .from('messages')
@@ -287,14 +287,19 @@ export async function buildChatContext(
           .eq('conversation_id', conversation.id)
           .order('created_at', { ascending: false })
           .limit(maxRecentMessages);
-        messages = oldMessages;
-      }
 
-      if (messages) {
+        if (oldMessages) {
+          recentMessages = oldMessages.reverse().map((m: any) => ({
+            role: m.sender_id === subscriberId ? 'user' : 'assistant',
+            content: m.content,
+          })) as any;
+        }
+      } else {
+        // chat_messages uses 'role' field directly
         recentMessages = messages.reverse().map((m: any) => ({
-          role: m.sender_id === subscriberId ? 'user' : 'assistant',
+          role: m.role as 'user' | 'assistant',
           content: m.content,
-        })) as any;
+        }));
       }
     }
   }
