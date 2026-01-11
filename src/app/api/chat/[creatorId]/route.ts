@@ -45,13 +45,44 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid message' }, { status: 400 });
     }
 
-    // Get AI personality
-    const { data: personality } = await supabase
+    // Get AI personality - check ai_personalities first, then creator_models
+    let personality: any = null;
+
+    // First try ai_personalities table (for real human creators)
+    const { data: aiPersonality } = await supabase
       .from('ai_personalities')
       .select('*')
       .eq('creator_id', creatorId)
       .eq('is_active', true)
       .single();
+
+    if (aiPersonality) {
+      personality = aiPersonality;
+    } else {
+      // Check if this is a creator model (like Lyra)
+      const { data: model } = await supabase
+        .from('creator_models')
+        .select('id, name, backstory, speaking_style, personality_traits, emoji_usage, nsfw_enabled, sfw_enabled')
+        .eq('id', creatorId)
+        .eq('status', 'approved')
+        .single();
+
+      if (model) {
+        // Convert creator_model persona to ai_personality format
+        personality = {
+          id: model.id,
+          creator_id: model.id,
+          name: model.name,
+          backstory: model.backstory || '',
+          speaking_style: model.speaking_style || 'playful and engaging',
+          personality_traits: model.personality_traits || ['friendly', 'flirty'],
+          emoji_usage: model.emoji_usage || 'moderate',
+          nsfw_enabled: model.nsfw_enabled || false,
+          sfw_enabled: model.sfw_enabled !== false,
+          is_active: true,
+        };
+      }
+    }
 
     if (!personality) {
       return NextResponse.json(

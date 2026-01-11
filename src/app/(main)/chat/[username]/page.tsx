@@ -531,11 +531,11 @@ export default function AIChatPage() {
     setMessages(prev => [...prev, tempUserMsg]);
 
     try {
-      // Check if this is a mock creator (ID doesn't look like UUID) or a database model
+      // Check if this is a mock creator (ID doesn't look like UUID)
       const isMockCreator = !creator.id.includes('-') || creator.id.length < 30;
 
-      if (isMockCreator || isModelChat) {
-        // For mock creators and database models, call the mock AI endpoint
+      if (isMockCreator) {
+        // For mock creators only, call the mock AI endpoint (no memory)
         const response = await fetch('/api/ai-chat/mock', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
