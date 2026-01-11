@@ -839,8 +839,8 @@ export default function AIChatPage() {
         </div>
       )}
 
-      {/* Messages - pb-32 accounts for fixed input area */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 pb-32">
+      {/* Messages - pb-48 accounts for fixed input area + tip bar */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 pb-48">
         <div className="max-w-2xl mx-auto space-y-4">
           {messages.length === 0 && !openingMessage ? (
             <div className="text-center py-6 md:py-12">
