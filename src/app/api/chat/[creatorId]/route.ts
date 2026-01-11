@@ -62,23 +62,40 @@ export async function POST(
       // Check if this is a creator model (like Lyra)
       const { data: model } = await supabase
         .from('creator_models')
-        .select('id, name, backstory, speaking_style, personality_traits, emoji_usage, nsfw_enabled, sfw_enabled')
+        .select('id, name, age, backstory, speaking_style, personality_traits, interests, turn_ons, turn_offs, emoji_usage, response_length, nsfw_enabled, sfw_enabled')
         .eq('id', creatorId)
         .eq('status', 'approved')
         .single();
 
       if (model) {
-        // Convert creator_model persona to ai_personality format
+        // Convert creator_model persona to AIPersonalityFull format
         personality = {
           id: model.id,
           creator_id: model.id,
-          name: model.name,
-          backstory: model.backstory || '',
-          speaking_style: model.speaking_style || 'playful and engaging',
+          // Identity - CRITICAL: persona_name is required for prompt builder
+          persona_name: model.name,
+          age: model.age || 21,
+          // Personality
           personality_traits: model.personality_traits || ['friendly', 'flirty'],
+          energy_level: 7,
+          humor_style: 'playful teasing',
+          mood: 'flirty and engaged',
+          // Interests
+          interests: model.interests || ['chatting', 'getting to know you'],
+          // Chat style
+          flirting_style: ['playful', 'engaging'],
+          dynamic: 'switch' as const,
+          pace: 5,
+          // Voice
           emoji_usage: model.emoji_usage || 'moderate',
-          nsfw_enabled: model.nsfw_enabled || false,
-          sfw_enabled: model.sfw_enabled !== false,
+          response_length: model.response_length || 'medium',
+          speech_patterns: [model.speaking_style || 'playful and engaging'],
+          // Behavior
+          topics_loves: model.turn_ons || ['flirting', 'compliments'],
+          topics_avoids: model.turn_offs || [],
+          when_complimented: 'blushes and thanks them sweetly',
+          when_heated: 'maintains playful energy',
+          // Status
           is_active: true,
         };
       }

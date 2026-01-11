@@ -71,16 +71,30 @@ export async function generateChatResponse(
   // 3. Get or create conversation
   let conversationId = request.conversationId;
   if (!conversationId) {
-    const { data: conv } = await (supabase as any)
+    // First check if conversation exists
+    const { data: existingConv } = await (supabase as any)
       .from('conversations')
-      .upsert({
-        subscriber_id: subscriberId,
-        creator_id: creatorId,
-        last_message_at: new Date().toISOString(),
-      }, { onConflict: 'creator_id,subscriber_id' })
       .select('id')
-      .single();
-    conversationId = conv?.id;
+      .or(
+        `and(participant1_id.eq.${subscriberId},participant2_id.eq.${creatorId}),` +
+        `and(participant1_id.eq.${creatorId},participant2_id.eq.${subscriberId})`
+      )
+      .maybeSingle();
+
+    if (existingConv) {
+      conversationId = existingConv.id;
+    } else {
+      // Create new conversation
+      const { data: newConv } = await (supabase as any)
+        .from('conversations')
+        .insert({
+          participant1_id: subscriberId,
+          participant2_id: creatorId,
+        })
+        .select('id')
+        .single();
+      conversationId = newConv?.id;
+    }
   }
 
   // 4. Save user message
