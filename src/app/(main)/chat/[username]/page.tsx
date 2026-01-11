@@ -13,6 +13,7 @@ import { ChatAccessGate } from '@/components/chat/ChatAccessGate';
 import { PurchaseSessionModal } from '@/components/chat/PurchaseSessionModal';
 import { InlineTokenBalance } from '@/components/chat/ChatTokenBalance';
 import { SubscribeModal } from '@/components/shared/SubscribeModal';
+import { isAdminUser } from '@/lib/auth/admin';
 import type { ChatAccess, UnlockOption, MessagePack } from '@/lib/chat';
 
 interface Message {
@@ -155,7 +156,7 @@ export default function AIChatPage() {
               }
 
               // Check subscription status - admin email gets full access
-              const isAdmin = user?.email === 'example@gmail.com';
+              const isAdmin = isAdminUser(user?.email);
               const isSubscribedToModel = modelData.isSubscribed || isAdmin;
 
               if (user && isSubscribedToModel) {

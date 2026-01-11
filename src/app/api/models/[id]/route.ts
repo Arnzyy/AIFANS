@@ -1,5 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { isAdminUser } from '@/lib/auth/admin';
 
 // GET /api/models/[id] - Get public model profile
 export async function GET(
@@ -76,16 +77,21 @@ export async function GET(
     let isSubscribed = false;
 
     if (user) {
-      // Subscriptions are stored with model.id as creator_id (not the human creator's ID)
-      const { data: subscription } = await supabase
-        .from('subscriptions')
-        .select('id')
-        .eq('subscriber_id', user.id)
-        .eq('creator_id', model.id)
-        .eq('status', 'active')
-        .single();
+      // Admin users have full access
+      if (isAdminUser(user.email)) {
+        isSubscribed = true;
+      } else {
+        // Subscriptions are stored with model.id as creator_id (not the human creator's ID)
+        const { data: subscription } = await supabase
+          .from('subscriptions')
+          .select('id')
+          .eq('subscriber_id', user.id)
+          .eq('creator_id', model.id)
+          .eq('status', 'active')
+          .single();
 
-      isSubscribed = !!subscription;
+        isSubscribed = !!subscription;
+      }
     }
 
     // Check if AI chat is actually configured (has persona data)

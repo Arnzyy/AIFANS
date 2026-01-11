@@ -4,6 +4,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CHAT_CONFIG, calculateExtensionCost, formatTokensAsGbp } from './config';
+import { isAdminUser } from '@/lib/auth/admin';
 
 // ===========================================
 // TYPES
@@ -81,6 +82,20 @@ export async function checkChatAccess(
       canSendMessage: false,
       requiresUnlock: true,
       unlockOptions: getGuestUnlockOptions(),
+      isLowMessages: false,
+    };
+  }
+
+  // Check if user is admin (bypass all access checks)
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user && isAdminUser(user.email)) {
+    return {
+      hasAccess: true,
+      accessType: 'subscription',
+      messagesRemaining: null, // unlimited for admin
+      canSendMessage: true,
+      requiresUnlock: false,
+      unlockOptions: [],
       isLowMessages: false,
     };
   }
