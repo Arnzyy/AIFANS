@@ -14,11 +14,18 @@ import {
 // Configuration
 // ============================================
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// Lazy-loaded Supabase admin client to avoid build-time errors
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null;
 
-// Service client with admin privileges for background jobs
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getDb(): any {
+  if (!_supabaseAdmin) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+  }
+  return _supabaseAdmin;
+}
 
 // ============================================
 // Settings Cache
@@ -34,7 +41,7 @@ async function getSettings(): Promise<ModerationSettings> {
     return settingsCache;
   }
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getDb()
     .from('moderation_settings')
     .select('*')
     .single();
@@ -75,7 +82,7 @@ export async function createModerationScan(request: CreateScanRequest): Promise<
 
   if (!settings.enabled) {
     // If moderation disabled, auto-approve
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getDb()
       .from('content_moderation_scans')
       .insert({
         ...request,
@@ -90,7 +97,7 @@ export async function createModerationScan(request: CreateScanRequest): Promise<
   }
 
   // Create scan record
-  const { data: scan, error: scanError } = await supabaseAdmin
+  const { data: scan, error: scanError } = await getDb()
     .from('content_moderation_scans')
     .insert({
       target_type: request.target_type,
@@ -108,7 +115,7 @@ export async function createModerationScan(request: CreateScanRequest): Promise<
   if (scanError) throw scanError;
 
   // Create job
-  const { error: jobError } = await supabaseAdmin
+  const { error: jobError } = await getDb()
     .from('moderation_jobs')
     .insert({
       target_type: request.target_type === 'onboarding' ? 'model_onboarding' : 'content_upload',
@@ -128,7 +135,7 @@ export async function createModerationScan(request: CreateScanRequest): Promise<
 // ============================================
 
 export async function getModelAnchors(modelId: string): Promise<ModelAnchor[]> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getDb()
     .from('model_anchors')
     .select('*')
     .eq('model_id', modelId)
@@ -158,7 +165,7 @@ export async function addModelAnchor(
     throw new Error(`Maximum ${settings.max_anchors_per_model} anchors per model`);
   }
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getDb()
     .from('model_anchors')
     .insert({
       model_id: modelId,
@@ -185,13 +192,13 @@ export async function addModelAnchor(
 }
 
 export async function removeModelAnchor(anchorId: string, removedBy: string): Promise<void> {
-  const { data: anchor } = await supabaseAdmin
+  const { data: anchor } = await getDb()
     .from('model_anchors')
     .select('model_id')
     .eq('id', anchorId)
     .single();
 
-  const { error } = await supabaseAdmin
+  const { error } = await getDb()
     .from('model_anchors')
     .update({ is_active: false })
     .eq('id', anchorId);
@@ -455,7 +462,7 @@ export async function processScanJob(scanId: string): Promise<void> {
   const startTime = Date.now();
 
   // Get scan record
-  const { data: scan, error: scanError } = await supabaseAdmin
+  const { data: scan, error: scanError } = await getDb()
     .from('content_moderation_scans')
     .select('*')
     .eq('id', scanId)
@@ -466,7 +473,7 @@ export async function processScanJob(scanId: string): Promise<void> {
   }
 
   // Update status to scanning
-  await supabaseAdmin
+  await getDb()
     .from('content_moderation_scans')
     .update({ status: 'scanning' })
     .eq('id', scanId);
@@ -509,7 +516,7 @@ export async function processScanJob(scanId: string): Promise<void> {
     const scanDuration = Date.now() - startTime;
 
     // Update scan record
-    await supabaseAdmin
+    await getDb()
       .from('content_moderation_scans')
       .update({
         status,
@@ -560,7 +567,7 @@ export async function processScanJob(scanId: string): Promise<void> {
   } catch (error: any) {
     console.error('Scan processing failed:', error);
 
-    await supabaseAdmin
+    await getDb()
       .from('content_moderation_scans')
       .update({
         status: 'failed',
@@ -585,7 +592,7 @@ export async function reviewScan(
   notes?: string,
   addAsAnchor?: boolean
 ): Promise<void> {
-  const { data: scan } = await supabaseAdmin
+  const { data: scan } = await getDb()
     .from('content_moderation_scans')
     .select('*')
     .eq('id', scanId)
@@ -599,7 +606,7 @@ export async function reviewScan(
   const newStatus: ModerationStatus =
     action === 'escalated' ? 'pending_review' : action;
 
-  await supabaseAdmin
+  await getDb()
     .from('content_moderation_scans')
     .update({
       status: newStatus,
@@ -653,7 +660,7 @@ interface ModerationAuditLogEntry {
 
 async function logModerationAction(entry: ModerationAuditLogEntry): Promise<void> {
   try {
-    await supabaseAdmin.from('moderation_audit_log').insert(entry);
+    await getDb().from('moderation_audit_log').insert(entry);
   } catch (error) {
     console.error('Failed to log moderation action:', error);
   }
@@ -676,7 +683,7 @@ export async function getModerationStats(): Promise<any> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const { data } = await supabaseAdmin.rpc('get_moderation_stats', {
+  const { data } = await getDb().rpc('get_moderation_stats', {
     start_date: today.toISOString(),
   });
 

@@ -5,9 +5,18 @@ import { createClient } from '@supabase/supabase-js';
 import { processScanJob } from './moderation-service';
 import { ModerationJob } from './types';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+// Lazy-loaded Supabase admin client to avoid build-time errors
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getDb(): any {
+  if (!_supabaseAdmin) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+  }
+  return _supabaseAdmin;
+}
 
 const WORKER_ID = `worker-${process.env.VERCEL_REGION || 'local'}-${Date.now()}`;
 const MAX_JOBS_PER_RUN = 5;
@@ -45,7 +54,7 @@ export async function processJobQueue(): Promise<{
   }
 
   // Get remaining count
-  const { count } = await supabaseAdmin
+  const { count } = await getDb()
     .from('moderation_jobs')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'queued');
@@ -59,7 +68,7 @@ export async function processJobQueue(): Promise<{
 
 async function claimNextJob(): Promise<ModerationJob | null> {
   // Use the database function to atomically claim a job
-  const { data, error } = await supabaseAdmin.rpc('claim_moderation_job', {
+  const { data, error } = await getDb().rpc('claim_moderation_job', {
     p_worker_id: WORKER_ID,
   });
 
@@ -102,12 +111,12 @@ async function processJobWithTimeout(job: ModerationJob): Promise<void> {
 async function markJobCompleted(
   jobId: string,
   success: boolean,
-  error?: string
+  errorMsg?: string
 ): Promise<void> {
-  await supabaseAdmin.rpc('complete_moderation_job', {
+  await getDb().rpc('complete_moderation_job', {
     p_job_id: jobId,
     p_success: success,
-    p_error: error || null,
+    p_error: errorMsg || null,
   });
 }
 
@@ -119,7 +128,7 @@ export async function recoverStaleJobs(): Promise<number> {
   // Find jobs that have been processing for too long (stuck)
   const staleTimeout = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes
 
-  const { data: staleJobs, error } = await supabaseAdmin
+  const { data: staleJobs, error } = await getDb()
     .from('moderation_jobs')
     .update({
       status: 'queued',
@@ -156,20 +165,20 @@ export async function getQueueStats(): Promise<{
 
   const [queuedResult, processingResult, completedResult, failedResult] =
     await Promise.all([
-      supabaseAdmin
+      getDb()
         .from('moderation_jobs')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'queued'),
-      supabaseAdmin
+      getDb()
         .from('moderation_jobs')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'processing'),
-      supabaseAdmin
+      getDb()
         .from('moderation_jobs')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'completed')
         .gte('completed_at', today.toISOString()),
-      supabaseAdmin
+      getDb()
         .from('moderation_jobs')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'failed')
@@ -177,7 +186,7 @@ export async function getQueueStats(): Promise<{
     ]);
 
   // Calculate average wait time from recent completed jobs
-  const { data: recentJobs } = await supabaseAdmin
+  const { data: recentJobs } = await getDb()
     .from('moderation_jobs')
     .select('created_at, started_at')
     .eq('status', 'completed')
@@ -188,10 +197,11 @@ export async function getQueueStats(): Promise<{
   let avgWaitTime = 0;
   if (recentJobs && recentJobs.length > 0) {
     const waitTimes = recentJobs.map(
-      (j) => new Date(j.started_at!).getTime() - new Date(j.created_at).getTime()
+      (j: { started_at: string; created_at: string }) =>
+        new Date(j.started_at).getTime() - new Date(j.created_at).getTime()
     );
     avgWaitTime = Math.round(
-      waitTimes.reduce((a, b) => a + b, 0) / waitTimes.length
+      waitTimes.reduce((a: number, b: number) => a + b, 0) / waitTimes.length
     );
   }
 
@@ -205,7 +215,7 @@ export async function getQueueStats(): Promise<{
 }
 
 export async function cancelJob(jobId: string): Promise<void> {
-  await supabaseAdmin
+  await getDb()
     .from('moderation_jobs')
     .update({ status: 'cancelled' })
     .eq('id', jobId)
@@ -213,7 +223,7 @@ export async function cancelJob(jobId: string): Promise<void> {
 }
 
 export async function retryJob(jobId: string): Promise<void> {
-  await supabaseAdmin
+  await getDb()
     .from('moderation_jobs')
     .update({
       status: 'queued',
@@ -231,7 +241,7 @@ export async function retryJob(jobId: string): Promise<void> {
 // ============================================
 
 export async function prioritizeJob(jobId: string, priority: number): Promise<void> {
-  await supabaseAdmin
+  await getDb()
     .from('moderation_jobs')
     .update({ priority: Math.max(1, Math.min(10, priority)) })
     .eq('id', jobId)
@@ -244,7 +254,7 @@ export async function prioritizeJob(jobId: string, priority: number): Promise<vo
 
 export async function triggerImmediateScan(scanId: string): Promise<void> {
   // Check if job already exists
-  const { data: existingJob } = await supabaseAdmin
+  const { data: existingJob } = await getDb()
     .from('moderation_jobs')
     .select('id, status')
     .eq('target_id', scanId)
@@ -260,7 +270,7 @@ export async function triggerImmediateScan(scanId: string): Promise<void> {
   }
 
   // Create high-priority job
-  await supabaseAdmin.from('moderation_jobs').insert({
+  await getDb().from('moderation_jobs').insert({
     target_type: 'content_upload',
     target_id: scanId,
     priority: 1,

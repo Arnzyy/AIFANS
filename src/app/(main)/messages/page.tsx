@@ -24,7 +24,7 @@ export default async function MessagesPage() {
     .order('last_message_at', { ascending: false });
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Messages</h1>
@@ -101,10 +101,10 @@ export default async function MessagesPage() {
           <h3 className="text-xl font-semibold mb-2">No messages yet</h3>
           <p className="text-gray-400 mb-6">Subscribe to creators to start chatting</p>
           <Link
-            href="/browse"
+            href="/explore"
             className="inline-block px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-medium hover:opacity-90 transition-opacity"
           >
-            Browse Creators
+            Explore Creators
           </Link>
         </div>
       )}

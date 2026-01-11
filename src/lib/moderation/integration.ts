@@ -116,12 +116,21 @@ export async function onModelOnboarding(
 // Creator-Facing Status Check
 // ============================================
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+// Lazy-loaded Supabase admin client to avoid build-time errors
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getDb(): any {
+  if (!_supabaseAdmin) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+  }
+  return _supabaseAdmin;
+}
 
 export async function getCreatorUploadStatus(scanId: string, creatorId: string) {
-  const { data } = await supabaseAdmin
+  const { data } = await getDb()
     .from('content_moderation_scans')
     .select('id, status, created_at')
     .eq('id', scanId)
@@ -131,6 +140,9 @@ export async function getCreatorUploadStatus(scanId: string, creatorId: string) 
   if (!data) {
     return null;
   }
+
+  // Type assertion for the data
+  const scanData = data as { id: string; status: string; created_at: string };
 
   // Return simplified status (no scores for creators)
   const statusMessages: Record<string, string> = {
@@ -143,9 +155,9 @@ export async function getCreatorUploadStatus(scanId: string, creatorId: string) 
   };
 
   return {
-    id: data.id,
-    status: data.status,
-    message: statusMessages[data.status] || data.status,
-    created_at: data.created_at,
+    id: scanData.id,
+    status: scanData.status,
+    message: statusMessages[scanData.status] || scanData.status,
+    created_at: scanData.created_at,
   };
 }

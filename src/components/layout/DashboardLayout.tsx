@@ -30,6 +30,7 @@ import {
   Menu,
   Home,
   MoreHorizontal,
+  Compass,
 } from 'lucide-react';
 
 // ===========================================
@@ -55,7 +56,7 @@ interface DashboardLayoutProps {
 // ===========================================
 
 const FAN_NAV_ITEMS = [
-  { href: '/browse', icon: Search, label: 'Browse' },
+  { href: '/explore', icon: Compass, label: 'Explore' },
   { href: '/subscriptions', icon: Heart, label: 'Subscriptions' },
   { href: '/messages', icon: MessageCircle, label: 'Messages' },
   { href: '/notifications', icon: Bell, label: 'Notifications' },
@@ -63,7 +64,7 @@ const FAN_NAV_ITEMS = [
 ];
 
 const CREATOR_NAV_ITEMS = [
-  { href: '/browse', icon: Search, label: 'Explore' },
+  { href: '/explore', icon: Compass, label: 'Explore' },
   { href: '/dashboard', icon: LayoutDashboard, label: 'Overview' },
   { href: '/dashboard/models', icon: UserCircle, label: 'Models' },
   { href: '/dashboard/content', icon: ImageIcon, label: 'Content' },
@@ -76,13 +77,22 @@ const CREATOR_NAV_ITEMS = [
   { href: '/dashboard/settings', icon: Settings, label: 'Settings' },
 ];
 
-// Mobile bottom nav - key actions only
-const MOBILE_BOTTOM_NAV = [
+// Mobile bottom nav - creator key actions
+const CREATOR_MOBILE_BOTTOM_NAV = [
   { href: '/dashboard', icon: Home, label: 'Home' },
   { href: '/dashboard/posts', icon: FileText, label: 'Posts' },
   { href: '/posts/new', icon: Plus, label: 'New', isAction: true },
   { href: '/dashboard/messages', icon: MessageCircle, label: 'Messages' },
   { href: '/dashboard/earnings', icon: PoundSterling, label: 'Earnings' },
+];
+
+// Mobile bottom nav - fan navigation
+const FAN_MOBILE_BOTTOM_NAV = [
+  { href: '/explore', icon: Compass, label: 'Explore' },
+  { href: '/subscriptions', icon: Heart, label: 'Subs' },
+  { href: '/messages', icon: MessageCircle, label: 'Messages' },
+  { href: '/notifications', icon: Bell, label: 'Alerts' },
+  { href: '/wallet', icon: Wallet, label: 'Wallet' },
 ];
 
 // ===========================================
@@ -273,7 +283,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
           <div className="p-4 border-b border-white/10">
             <div className="p-1 bg-white/5 rounded-lg flex">
               <Link
-                href="/browse"
+                href="/explore"
                 className={`flex-1 py-2.5 px-3 rounded-md text-center text-sm font-medium transition ${
                   !isCreatorSection
                     ? 'bg-white/10 text-white'
@@ -297,10 +307,10 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
         ) : isCreatorSection && (
           <div className="p-4 border-b border-white/10">
             <Link
-              href="/browse"
+              href="/explore"
               className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-white font-medium transition hover:from-purple-500/30 hover:to-pink-500/30"
             >
-              <Search className="w-4 h-4" />
+              <Compass className="w-4 h-4" />
               Explore Creators
             </Link>
           </div>
@@ -379,11 +389,11 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-zinc-950 border-t border-white/10 z-50 safe-area-inset-bottom">
         <div className="grid grid-cols-5 items-center h-full">
-          {MOBILE_BOTTOM_NAV.map((item) => {
+          {(isCreatorSection ? CREATOR_MOBILE_BOTTOM_NAV : FAN_MOBILE_BOTTOM_NAV).map((item) => {
             const isActive = pathname === item.href ||
               (item.href !== '/dashboard' && item.href !== '/posts/new' && pathname?.startsWith(item.href));
 
-            if (item.isAction) {
+            if ('isAction' in item && item.isAction) {
               return (
                 <div key={item.href} className="flex justify-center">
                   <Link
