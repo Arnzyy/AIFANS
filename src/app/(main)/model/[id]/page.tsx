@@ -671,11 +671,11 @@ export default function ModelProfilePage() {
           </div>
         )}
 
-        {/* Posts Grid */}
+        {/* Content Grid */}
         <div className="pb-8">
           <div className="flex items-center gap-2 mb-4">
             <Grid3X3 className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">Posts</h2>
+            <h2 className="text-lg font-semibold">Content</h2>
           </div>
 
           <div className="grid grid-cols-3 gap-1 md:gap-2">
