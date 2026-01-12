@@ -265,8 +265,10 @@ export async function GET(
     // Transform to expected format
     const content = (items || []).map((item) => {
       const isPpv = item.visibility === 'ppv';
-      // Admins see all content as unlocked
-      const isUnlocked = isAdmin || !isPpv || unlockedContentIds.has(item.id);
+      // Subscribers see all content as unlocked (they paid for subscription)
+      // PPV content packs are only for non-subscribers to purchase
+      // Only PPV POSTS (separate system) should be locked for subscribers
+      const isUnlocked = isAdmin || hasContentSubscription || !isPpv || unlockedContentIds.has(item.id);
       const price = contentPriceMap.get(item.id);
 
       return {

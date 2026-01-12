@@ -299,8 +299,9 @@ function ContentThumbnail({
   onClick: () => void;
   hasSubscription: boolean;
 }) {
-  // Content is locked if it's PPV and not unlocked, OR if user doesn't have content subscription
-  const isLocked = (item.is_ppv && !item.is_unlocked) || !hasSubscription;
+  // Subscribers have full access to ALL content (subscription unlocks everything)
+  // Non-subscribers can only view content they've purchased via PPV
+  const isLocked = !hasSubscription && !item.is_unlocked;
 
   return (
     <button
@@ -364,7 +365,8 @@ function ContentViewer({
   onNavigate: (direction: 'prev' | 'next') => void;
   hasSubscription: boolean;
 }) {
-  const isLocked = (item.is_ppv && !item.is_unlocked) || !hasSubscription;
+  // Subscribers have full access - only non-subscribers see locked content
+  const isLocked = !hasSubscription && !item.is_unlocked;
   const canNavigate = allContent.length > 1;
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
