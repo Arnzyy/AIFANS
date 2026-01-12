@@ -297,6 +297,21 @@ export default function ModelProfilePage() {
     return num.toString();
   };
 
+  // Keyboard navigation for content viewer - must be before early returns
+  useEffect(() => {
+    if (!model || selectedPostIndex === null) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedPostIndex(null);
+      }
+      // Arrow key navigation handled by the modal component
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [model, selectedPostIndex]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -383,36 +398,6 @@ export default function ModelProfilePage() {
   };
 
   const posts = buildPosts();
-
-  // Keyboard navigation for content viewer - skip locked items
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (selectedPostIndex === null) return;
-
-      if (e.key === 'Escape') {
-        setSelectedPostIndex(null);
-      } else if (e.key === 'ArrowLeft') {
-        // Find previous unlocked item
-        for (let i = selectedPostIndex - 1; i >= 0; i--) {
-          if (!posts[i].isLocked) {
-            setSelectedPostIndex(i);
-            break;
-          }
-        }
-      } else if (e.key === 'ArrowRight') {
-        // Find next unlocked item
-        for (let i = selectedPostIndex + 1; i < posts.length; i++) {
-          if (!posts[i].isLocked) {
-            setSelectedPostIndex(i);
-            break;
-          }
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedPostIndex, posts]);
 
   // Create tiers for subscribe modal
   const tiers = [
