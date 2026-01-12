@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { Globe, Check, X } from 'lucide-react';
+import { Globe, Check, X, Cake } from 'lucide-react';
 
 // Common timezones
 const TIMEZONES = [
@@ -44,6 +44,7 @@ export default function SettingsPage() {
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [bio, setBio] = useState('');
   const [timezone, setTimezone] = useState('UTC');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
@@ -118,6 +119,7 @@ export default function SettingsPage() {
         setOriginalUsername(profile.username || '');
         setBio(profile.bio || '');
         setTimezone(profile.timezone || 'UTC');
+        setDateOfBirth(profile.date_of_birth || '');
         setAvatarUrl(profile.avatar_url || '');
         setEmailNotifications(profile.email_notifications ?? true);
         setPushNotifications(profile.push_notifications ?? true);
@@ -189,6 +191,7 @@ export default function SettingsPage() {
         display_name: displayName || null,
         bio: bio || null,
         timezone: timezone,
+        date_of_birth: dateOfBirth || null,
         avatar_url: finalAvatarUrl || null,
         email_notifications: emailNotifications,
         push_notifications: pushNotifications,
@@ -381,6 +384,28 @@ export default function SettingsPage() {
               </option>
             ))}
           </select>
+        </section>
+
+        {/* Birthday Section */}
+        <section className="p-6 rounded-xl bg-white/5 border border-white/10">
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <Cake className="w-5 h-5" />
+            Birthday
+          </h2>
+          <p className="text-sm text-gray-400 mb-4">
+            Add your birthday so creators can wish you a happy birthday!
+          </p>
+
+          <input
+            type="date"
+            value={dateOfBirth}
+            onChange={(e) => setDateOfBirth(e.target.value)}
+            className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 outline-none transition-colors"
+            max={new Date().toISOString().split('T')[0]}
+          />
+          <p className="text-xs text-gray-500 mt-2">
+            Your birthday is private and only used for birthday messages
+          </p>
         </section>
 
         {/* Notifications Section */}

@@ -30,6 +30,7 @@ export interface ConversationContext {
   memory: UserMemory | null;
   summary: string | null;
   recent_messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  is_birthday?: boolean;
 }
 
 // ===========================================
@@ -194,12 +195,20 @@ export async function buildChatContext(
   creatorId: string,
   maxRecentMessages: number = 30
 ): Promise<ConversationContext> {
-  // Get user profile for fallback name
+  // Get user profile for fallback name and birthday
   const { data: userProfile } = await supabase
     .from('profiles')
-    .select('display_name, username')
+    .select('display_name, username, date_of_birth')
     .eq('id', subscriberId)
     .single();
+
+  // Check if today is user's birthday
+  let isBirthday = false;
+  if (userProfile?.date_of_birth) {
+    const today = new Date();
+    const dob = new Date(userProfile.date_of_birth);
+    isBirthday = today.getMonth() === dob.getMonth() && today.getDate() === dob.getDate();
+  }
 
   // Get user memory
   const { data: memory } = await supabase
@@ -308,6 +317,7 @@ export async function buildChatContext(
     memory: enrichedMemory,
     summary: summaryData?.summary || null,
     recent_messages: recentMessages,
+    is_birthday: isBirthday,
   };
 }
 
@@ -316,11 +326,16 @@ export async function buildChatContext(
  * Uses NEUTRAL language only
  */
 export function formatMemoryForPrompt(context: ConversationContext): string {
-  if (!context.memory && !context.summary) {
+  if (!context.memory && !context.summary && !context.is_birthday) {
     return ''; // No memory yet
   }
 
   let memoryPrompt = '\n═══════════════════════════════════════════\nUSER CONTEXT (USE NATURALLY, NO DEPENDENCY LANGUAGE)\n═══════════════════════════════════════════\n';
+
+  // Birthday check - this should take priority!
+  if (context.is_birthday) {
+    memoryPrompt += `🎂 IT'S THEIR BIRTHDAY TODAY! Wish them a happy birthday naturally in your first message. Be warm and celebratory!\n\n`;
+  }
 
   if (context.memory) {
     const m = context.memory;
