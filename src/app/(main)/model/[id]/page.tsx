@@ -146,48 +146,14 @@ export default function ModelProfilePage() {
         setModel(data.model);
         setIsSubscribed(data.isSubscribed);
 
-        // Fetch content for this model (both content items AND posts with media)
+        // Fetch content for this model (content API now includes both content items AND posts)
         try {
-          // Fetch content items from content library
           const contentRes = await fetch(`/api/creators/${id}/content`);
-          let contentItems: ContentItem[] = [];
           if (contentRes.ok) {
             const contentData = await contentRes.json();
             console.log('[ModelProfilePage] Got content:', contentData.content?.length, 'items');
-            contentItems = (contentData.content || []).map((item: any) => ({
-              ...item,
-              source: 'content' as const,
-            }));
+            setContentItems(contentData.content || []);
           }
-
-          // Also fetch posts from this creator that have media
-          const postsRes = await fetch(`/api/models/${id}/posts`);
-          let postItems: ContentItem[] = [];
-          if (postsRes.ok) {
-            const postsData = await postsRes.json();
-            console.log('[ModelProfilePage] Got posts:', postsData.posts?.length, 'posts');
-            // Convert posts to ContentItem format
-            postItems = (postsData.posts || [])
-              .filter((post: any) => post.media_urls && post.media_urls.length > 0)
-              .map((post: any) => ({
-                id: `post-${post.id}`,
-                post_id: post.id,
-                type: 'image' as const,
-                thumbnail_url: post.media_urls[0],
-                content_url: post.media_urls[0],
-                is_ppv: post.is_ppv || false,
-                price: post.ppv_price ? post.ppv_price / 100 : undefined,
-                is_unlocked: post.is_unlocked || false,
-                created_at: post.created_at,
-                source: 'post' as const,
-              }));
-          }
-
-          // Merge and sort by created_at (newest first)
-          const allContent = [...contentItems, ...postItems].sort(
-            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          );
-          setContentItems(allContent);
         } catch (contentErr) {
           console.error('[ModelProfilePage] Error fetching content:', contentErr);
         } finally {
@@ -379,33 +345,52 @@ export default function ModelProfilePage() {
   // Check if user has access (subscribed or admin)
   const hasFullAccess = isSubscribed || isAdmin;
 
-  // Use real content if available, otherwise show placeholder with avatar
-  const posts = contentItems.length > 0
-    ? contentItems.map((item, i) => ({
-        id: item.id,
-        postId: item.post_id, // For posts from the posts table
-        imageUrl: item.thumbnail_url || item.content_url,
-        likes: Math.floor(Math.random() * 500) + 50, // TODO: real likes from DB
-        comments: Math.floor(Math.random() * 50) + 5, // TODO: real comments from DB
-        isLocked: item.is_ppv && !item.is_unlocked,
-        isPpv: item.is_ppv,
-        price: item.price,
-        isVideo: item.type === 'video',
-        source: item.source || 'content',
-      }))
-    : // Fallback: show avatar as placeholder when no content uploaded
-      Array.from({ length: 3 }, (_, i) => ({
-        id: `placeholder-${i}`,
-        postId: undefined,
-        imageUrl: model.avatar,
-        likes: 0,
-        comments: 0,
-        isLocked: i >= 1 && !hasFullAccess,
-        isPpv: false,
-        price: undefined,
-        isVideo: false,
-        source: 'placeholder' as const,
-      }));
+  // Build content list based on subscription status
+  // For non-subscribers: Show profile picture (unlocked) + PPV content (locked/blurred)
+  // For subscribers: Show all actual content (no profile picture placeholder needed)
+  const buildPosts = () => {
+    const contentPosts = contentItems.map((item) => ({
+      id: item.id,
+      postId: item.post_id,
+      imageUrl: item.thumbnail_url || item.content_url,
+      likes: Math.floor(Math.random() * 500) + 50,
+      comments: Math.floor(Math.random() * 50) + 5,
+      isLocked: !item.is_unlocked,
+      isPpv: item.is_ppv,
+      price: item.price,
+      isVideo: item.type === 'video',
+      source: item.source || 'content',
+    }));
+
+    // For subscribers with full access, just show content (no profile pic placeholder)
+    if (hasFullAccess && contentPosts.length > 0) {
+      return contentPosts;
+    }
+
+    // For non-subscribers: Always show profile picture first as the only unlocked item
+    const profilePicPlaceholder = {
+      id: 'profile-placeholder',
+      postId: undefined,
+      imageUrl: model.avatar,
+      likes: 0,
+      comments: 0,
+      isLocked: false, // Profile picture is always viewable
+      isPpv: false,
+      price: undefined,
+      isVideo: false,
+      source: 'placeholder' as const,
+    };
+
+    // If no content, just show profile picture
+    if (contentPosts.length === 0) {
+      return [profilePicPlaceholder];
+    }
+
+    // Show profile picture first, then PPV content (locked)
+    return [profilePicPlaceholder, ...contentPosts];
+  };
+
+  const posts = buildPosts();
 
   // Create tiers for subscribe modal
   const tiers = [
@@ -754,7 +739,7 @@ export default function ModelProfilePage() {
                     <Lock className="w-6 h-6 md:w-8 md:h-8 text-white/80 mb-1" />
                     {post.isPpv && post.price && (
                       <span className="text-xs md:text-sm font-bold text-white">
-                        {'\u00A3'}{post.price.toFixed(2)}
+                        {Math.round(post.price * 250)} tokens
                       </span>
                     )}
                   </div>

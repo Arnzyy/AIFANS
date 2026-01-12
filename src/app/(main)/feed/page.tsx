@@ -33,6 +33,12 @@ export default async function FeedPage() {
           username,
           display_name,
           avatar_url
+        ),
+        model:creator_models(
+          id,
+          name,
+          display_name,
+          avatar_url
         )
       `)
       .in('creator_id', subscribedCreatorIds)

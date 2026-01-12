@@ -16,6 +16,22 @@ interface PostDetailClientProps {
 export function PostDetailClient({ post, currentUserId, hasAccess, isUnlocked }: PostDetailClientProps) {
   const router = useRouter();
   const creator = post.creator;
+
+  // Use model info if post is linked to a model
+  const displayEntity = post.model ? {
+    id: post.model.id,
+    username: post.model.name,
+    display_name: post.model.display_name || post.model.name,
+    avatar_url: post.model.avatar_url,
+    isModel: true,
+  } : {
+    id: creator.id,
+    username: creator.username,
+    display_name: creator.display_name || creator.username,
+    avatar_url: creator.avatar_url,
+    isModel: false,
+  };
+
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.likes_count || 0);
   const [isSaved, setIsSaved] = useState(false);
@@ -44,7 +60,7 @@ export function PostDetailClient({ post, currentUserId, hasAccess, isUnlocked }:
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Post by ${creator.display_name || creator.username}`,
+          title: `Post by ${displayEntity.display_name}`,
           url: url,
         });
       } catch (err) {
@@ -82,40 +98,42 @@ export function PostDetailClient({ post, currentUserId, hasAccess, isUnlocked }:
 
   const mediaUrls = post.media_urls || [];
   const showMedia = isUnlocked || !post.is_ppv;
-  const creatorName = creator.display_name || creator.username;
+  const displayName = displayEntity.display_name;
+  const profileLink = displayEntity.isModel ? `/model/${displayEntity.id}` : `/${creator.username}`;
+  const chatLink = displayEntity.isModel ? `/chat/${displayEntity.username}` : `/chat/${creator.username}`;
 
   return (
     <div className="pb-20">
-      {/* Creator header - clickable */}
+      {/* Model/Creator header - clickable */}
       <div className="flex items-center gap-3 p-4 border-b border-white/10">
-        <Link href={`/${creator.username}`} className="flex-shrink-0">
+        <Link href={profileLink} className="flex-shrink-0">
           <div className="w-12 h-12 rounded-full bg-white/10 overflow-hidden hover:ring-2 hover:ring-purple-500 transition-all">
-            {creator.avatar_url ? (
+            {displayEntity.avatar_url ? (
               <img
-                src={creator.avatar_url}
-                alt={creatorName}
+                src={displayEntity.avatar_url}
+                alt={displayName}
                 className="w-full h-full object-cover"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-xl">
-                {creatorName.charAt(0).toUpperCase()}
+                {displayName.charAt(0).toUpperCase()}
               </div>
             )}
           </div>
         </Link>
         <div className="flex-1 min-w-0">
           <Link
-            href={`/${creator.username}`}
+            href={profileLink}
             className="font-semibold text-lg hover:text-purple-400 transition-colors"
           >
-            {creatorName}
+            {displayName}
           </Link>
-          <p className="text-sm text-gray-500">@{creator.username}</p>
+          <p className="text-sm text-gray-500">@{displayEntity.username}</p>
         </div>
 
-        {/* Chat button */}
+        {/* Chat button - links to model chat if model exists */}
         <Link
-          href={`/chat/${creator.username}`}
+          href={chatLink}
           className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-xl font-medium transition-colors"
         >
           <MessageSquare className="w-4 h-4" />
@@ -146,8 +164,9 @@ export function PostDetailClient({ post, currentUserId, hasAccess, isUnlocked }:
                 <p className="font-semibold text-xl mb-2">Premium Content</p>
                 <p className="text-gray-400 mb-4">{mediaUrls.length} {mediaUrls.length === 1 ? 'item' : 'items'}</p>
                 <button className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl font-medium hover:opacity-90 transition-opacity">
-                  Unlock for {((post.ppv_price || 0) / 100).toFixed(2)} GBP
+                  Unlock for {Math.round((post.ppv_price || 0) * 2.5)} tokens
                 </button>
+                <p className="text-xs text-gray-400 mt-2">= £{((post.ppv_price || 0) / 100).toFixed(2)}</p>
               </div>
             </div>
           ) : (

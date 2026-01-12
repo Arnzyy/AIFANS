@@ -1,26 +1,73 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 
+interface Model {
+  id: string;
+  name: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
 export default function NewPostPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [content, setContent] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [isPPV, setIsPPV] = useState(false);
   const [ppvTokens, setPpvTokens] = useState('');
   const [isScheduled, setIsScheduled] = useState(false);
+  const [models, setModels] = useState<Model[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string>('');
+  const [modelsLoading, setModelsLoading] = useState(true);
 
   // Token to GBP conversion (250 tokens = £1)
   const ppvPriceGbp = ppvTokens ? (parseInt(ppvTokens) / 250).toFixed(2) : '0.00';
   const [scheduleDate, setScheduleDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Fetch creator's models on mount
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Get creator record
+        const { data: creator } = await supabase
+          .from('creators')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (creator) {
+          // Fetch models for this creator
+          const { data: creatorModels } = await supabase
+            .from('creator_models')
+            .select('id, name, display_name, avatar_url')
+            .eq('creator_id', creator.id)
+            .eq('is_active', true);
+
+          if (creatorModels && creatorModels.length > 0) {
+            setModels(creatorModels);
+            setSelectedModelId(creatorModels[0].id); // Default to first model
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching models:', err);
+      } finally {
+        setModelsLoading(false);
+      }
+    };
+
+    fetchModels();
+  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
@@ -109,6 +156,7 @@ export default function NewPostPage() {
           ppvPrice: isPPV ? Math.round((parseInt(ppvTokens) / 250) * 100) : null, // Convert tokens to pence
           isPublished: !isScheduled,
           scheduledAt: isScheduled ? new Date(scheduleDate).toISOString() : null,
+          modelId: selectedModelId || null, // Link to selected model
         }),
       });
 
@@ -150,6 +198,38 @@ export default function NewPostPage() {
           {error && (
             <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
               {error}
+            </div>
+          )}
+
+          {/* Model Selector */}
+          {models.length > 0 && (
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <label className="block text-sm font-medium mb-3">Post as Model</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {models.map((model) => (
+                  <button
+                    key={model.id}
+                    type="button"
+                    onClick={() => setSelectedModelId(model.id)}
+                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                      selectedModelId === model.id
+                        ? 'border-purple-500 bg-purple-500/10'
+                        : 'border-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-white/10 overflow-hidden flex-shrink-0">
+                      {model.avatar_url ? (
+                        <img src={model.avatar_url} alt={model.display_name || model.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-sm">
+                          {(model.display_name || model.name).charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <span className="font-medium truncate text-sm">{model.display_name || model.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

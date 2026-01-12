@@ -13,6 +13,17 @@ interface PostCardProps {
 export function PostCard({ post, onHide }: PostCardProps) {
   const router = useRouter();
   const creator = post.creator;
+  // Use model info if post is linked to a model, otherwise use creator
+  const displayEntity = post.model ? {
+    id: post.model.id,
+    username: post.model.name,
+    display_name: post.model.display_name || post.model.name,
+    avatar_url: post.model.avatar_url,
+    isModel: true,
+  } : {
+    ...creator,
+    isModel: false,
+  };
   const timeAgo = getTimeAgo(new Date(post.created_at));
   const [showMenu, setShowMenu] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
@@ -60,7 +71,7 @@ export function PostCard({ post, onHide }: PostCardProps) {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Post by ${creator.display_name || creator.username}`,
+          title: `Post by ${displayEntity.display_name || displayEntity.username}`,
           url: url,
         });
       } catch (err) {
@@ -103,31 +114,31 @@ export function PostCard({ post, onHide }: PostCardProps) {
 
   return (
     <article className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-      {/* Creator header */}
+      {/* Creator/Model header */}
       <div className="flex items-center gap-3 p-4">
-        <Link href={`/${creator.username}`} className="flex-shrink-0">
+        <Link href={displayEntity.isModel ? `/model/${displayEntity.id}` : `/${creator.username}`} className="flex-shrink-0">
           <div className="w-10 h-10 rounded-full bg-white/10 overflow-hidden">
-            {creator.avatar_url ? (
+            {displayEntity.avatar_url ? (
               <img
-                src={creator.avatar_url}
-                alt={creator.display_name || creator.username}
+                src={displayEntity.avatar_url}
+                alt={displayEntity.display_name || displayEntity.username}
                 className="w-full h-full object-cover"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-lg">
-                {(creator.display_name || creator.username).charAt(0).toUpperCase()}
+                {(displayEntity.display_name || displayEntity.username).charAt(0).toUpperCase()}
               </div>
             )}
           </div>
         </Link>
         <div className="flex-1 min-w-0">
           <Link
-            href={`/${creator.username}`}
+            href={displayEntity.isModel ? `/model/${displayEntity.id}` : `/${creator.username}`}
             className="font-medium hover:text-purple-400 transition-colors"
           >
-            {creator.display_name || creator.username}
+            {displayEntity.display_name || displayEntity.username}
           </Link>
-          <p className="text-sm text-gray-500">@{creator.username} · {timeAgo}</p>
+          <p className="text-sm text-gray-500">@{displayEntity.username} · {timeAgo}</p>
         </div>
 
         {/* More menu */}
@@ -204,8 +215,11 @@ export function PostCard({ post, onHide }: PostCardProps) {
                   <span className="text-4xl mb-3">🔒</span>
                   <p className="font-medium mb-2">Premium Content</p>
                   <button className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-                    Unlock for £{((post.ppv_price || 0) / 100).toFixed(2)}
+                    Unlock for {Math.round((post.ppv_price || 0) * 2.5)} tokens
                   </button>
+                  <p className="text-xs text-gray-400 mt-1">
+                    = £{((post.ppv_price || 0) / 100).toFixed(2)}
+                  </p>
                 </div>
               </div>
             ) : (

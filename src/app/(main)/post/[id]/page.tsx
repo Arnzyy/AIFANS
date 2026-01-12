@@ -18,7 +18,7 @@ export default async function PostPage({ params }: PageProps) {
     redirect(`/login?redirect=/post/${id}`);
   }
 
-  // Fetch the post with creator info
+  // Fetch the post with creator and model info
   const { data: post, error } = await supabase
     .from('posts')
     .select(`
@@ -26,6 +26,12 @@ export default async function PostPage({ params }: PageProps) {
       creator:profiles!posts_creator_id_fkey(
         id,
         username,
+        display_name,
+        avatar_url
+      ),
+      model:creator_models(
+        id,
+        name,
         display_name,
         avatar_url
       )

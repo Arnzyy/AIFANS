@@ -34,6 +34,9 @@ export async function GET(request: NextRequest) {
           *,
           creator:profiles!posts_creator_id_fkey(
             id, username, display_name, avatar_url
+          ),
+          model:creator_models(
+            id, name, display_name, avatar_url
           )
         `, { count: 'exact' })
         .in('creator_id', creatorIds)
@@ -154,13 +157,15 @@ export async function POST(request: NextRequest) {
       isPpv,
       ppvPrice,
       isPublished,
-      scheduledAt
+      scheduledAt,
+      modelId
     } = await request.json()
 
     const { data: post, error } = await supabase
       .from('posts')
       .insert({
         creator_id: user.id,
+        model_id: modelId || null, // Link to specific model
         text_content: textContent,
         media_urls: mediaUrls || [],
         is_ppv: isPpv || false,

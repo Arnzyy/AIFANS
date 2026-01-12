@@ -302,9 +302,11 @@ function ContentThumbnail({
   onClick: () => void;
   hasSubscription: boolean;
 }) {
-  // Subscribers have full access to ALL content (subscription unlocks everything)
-  // Non-subscribers can only view content they've purchased via PPV
-  const isLocked = !hasSubscription && !item.is_unlocked;
+  // For PPV posts: locked if not purchased (even for subscribers)
+  // For content items: subscribers have full access
+  const isLocked = item.source === 'post'
+    ? (item.is_ppv && !item.is_unlocked)
+    : (!hasSubscription && !item.is_unlocked);
 
   return (
     <button
@@ -316,27 +318,29 @@ function ContentThumbnail({
         src={item.thumbnail_url}
         alt=""
         className={`w-full h-full object-cover transition ${
-          isLocked ? 'blur-md scale-105' : 'group-hover:scale-105'
+          isLocked ? 'blur-xl scale-110' : 'group-hover:scale-105'
         }`}
       />
 
       {/* Hover overlay - desktop only */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition hidden md:block" />
+      {!isLocked && (
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition hidden md:block" />
+      )}
 
       {/* Video indicator */}
-      {item.type === 'video' && (
+      {item.type === 'video' && !isLocked && (
         <div className="absolute top-1 right-1 md:top-2 md:right-2 bg-black/60 rounded-full p-0.5 md:p-1">
           <Play className="w-2.5 h-2.5 md:w-3 md:h-3 fill-white" />
         </div>
       )}
 
-      {/* Lock overlay for PPV or no subscription */}
+      {/* Lock overlay for PPV posts or no subscription */}
       {isLocked && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
           <Lock className="w-4 h-4 md:w-6 md:h-6 mb-0.5 md:mb-1" />
           {item.is_ppv && item.price && (
             <span className="text-xs md:text-sm font-bold">
-              £{item.price.toFixed(2)}
+              {Math.round(item.price * 250)} tokens
             </span>
           )}
         </div>
