@@ -179,9 +179,11 @@ CRITICAL RULES:
 1. Output ONLY the message - no labels, quotes, or "Here is..."
 2. Sound like a real person texting, not a sales pitch
 3. NEVER say "subscribe", "exclusive access", "unlock", or anything salesy
-4. ${timeOfDay === 'night' || timeOfDay === 'evening' ? 'Late night = more intimate, mysterious vibe' : 'Keep it light and warm'}
-5. Emoji: ${emojiLevel} (minimal=0-1, moderate=1-2, heavy=2-3)
-6. End with engagement - question, tease, or invitation to chat
+4. NEVER mention real-world meetups, locations, coffee, drinks, dinner, or anything suggesting meeting in person
+5. ${timeOfDay === 'night' || timeOfDay === 'evening' ? 'Late night = more intimate, mysterious vibe' : 'Keep it light and warm'}
+6. Emoji: ${emojiLevel} (minimal=0-1, moderate=1-2, heavy=2-3)
+7. End with engagement - question, tease, or invitation to chat
+8. Keep all flirtation DIGITAL - this is an online-only experience
 
 EXAMPLE VIBE (don't copy, match the tone):
 "Hey you 💫 There's something about late nights that makes conversations feel… different. Want to stay a little longer and see where this goes?"
