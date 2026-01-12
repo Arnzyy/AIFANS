@@ -151,26 +151,47 @@ function PostCard({ post }: { post: any }) {
       )}
 
       {/* Media */}
-      {post.is_ppv && !post.is_purchased ? (
-        <div className="relative aspect-[4/3] bg-white/5">
-          <div className="absolute inset-0 flex flex-col items-center justify-center backdrop-blur-xl">
-            <span className="text-4xl mb-3">🔒</span>
-            <p className="font-medium mb-2">Premium Content</p>
-            <button className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-              Unlock for £{((post.ppv_price || 0) / 100).toFixed(2)}
-            </button>
-          </div>
+      {post.media_urls && post.media_urls.length > 0 && (
+        <div className="relative">
+          {post.is_ppv && !post.is_unlocked ? (
+            // PPV locked - show blurred image with unlock button
+            <div className="relative aspect-[4/3] bg-white/5 overflow-hidden">
+              <img
+                src={post.media_urls[0]}
+                alt=""
+                className="w-full h-full object-cover blur-xl scale-110"
+              />
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40">
+                <span className="text-4xl mb-3">🔒</span>
+                <p className="font-medium mb-2">Premium Content</p>
+                <button className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+                  Unlock for £{((post.ppv_price || 0) / 100).toFixed(2)}
+                </button>
+              </div>
+            </div>
+          ) : (
+            // Free or unlocked - show media
+            <div className={`grid gap-1 ${post.media_urls.length === 1 ? 'grid-cols-1' : post.media_urls.length === 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
+              {post.media_urls.slice(0, 4).map((url: string, index: number) => (
+                <div
+                  key={index}
+                  className={`relative bg-white/5 overflow-hidden ${post.media_urls.length === 1 ? 'aspect-[4/3]' : 'aspect-square'} ${post.media_urls.length === 3 && index === 0 ? 'row-span-2 aspect-auto' : ''}`}
+                >
+                  <img
+                    src={url}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                  {post.media_urls.length > 4 && index === 3 && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <span className="text-2xl font-bold">+{post.media_urls.length - 4}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      ) : (
-        post.media_url && (
-          <div className="aspect-[4/3] bg-white/5">
-            <img 
-              src={post.media_url} 
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          </div>
-        )
       )}
 
       {/* Actions */}
