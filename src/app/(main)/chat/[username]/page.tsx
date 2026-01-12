@@ -328,12 +328,12 @@ export default function AIChatPage() {
                       setOpeningMessage(''); // Clear opening message for returning users
 
                       // Check if we should generate a welcome back message
-                      // Only if the last message was more than 5 mins ago
+                      // Only if the last message was more than 1 hour ago
                       const lastMsg = filteredMessages[filteredMessages.length - 1];
                       const lastMsgTime = new Date(lastMsg.created_at).getTime();
-                      const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+                      const oneHourAgo = Date.now() - (60 * 60 * 1000);
 
-                      if (lastMsgTime < fiveMinutesAgo) {
+                      if (lastMsgTime < oneHourAgo) {
                         // Generate welcome back message
                         try {
                           const welcomeRes = await fetch(`/api/chat/${model.id}/welcome-back`, {

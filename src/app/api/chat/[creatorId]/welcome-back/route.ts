@@ -43,12 +43,12 @@ export async function POST(
 
     const lastMessage = messages[0];
     const lastMessageTime = new Date(lastMessage.created_at).getTime();
-    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+    const oneHourAgo = Date.now() - (60 * 60 * 1000);
 
     // Don't generate welcome back if:
-    // 1. Conversation is still active (last message < 5 mins ago)
+    // 1. Conversation is still active (last message < 1 hour ago)
     // 2. Last message was from AI (they haven't replied yet - don't spam welcomes)
-    if (lastMessageTime > fiveMinutesAgo) {
+    if (lastMessageTime > oneHourAgo) {
       return NextResponse.json({ welcomeMessage: '' });
     }
 
