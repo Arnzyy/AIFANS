@@ -14,7 +14,7 @@ export function FeedClient({ initialPosts, suggestedCreators }: FeedClientProps)
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
 
   const handleHidePost = (postId: string) => {
-    setHiddenPostIds(prev => new Set([...prev, postId]));
+    setHiddenPostIds(prev => new Set([...Array.from(prev), postId]));
   };
 
   const visiblePosts = posts.filter(post => !hiddenPostIds.has(post.id));

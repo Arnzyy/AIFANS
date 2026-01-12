@@ -262,12 +262,11 @@ export async function GET(
       }
     });
 
-    // Transform to expected format
-    const content = (items || []).map((item) => {
+    // Transform content items to expected format
+    const contentFromItems = (items || []).map((item) => {
       const isPpv = item.visibility === 'ppv';
       // Subscribers see all content as unlocked (they paid for subscription)
       // PPV content packs are only for non-subscribers to purchase
-      // Only PPV POSTS (separate system) should be locked for subscribers
       const isUnlocked = isAdmin || hasContentSubscription || !isPpv || unlockedContentIds.has(item.id);
       const price = contentPriceMap.get(item.id);
 
@@ -282,10 +281,69 @@ export async function GET(
         title: item.title,
         is_unlocked: isUnlocked,
         created_at: item.created_at,
+        source: 'content' as const,
         // Include moderation status for admins
         ...(isAdmin && { moderation_status: item.moderation_status }),
       };
     });
+
+    // Also fetch PPV posts from this creator that have media
+    // Posts with is_ppv=true should show for subscribers (blurred) so they can purchase
+    let contentFromPosts: any[] = [];
+
+    // Check for unlocked post IDs (PPV post purchases)
+    const unlockedPostIds = new Set<string>();
+    if (user) {
+      const { data: postPurchases } = await supabase
+        .from('post_purchases')
+        .select('post_id')
+        .eq('buyer_id', user.id);
+
+      postPurchases?.forEach((p) => unlockedPostIds.add(p.post_id));
+    }
+
+    // Fetch posts with media - try both actualCreatorId and creatorUserId
+    const possibleCreatorIds = [actualCreatorId];
+    if (creatorUserId && creatorUserId !== actualCreatorId) {
+      possibleCreatorIds.push(creatorUserId);
+    }
+
+    for (const cid of possibleCreatorIds) {
+      const { data: postsWithMedia } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('creator_id', cid)
+        .eq('is_published', true)
+        .not('media_urls', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (postsWithMedia && postsWithMedia.length > 0) {
+        contentFromPosts = postsWithMedia
+          .filter((post: any) => post.media_urls && post.media_urls.length > 0)
+          .map((post: any) => ({
+            id: `post-${post.id}`,
+            post_id: post.id,
+            creator_id: post.creator_id,
+            type: 'image' as const,
+            thumbnail_url: post.media_urls[0],
+            content_url: post.media_urls[0],
+            is_ppv: post.is_ppv || false,
+            price: post.ppv_price ? post.ppv_price / 100 : undefined,
+            title: post.text_content?.substring(0, 50),
+            // For PPV posts: locked unless purchased OR admin
+            // For non-PPV posts: unlocked for subscribers
+            is_unlocked: isAdmin || (!post.is_ppv && hasContentSubscription) || unlockedPostIds.has(post.id),
+            created_at: post.created_at,
+            source: 'post' as const,
+          }));
+        break; // Found posts, stop looking
+      }
+    }
+
+    // Merge and sort all content by created_at
+    const content = [...contentFromItems, ...contentFromPosts].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
 
     return NextResponse.json({
       content,

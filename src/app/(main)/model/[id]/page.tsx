@@ -42,6 +42,8 @@ interface ContentItem {
   price?: number;
   is_unlocked: boolean;
   created_at: string;
+  source?: 'content' | 'post'; // Track where item came from
+  post_id?: string; // For posts, store the post ID
 }
 
 interface Comment {
@@ -144,15 +146,48 @@ export default function ModelProfilePage() {
         setModel(data.model);
         setIsSubscribed(data.isSubscribed);
 
-        // Fetch content for this model
+        // Fetch content for this model (both content items AND posts with media)
         try {
+          // Fetch content items from content library
           const contentRes = await fetch(`/api/creators/${id}/content`);
+          let contentItems: ContentItem[] = [];
           if (contentRes.ok) {
             const contentData = await contentRes.json();
             console.log('[ModelProfilePage] Got content:', contentData.content?.length, 'items');
-            console.log('[ModelProfilePage] Debug info:', contentData._debug);
-            setContentItems(contentData.content || []);
+            contentItems = (contentData.content || []).map((item: any) => ({
+              ...item,
+              source: 'content' as const,
+            }));
           }
+
+          // Also fetch posts from this creator that have media
+          const postsRes = await fetch(`/api/models/${id}/posts`);
+          let postItems: ContentItem[] = [];
+          if (postsRes.ok) {
+            const postsData = await postsRes.json();
+            console.log('[ModelProfilePage] Got posts:', postsData.posts?.length, 'posts');
+            // Convert posts to ContentItem format
+            postItems = (postsData.posts || [])
+              .filter((post: any) => post.media_urls && post.media_urls.length > 0)
+              .map((post: any) => ({
+                id: `post-${post.id}`,
+                post_id: post.id,
+                type: 'image' as const,
+                thumbnail_url: post.media_urls[0],
+                content_url: post.media_urls[0],
+                is_ppv: post.is_ppv || false,
+                price: post.ppv_price ? post.ppv_price / 100 : undefined,
+                is_unlocked: post.is_unlocked || false,
+                created_at: post.created_at,
+                source: 'post' as const,
+              }));
+          }
+
+          // Merge and sort by created_at (newest first)
+          const allContent = [...contentItems, ...postItems].sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+          setContentItems(allContent);
         } catch (contentErr) {
           console.error('[ModelProfilePage] Error fetching content:', contentErr);
         } finally {
@@ -348,20 +383,28 @@ export default function ModelProfilePage() {
   const posts = contentItems.length > 0
     ? contentItems.map((item, i) => ({
         id: item.id,
+        postId: item.post_id, // For posts from the posts table
         imageUrl: item.thumbnail_url || item.content_url,
         likes: Math.floor(Math.random() * 500) + 50, // TODO: real likes from DB
         comments: Math.floor(Math.random() * 50) + 5, // TODO: real comments from DB
-        isLocked: item.is_ppv && !item.is_unlocked && !hasFullAccess,
+        isLocked: item.is_ppv && !item.is_unlocked,
+        isPpv: item.is_ppv,
+        price: item.price,
         isVideo: item.type === 'video',
+        source: item.source || 'content',
       }))
     : // Fallback: show avatar as placeholder when no content uploaded
       Array.from({ length: 3 }, (_, i) => ({
         id: `placeholder-${i}`,
+        postId: undefined,
         imageUrl: model.avatar,
         likes: 0,
         comments: 0,
         isLocked: i >= 1 && !hasFullAccess,
+        isPpv: false,
+        price: undefined,
         isVideo: false,
+        source: 'placeholder' as const,
       }));
 
   // Create tiers for subscribe modal
@@ -682,7 +725,14 @@ export default function ModelProfilePage() {
             {posts.map((post, index) => (
               <div
                 key={post.id}
-                onClick={() => !post.isLocked && setSelectedPostIndex(index)}
+                onClick={() => {
+                  if (post.isLocked && post.isPpv && post.postId) {
+                    // For locked PPV posts, navigate to the post page to purchase
+                    router.push(`/post/${post.postId}`);
+                  } else if (!post.isLocked) {
+                    setSelectedPostIndex(index);
+                  }
+                }}
                 className="relative aspect-square bg-white/5 overflow-hidden group cursor-pointer"
               >
                 <img
@@ -698,10 +748,15 @@ export default function ModelProfilePage() {
                   </div>
                 )}
 
-                {/* Locked overlay */}
+                {/* Locked overlay with price for PPV posts */}
                 {post.isLocked && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                    <Lock className="w-8 h-8 text-white/80" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
+                    <Lock className="w-6 h-6 md:w-8 md:h-8 text-white/80 mb-1" />
+                    {post.isPpv && post.price && (
+                      <span className="text-xs md:text-sm font-bold text-white">
+                        {'\u00A3'}{post.price.toFixed(2)}
+                      </span>
+                    )}
                   </div>
                 )}
 

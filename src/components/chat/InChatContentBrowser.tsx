@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   X,
   Lock,
@@ -27,6 +28,8 @@ interface ContentItem {
   title?: string;
   is_unlocked: boolean;
   created_at: string;
+  source?: 'content' | 'post'; // Track where item came from
+  post_id?: string; // For posts from the posts table
 }
 
 interface InChatContentBrowserProps {
@@ -365,11 +368,25 @@ function ContentViewer({
   onNavigate: (direction: 'prev' | 'next') => void;
   hasSubscription: boolean;
 }) {
-  // Subscribers have full access - only non-subscribers see locked content
-  const isLocked = !hasSubscription && !item.is_unlocked;
+  const router = useRouter();
+  // For PPV posts: locked if not purchased (even for subscribers)
+  // For content items: subscribers have full access
+  const isLocked = item.source === 'post'
+    ? (item.is_ppv && !item.is_unlocked)
+    : (!hasSubscription && !item.is_unlocked);
   const canNavigate = allContent.length > 1;
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
+
+  // Handle purchase - for posts, navigate to post page
+  const handlePurchaseClick = () => {
+    if (item.source === 'post' && item.post_id) {
+      onClose();
+      router.push(`/post/${item.post_id}`);
+    } else {
+      onPurchase();
+    }
+  };
 
   // Handle swipe gestures for mobile
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -459,16 +476,18 @@ function ContentViewer({
                 <Lock className="w-10 h-10 md:w-12 md:h-12 text-gray-500" />
               </div>
               <h3 className="text-lg md:text-xl font-semibold mb-2 text-center">
-                {hasSubscription ? 'Premium Content' : 'Subscription Required'}
+                {item.source === 'post' ? 'Premium Post' : hasSubscription ? 'Premium Content' : 'Subscription Required'}
               </h3>
               <p className="text-gray-400 mb-4 md:mb-6 text-center text-sm md:text-base">
-                {hasSubscription
-                  ? `Unlock this ${item.type} for £${item.price?.toFixed(2)}`
-                  : 'Subscribe to view this content'}
+                {item.source === 'post'
+                  ? `Unlock this post for ${'\u00A3'}${item.price?.toFixed(2)}`
+                  : hasSubscription
+                    ? `Unlock this ${item.type} for ${'\u00A3'}${item.price?.toFixed(2)}`
+                    : 'Subscribe to view this content'}
               </p>
-              {hasSubscription && item.is_ppv && (
+              {item.is_ppv && (
                 <button
-                  onClick={onPurchase}
+                  onClick={handlePurchaseClick}
                   disabled={purchasing}
                   className="px-6 md:px-8 py-2.5 md:py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full font-semibold hover:opacity-90 disabled:opacity-50 transition flex items-center gap-2 text-sm md:text-base"
                 >
@@ -480,7 +499,7 @@ function ContentViewer({
                   ) : (
                     <>
                       <ShoppingCart className="w-4 h-4 md:w-5 md:h-5" />
-                      Unlock £{item.price?.toFixed(2)}
+                      Unlock {'\u00A3'}{item.price?.toFixed(2)}
                     </>
                   )}
                 </button>
