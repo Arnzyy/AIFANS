@@ -499,7 +499,7 @@ YOUR PERSONALITY (from creator settings):
 - Mood: ${personality.mood || 'happy'}
 - Humor: ${personality.humor_style || 'witty'}
 - Flirting pace: ${personality.pace || 5}/10
-- Signature phrases: ${personality.signature_phrases || 'none specified'}
+- Speech patterns: ${personality.speech_patterns?.join(', ') || 'natural'}
 - Emoji usage: ${personality.emoji_usage || 'moderate'}
 
 Stay in character with these personality traits while thanking for the tip.
