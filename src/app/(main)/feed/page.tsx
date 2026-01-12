@@ -20,40 +20,46 @@ export default async function FeedPage() {
     .eq('status', 'active');
 
   const subscribedIds = subscriptions?.map(s => s.creator_id) || [];
+  console.log('[Feed] User:', user.id, 'Subscribed IDs:', subscribedIds);
 
   // Get posts from subscribed creators/models
   let posts: any[] = [];
 
   if (subscribedIds.length > 0) {
-    // Subscriptions might be to model IDs, so we need to find the creator profiles for those models
+    // Subscriptions are to model IDs stored in creator_id column
+    // Look up those models to get their owner's profile ID (creator_id on the model)
     const { data: models } = await supabase
       .from('creator_models')
       .select('id, creator_id')
       .in('id', subscribedIds);
 
-    // Get the creator IDs from the models (models.creator_id points to creators.id or profile.id)
-    const creatorIdsFromModels = models?.map(m => m.creator_id) || [];
+    console.log('[Feed] Models found:', models);
 
-    // Also get creators table to find user_ids
-    const { data: creators } = await supabase
-      .from('creators')
-      .select('id, user_id')
-      .in('id', creatorIdsFromModels);
-
-    // Build list of all possible creator IDs for posts:
-    // 1. Direct subscription IDs (could be profile IDs)
-    // 2. Creator IDs from models
-    // 3. User IDs from creators table
-    const allPossibleCreatorIds = new Set([
-      ...subscribedIds,
-      ...creatorIdsFromModels,
-      ...(creators?.map(c => c.user_id) || []),
-    ]);
-
-    // Also get posts that are linked to subscribed model IDs via model_id column
+    // The model's creator_id points directly to the profile ID of the creator who owns it
+    const creatorProfileIds = models?.map(m => m.creator_id).filter(Boolean) || [];
     const subscribedModelIds = models?.map(m => m.id) || [];
 
-    const { data } = await supabase
+    console.log('[Feed] Creator profile IDs:', creatorProfileIds);
+    console.log('[Feed] Subscribed model IDs:', subscribedModelIds);
+
+    // Build list of all possible creator IDs for posts:
+    // 1. Direct subscription IDs (could be profile IDs for direct creator subscriptions)
+    // 2. Creator profile IDs from the models (the owner of the subscribed model)
+    const allPossibleCreatorIds = new Set([
+      ...subscribedIds,
+      ...creatorProfileIds,
+    ]);
+
+    // Query posts where:
+    // - creator_id matches any of the possible creator profile IDs, OR
+    // - model_id matches any of the subscribed model IDs
+    const creatorIdList = Array.from(allPossibleCreatorIds).join(',');
+    const modelIdList = subscribedModelIds.length > 0 ? subscribedModelIds.join(',') : '';
+
+    console.log('[Feed] Query creatorIdList:', creatorIdList);
+    console.log('[Feed] Query modelIdList:', modelIdList);
+
+    let query = supabase
       .from('posts')
       .select(`
         *,
@@ -70,10 +76,19 @@ export default async function FeedPage() {
           avatar_url
         )
       `)
-      .or(`creator_id.in.(${Array.from(allPossibleCreatorIds).join(',')}),model_id.in.(${subscribedModelIds.length > 0 ? subscribedModelIds.join(',') : 'null'})`)
       .eq('is_published', true)
       .order('created_at', { ascending: false })
       .limit(20);
+
+    // Build the OR filter for creator_id and model_id
+    if (modelIdList) {
+      query = query.or(`creator_id.in.(${creatorIdList}),model_id.in.(${modelIdList})`);
+    } else {
+      query = query.in('creator_id', Array.from(allPossibleCreatorIds));
+    }
+
+    const { data, error } = await query;
+    console.log('[Feed] Posts query result:', data?.length || 0, 'posts, error:', error);
 
     posts = data || [];
   }
