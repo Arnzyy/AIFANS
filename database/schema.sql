@@ -626,11 +626,10 @@ BEGIN
         COALESCE(NEW.raw_user_meta_data->>'username', 'user_' || substr(NEW.id::text, 1, 8)),
         NEW.email
     );
-    
-    -- Also create credit balance
-    INSERT INTO credit_balances (user_id, balance)
-    VALUES (NEW.id, 0);
-    
+
+    -- Token wallet is created on-demand by the app (src/lib/tokens/token-service.ts)
+    -- when the user first needs to check their balance or make a transaction
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
