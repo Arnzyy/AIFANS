@@ -1,20 +1,83 @@
-import { createServerClient } from '@/lib/supabase/server';
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 
-export default async function DashboardPostsPage() {
-  const supabase = await createServerClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
+interface Post {
+  id: string;
+  text_content: string | null;
+  media_urls: string[];
+  is_ppv: boolean;
+  ppv_price: number | null;
+  is_published: boolean;
+  scheduled_at: string | null;
+  likes_count: number;
+  comments_count: number;
+  created_at: string;
+}
 
-  const { data: posts } = await supabase
-    .from('posts')
-    .select('*')
-    .eq('creator_id', user?.id)
-    .order('created_at', { ascending: false });
+export default function DashboardPostsPage() {
+  const router = useRouter();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const publishedCount = posts?.filter(p => p.is_published).length || 0;
-  const scheduledCount = posts?.filter(p => !p.is_published && p.scheduled_at).length || 0;
-  const draftCount = posts?.filter(p => !p.is_published && !p.scheduled_at).length || 0;
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const fetchPosts = async () => {
+    try {
+      const res = await fetch('/api/posts?type=mine');
+      const data = await res.json();
+      setPosts(data.posts || []);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (postId: string) => {
+    router.push(`/posts/${postId}/edit`);
+  };
+
+  const handleDelete = async (postId: string) => {
+    if (!confirm('Are you sure you want to delete this post?')) return;
+
+    setDeletingId(postId);
+    try {
+      const res = await fetch(`/api/posts?id=${postId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        setPosts(posts.filter(p => p.id !== postId));
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete post');
+      }
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      alert('Failed to delete post');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const publishedCount = posts.filter(p => p.is_published).length;
+  const scheduledCount = posts.filter(p => !p.is_published && p.scheduled_at).length;
+  const draftCount = posts.filter(p => !p.is_published && !p.scheduled_at).length;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -49,7 +112,7 @@ export default async function DashboardPostsPage() {
       </div>
 
       {/* Posts list */}
-      {posts && posts.length > 0 ? (
+      {posts.length > 0 ? (
         <div className="space-y-3">
           {posts.map((post) => (
             <div
@@ -58,10 +121,10 @@ export default async function DashboardPostsPage() {
             >
               {/* Thumbnail */}
               <div className="w-20 h-20 rounded-lg bg-white/10 flex-shrink-0 overflow-hidden">
-                {post.media_url ? (
-                  <img 
-                    src={post.media_url} 
-                    alt="" 
+                {post.media_urls?.[0] ? (
+                  <img
+                    src={post.media_urls[0]}
+                    alt=""
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -73,9 +136,9 @@ export default async function DashboardPostsPage() {
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">
                   {post.text_content?.slice(0, 60) || 'Untitled post'}
-                  {post.text_content?.length > 60 ? '...' : ''}
+                  {(post.text_content?.length || 0) > 60 ? '...' : ''}
                 </p>
-                
+
                 <div className="flex items-center gap-3 mt-2 text-sm text-gray-500">
                   {/* Status badge */}
                   {post.is_published ? (
@@ -117,11 +180,24 @@ export default async function DashboardPostsPage() {
 
               {/* Actions */}
               <div className="flex items-center gap-2">
-                <button className="p-2 rounded-lg hover:bg-white/5 transition-colors text-gray-400 hover:text-white">
+                <button
+                  onClick={() => handleEdit(post.id)}
+                  className="p-2 rounded-lg hover:bg-white/5 transition-colors text-gray-400 hover:text-white"
+                  title="Edit post"
+                >
                   ✏️
                 </button>
-                <button className="p-2 rounded-lg hover:bg-white/5 transition-colors text-gray-400 hover:text-red-400">
-                  🗑️
+                <button
+                  onClick={() => handleDelete(post.id)}
+                  disabled={deletingId === post.id}
+                  className="p-2 rounded-lg hover:bg-white/5 transition-colors text-gray-400 hover:text-red-400 disabled:opacity-50"
+                  title="Delete post"
+                >
+                  {deletingId === post.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    '🗑️'
+                  )}
                 </button>
               </div>
             </div>

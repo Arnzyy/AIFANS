@@ -1,10 +1,11 @@
 // ===========================================
 // API ROUTE: /api/creator/content/route.ts
-// Content upload and management
+// Content upload and management with moderation
 // ===========================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
+import { queueUploadForModeration } from '@/lib/moderation/integration';
 
 // POST - Upload/register new content
 export async function POST(request: NextRequest) {
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { type, url, thumbnail_url, title, description, visibility, is_nsfw, model_id } = body;
+    const { type, url, thumbnail_url, title, description, visibility, is_nsfw, model_id, r2_key } = body;
 
     if (!url || !type) {
       return NextResponse.json(
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert content item
+    // Insert content item with pending moderation status
     const { data: content, error } = await supabase
       .from('content_items')
       .insert({
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest) {
         description,
         visibility: visibility || 'subscribers',
         is_nsfw: is_nsfw || false,
+        moderation_status: 'pending_scan', // Content hidden until approved
       })
       .select()
       .single();
@@ -68,7 +70,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ item: content });
+    // Queue for moderation scan (images/videos only)
+    let scanId: string | null = null;
+    if (content && (type === 'image' || type === 'video')) {
+      try {
+        scanId = await queueUploadForModeration({
+          targetType: 'model_gallery',
+          targetId: content.id,
+          modelId: model_id || undefined,
+          creatorId: creator.id,
+          r2Key: r2_key || url, // Use r2_key if provided, otherwise URL
+          r2Url: url,
+          priority: 5,
+        });
+
+        // Link scan to content item
+        if (scanId) {
+          await supabase
+            .from('content_items')
+            .update({ moderation_scan_id: scanId })
+            .eq('id', content.id);
+        }
+
+        console.log('[Content Upload] Queued moderation scan:', scanId);
+      } catch (moderationError) {
+        // Log but don't fail - content is still pending
+        console.error('[Content Upload] Moderation queue error:', moderationError);
+      }
+    }
+
+    return NextResponse.json({
+      item: content,
+      moderation: {
+        status: 'pending_scan',
+        scanId,
+        message: 'Content is being reviewed and will be visible once approved.',
+      },
+    });
   } catch (error) {
     console.error('Content upload error:', error);
     return NextResponse.json({ error: 'Failed' }, { status: 500 });

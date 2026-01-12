@@ -104,6 +104,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ posts, total: purchases?.length || 0 })
     }
 
+    if (type === 'mine' && user) {
+      // Get creator's own posts (for dashboard)
+      const { data: posts, count } = await supabase
+        .from('posts')
+        .select('*', { count: 'exact' })
+        .eq('creator_id', user.id)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1)
+
+      return NextResponse.json({ posts: posts || [], total: count || 0 })
+    }
+
     return NextResponse.json({ posts: [], total: 0 })
 
   } catch (error: any) {

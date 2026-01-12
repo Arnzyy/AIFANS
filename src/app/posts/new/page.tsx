@@ -60,37 +60,59 @@ export default function NewPostPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Upload files first
+      // Upload files to R2
       const mediaUrls: string[] = [];
-      
+
       for (const file of files) {
-        const fileName = `${user.id}/${Date.now()}-${file.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from('posts')
-          .upload(fileName, file);
+        // Get presigned URL from our API
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: file.name,
+            type: 'post',
+          }),
+        });
 
-        if (uploadError) throw uploadError;
+        if (!uploadRes.ok) {
+          const errData = await uploadRes.json();
+          throw new Error(errData.error || 'Failed to get upload URL');
+        }
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('posts')
-          .getPublicUrl(fileName);
+        const { uploadUrl, publicUrl } = await uploadRes.json();
+
+        // Upload to R2
+        const r2Res = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type },
+        });
+
+        if (!r2Res.ok) {
+          throw new Error('Failed to upload file');
+        }
 
         mediaUrls.push(publicUrl);
       }
 
-      // Create post
-      const { error: postError } = await supabase
-        .from('posts')
-        .insert({
-          creator_id: user.id,
-          text_content: content.trim() || null,
-          is_ppv: isPPV,
-          ppv_price: isPPV ? Math.round(parseFloat(ppvPrice) * 100) : null,
-          is_published: !isScheduled,
-          scheduled_at: isScheduled ? new Date(scheduleDate).toISOString() : null,
-        });
+      // Create post via API (handles RLS properly)
+      const res = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          textContent: content.trim() || null,
+          mediaUrls: mediaUrls, // Include the uploaded media!
+          isPpv: isPPV,
+          ppvPrice: isPPV ? Math.round(parseFloat(ppvPrice) * 100) : null,
+          isPublished: !isScheduled,
+          scheduledAt: isScheduled ? new Date(scheduleDate).toISOString() : null,
+        }),
+      });
 
-      if (postError) throw postError;
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to create post');
+      }
 
       router.push('/dashboard/posts');
       router.refresh();

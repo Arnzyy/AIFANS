@@ -16,14 +16,12 @@ export async function GET(
     const { username: creatorId } = await params;
     const supabase = await createServerClient();
 
-    // Get current user
+    // Get current user (optional - guests can browse content)
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Guests can view content (locked/blurred) - no auth required for browsing
 
     // The creatorId could be:
     // 1. A creator_models.id (for AI models)
@@ -112,12 +110,12 @@ export async function GET(
     debugInfo.actualCreatorId = actualCreatorId;
 
     // Check if user is admin (full access)
-    const isAdmin = isAdminUser(user.email);
+    const isAdmin = user ? isAdminUser(user.email) : false;
 
     // Check subscription status (content or bundle)
     let hasContentSubscription = isAdmin; // Admins have full access
 
-    if (!isAdmin) {
+    if (!isAdmin && user) {
       // Check subscription - subscriptions use the creator's profile/user_id
       // Try with creatorUserId first (the profile ID that foreign key requires)
       let { data: subscription } = creatorUserId
@@ -176,9 +174,14 @@ export async function GET(
       .eq('creator_id', actualCreatorId)
       .order('created_at', { ascending: false });
 
-    // Only show public content if no subscription
+    // Show public + PPV content for guests/non-subscribers, all for subscribers
     if (!hasContentSubscription) {
-      query = query.eq('visibility', 'public');
+      query = query.in('visibility', ['public', 'ppv']);
+    }
+
+    // MODERATION: Only show approved content (admins see all)
+    if (!isAdmin) {
+      query = query.eq('moderation_status', 'approved');
     }
 
     const { data: items, error: contentError } = await query;
@@ -225,19 +228,21 @@ export async function GET(
       }
     }
 
-    // Get PPV entitlements for this user
-    const { data: entitlements } = await supabase
-      .from('ppv_entitlements')
-      .select('offer_id, content_ids')
-      .eq('user_id', user.id);
-
-    // Build set of unlocked content IDs from PPV purchases
+    // Get PPV entitlements for this user (if logged in)
     const unlockedContentIds = new Set<string>();
-    entitlements?.forEach((ent) => {
-      if (ent.content_ids && Array.isArray(ent.content_ids)) {
-        ent.content_ids.forEach((id: string) => unlockedContentIds.add(id));
-      }
-    });
+    if (user) {
+      const { data: entitlements } = await supabase
+        .from('ppv_entitlements')
+        .select('offer_id, content_ids')
+        .eq('user_id', user.id);
+
+      // Build set of unlocked content IDs from PPV purchases
+      entitlements?.forEach((ent) => {
+        if (ent.content_ids && Array.isArray(ent.content_ids)) {
+          ent.content_ids.forEach((id: string) => unlockedContentIds.add(id));
+        }
+      });
+    }
 
     // Get PPV prices for items
     const { data: ppvOffers } = await supabase
@@ -275,6 +280,8 @@ export async function GET(
         title: item.title,
         is_unlocked: isUnlocked,
         created_at: item.created_at,
+        // Include moderation status for admins
+        ...(isAdmin && { moderation_status: item.moderation_status }),
       };
     });
 
