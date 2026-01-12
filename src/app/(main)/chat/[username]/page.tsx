@@ -42,6 +42,17 @@ function isUUID(str: string): boolean {
   return uuidRegex.test(str);
 }
 
+// Helper to get/set chat cleared timestamp (persists visual clear across reloads)
+function getChatClearedAt(conversationId: string): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(`chat_cleared_${conversationId}`);
+}
+
+function setChatClearedAt(conversationId: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(`chat_cleared_${conversationId}`, new Date().toISOString());
+}
+
 // Random fallback opening messages (used when API fails)
 function getRandomFallbackOpener(name: string): string {
   const hour = new Date().getHours();
@@ -242,10 +253,20 @@ export default function AIChatPage() {
                     // Reverse to show in chronological order (oldest first)
                     if (existingMessages) existingMessages.reverse();
 
-                    if (existingMessages && existingMessages.length > 0) {
+                    // Filter out messages before the "cleared at" timestamp (visual clear persistence)
+                    const clearedAt = getChatClearedAt(conv.id);
+                    let filteredMessages = existingMessages || [];
+                    if (clearedAt && filteredMessages.length > 0) {
+                      const clearedTime = new Date(clearedAt).getTime();
+                      filteredMessages = filteredMessages.filter(
+                        (m: any) => new Date(m.created_at).getTime() > clearedTime
+                      );
+                    }
+
+                    if (filteredMessages.length > 0) {
                       hasExistingMessages = true;
                       // Transform to Message format
-                      const msgs = existingMessages.map((m: any) => ({
+                      const msgs = filteredMessages.map((m: any) => ({
                         id: m.id,
                         content: m.content,
                         sender_id: m.role === 'user' ? user.id : model.id,
@@ -259,7 +280,7 @@ export default function AIChatPage() {
 
                       // Check if we should generate a welcome back message
                       // Only if the last message was more than 5 mins ago
-                      const lastMsg = existingMessages[existingMessages.length - 1];
+                      const lastMsg = filteredMessages[filteredMessages.length - 1];
                       const lastMsgTime = new Date(lastMsg.created_at).getTime();
                       const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
 
@@ -950,15 +971,19 @@ export default function AIChatPage() {
             />
           )}
 
-          {/* Clear chat button (visual only - keeps history) */}
+          {/* Clear chat button (visual only - keeps history & memories) */}
           {messages.length > 0 && (
             <button
               onClick={() => {
+                // Save clear timestamp so it persists across page reloads
+                if (conversationId) {
+                  setChatClearedAt(conversationId);
+                }
                 setMessages([]);
                 setOpeningMessage('');
               }}
               className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition"
-              title="Clear chat window (history is saved)"
+              title="Clear chat window (memories are preserved)"
             >
               <RotateCcw className="w-4 h-4 text-gray-400" />
             </button>
