@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase/server';
 import { generateMockResponse, ChatMessage } from '@/lib/ai/chat-service';
 import { getCreatorByUsername } from '@/lib/data/creators';
 import { cleanResponse } from '@/lib/ai/chat';
+import { buildChatContext, formatMemoryForPrompt, updateMemory } from '@/lib/ai/memory-system/memory-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,6 +83,20 @@ export async function POST(request: NextRequest) {
         content: m.content,
       }));
 
+      // Build memory context - this contains user's personal details (name, height, interests, etc.)
+      let memoryContext = '';
+      try {
+        const context = await buildChatContext(supabase, user.id, modelId);
+        memoryContext = formatMemoryForPrompt(context);
+        console.log('Memory loaded for user:', {
+          preferredName: context.memory?.preferred_name,
+          personalFacts: context.memory?.personal_facts?.length || 0,
+          interests: context.memory?.interests?.length || 0,
+        });
+      } catch (err) {
+        console.log('Memory unavailable (non-critical):', err);
+      }
+
       // Save user message
       if (conversationId) {
         await supabase.from('chat_messages').insert({
@@ -93,8 +108,8 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Generate response
-      const response = await generateMockResponse(displayName, message, history);
+      // Generate response with memory context
+      const response = await generateMockResponse(displayName, message, history, memoryContext);
       const cleanedResponse = cleanResponse(response);
 
       // Save AI response
@@ -107,6 +122,16 @@ export async function POST(request: NextRequest) {
           content: cleanedResponse,
         });
       }
+
+      // Update memory in background - extract facts from conversation
+      const messagesForMemory = [
+        ...history,
+        { role: 'user' as const, content: message },
+        { role: 'assistant' as const, content: cleanedResponse }
+      ];
+      updateMemory(supabase, user.id, modelId, messagesForMemory).catch(err => {
+        console.log('Memory update failed (non-critical):', err);
+      });
 
       return NextResponse.json({
         response: cleanedResponse,

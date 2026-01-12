@@ -383,10 +383,11 @@ function getFallbackResponse(): string {
 export async function generateMockResponse(
   creatorName: string,
   message: string,
-  conversationHistory: ChatMessage[] = []
+  conversationHistory: ChatMessage[] = [],
+  memoryContext?: string // Optional memory context to personalize responses
 ): Promise<string> {
   try {
-    const systemPrompt = `${MASTER_SYSTEM_PROMPT}
+    let systemPrompt = `${MASTER_SYSTEM_PROMPT}
 
 ═══════════════════════════════════════════
 YOUR PERSONA: ${creatorName.toUpperCase()}
@@ -397,6 +398,11 @@ Keep responses SHORT (2-4 sentences), flirty but not explicit.
 Ask engaging questions to keep the conversation going.
 NEVER use asterisks for actions like *giggles* or *smiles*. Express yourself naturally without roleplay formatting.
 `;
+
+    // Add memory context if available - this contains user's personal details
+    if (memoryContext) {
+      systemPrompt += memoryContext;
+    }
 
     const messages: ChatMessage[] = [
       ...conversationHistory.slice(-10),
