@@ -64,6 +64,18 @@ interface ModelStats {
   postCount: number;
 }
 
+interface PPVOffer {
+  id: string;
+  title: string;
+  description?: string;
+  preview_url?: string;
+  preview_images: string[];
+  price_tokens: number;
+  price_gbp: number;
+  item_count: number;
+  is_purchased: boolean;
+}
+
 export default function ModelProfilePage() {
   const params = useParams();
   const id = params.id as string;
@@ -77,6 +89,8 @@ export default function ModelProfilePage() {
   const [contentLoading, setContentLoading] = useState(true);
   const [selectedPostIndex, setSelectedPostIndex] = useState<number | null>(null);
   const [stats, setStats] = useState<ModelStats | null>(null);
+  const [ppvOffers, setPpvOffers] = useState<PPVOffer[]>([]);
+  const [ppvLoading, setPpvLoading] = useState(true);
 
   // Like/Comment state
   const [likeStatus, setLikeStatus] = useState<Record<string, { liked: boolean; count: number }>>({});
@@ -154,6 +168,19 @@ export default function ModelProfilePage() {
           }
         } catch (statsErr) {
           console.error('[ModelProfilePage] Error fetching stats:', statsErr);
+        }
+
+        // Fetch PPV offers for this model
+        try {
+          const ppvRes = await fetch(`/api/models/${id}/ppv`);
+          if (ppvRes.ok) {
+            const ppvData = await ppvRes.json();
+            setPpvOffers(ppvData.offers || []);
+          }
+        } catch (ppvErr) {
+          console.error('[ModelProfilePage] Error fetching PPV offers:', ppvErr);
+        } finally {
+          setPpvLoading(false);
         }
       } catch (error) {
         console.error('[ModelProfilePage] Error fetching model:', error);
@@ -573,6 +600,76 @@ export default function ModelProfilePage() {
             </button>
           </div>
         </div>
+
+        {/* PPV Offers Section */}
+        {ppvOffers.length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Lock className="w-5 h-5 text-purple-400" />
+              <h2 className="text-lg font-semibold">Exclusive Content Packs</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {ppvOffers.map((offer) => (
+                <div
+                  key={offer.id}
+                  className="p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 hover:border-purple-500/40 transition-colors"
+                >
+                  {/* Preview images grid */}
+                  <div className="grid grid-cols-2 gap-1 mb-3 rounded-lg overflow-hidden">
+                    {offer.preview_images.slice(0, 4).map((img, i) => (
+                      <div key={i} className="aspect-square bg-white/5">
+                        <img
+                          src={img}
+                          alt=""
+                          className="w-full h-full object-cover blur-lg"
+                        />
+                      </div>
+                    ))}
+                    {offer.preview_images.length === 0 && (
+                      <div className="col-span-2 aspect-video bg-white/5 flex items-center justify-center">
+                        <Lock className="w-8 h-8 text-white/30" />
+                      </div>
+                    )}
+                  </div>
+
+                  <h3 className="font-semibold text-lg">{offer.title}</h3>
+                  {offer.description && (
+                    <p className="text-sm text-gray-400 mt-1 line-clamp-2">{offer.description}</p>
+                  )}
+
+                  <div className="flex items-center justify-between mt-4">
+                    <div className="text-sm text-gray-400">
+                      {offer.item_count} {offer.item_count === 1 ? 'item' : 'items'}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-bold text-lg">£{offer.price_gbp.toFixed(2)}</span>
+                      {offer.is_purchased ? (
+                        <span className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium">
+                          Purchased
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            if (!currentUser) {
+                              router.push('/login');
+                            } else {
+                              // TODO: Open purchase modal
+                              alert('Purchase flow coming soon! Price: ' + offer.price_tokens + ' tokens');
+                            }
+                          }}
+                          className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          Buy Now
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Posts Grid */}
         <div className="pb-8">
