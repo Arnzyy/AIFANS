@@ -22,6 +22,7 @@ export interface UserMemory {
   };
   running_jokes: string[];
   neutral_topics: string[];
+  personal_facts: string[]; // Personal details user shared (shoe size, job, pets, etc.)
   message_count: number;
   last_interaction?: string;
 }
@@ -74,13 +75,21 @@ EXTRACT ONLY:
 - tone_preference: Do they seem to prefer playful, direct, teasing chat?
 - running_jokes: Any jokes or callbacks that could be reused
 - neutral_topics: Things they mentioned (work, weekend plans) as NEUTRAL FACTS
+- personal_facts: Personal details they shared about themselves like:
+  * Physical attributes (shoe size, height, eye color, hair color, etc.)
+  * Job/career/occupation
+  * Pets they have
+  * Where they're from (city/country level only)
+  * Relationship status
+  * Favorite things (food, color, season, etc.)
+  * Any other personal details they volunteered
 
 ABSOLUTELY DO NOT EXTRACT:
 - Emotional states (lonely, sad, stressed, depressed)
 - Relationship framing (how long chatting, milestones)
 - Vulnerability data
-- Health information
-- Precise locations
+- Precise home address or exact location
+- Financial information
 - Anything that could be used for emotional manipulation
 
 Return ONLY a JSON object with the safe fields. If nothing new to add, return empty object {}.
@@ -153,6 +162,18 @@ function sanitizeExtractedMemory(extracted: any): Partial<UserMemory> {
         return !emotionalKeywords.some(kw => lower.includes(kw));
       })
       .slice(0, 20);
+  }
+
+  if (Array.isArray(extracted.personal_facts)) {
+    // Filter out sensitive personal info but keep useful facts
+    const sensitiveKeywords = ['address', 'ssn', 'password', 'credit card', 'bank account', 'social security'];
+    safe.personal_facts = extracted.personal_facts
+      .filter((f: any) => {
+        if (typeof f !== 'string') return false;
+        const lower = f.toLowerCase();
+        return !sensitiveKeywords.some(kw => lower.includes(kw));
+      })
+      .slice(0, 30); // Allow more personal facts to be stored
   }
 
   if (extracted.preferences && typeof extracted.preferences === 'object') {
@@ -230,6 +251,7 @@ export async function buildChatContext(
       preferences: {},
       running_jokes: [],
       neutral_topics: [],
+      personal_facts: [],
       message_count: 0,
     };
   }
@@ -370,6 +392,10 @@ export function formatMemoryForPrompt(context: ConversationContext): string {
     if (m.neutral_topics?.length) {
       memoryPrompt += `Recently mentioned: ${m.neutral_topics.slice(-5).join(', ')}\n`;
     }
+
+    if (m.personal_facts?.length) {
+      memoryPrompt += `Personal details they shared: ${m.personal_facts.join(', ')}\n`;
+    }
   }
 
   if (context.summary) {
@@ -459,6 +485,7 @@ function mergeMemory(
     },
     running_jokes: dedupeArray([...(existing.running_jokes || []), ...(newFacts.running_jokes || [])]).slice(0, 10),
     neutral_topics: [...(existing.neutral_topics || []), ...(newFacts.neutral_topics || [])].slice(-20),
+    personal_facts: dedupeArray([...(existing.personal_facts || []), ...(newFacts.personal_facts || [])]).slice(0, 30),
   };
 }
 

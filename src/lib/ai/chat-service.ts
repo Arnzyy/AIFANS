@@ -281,21 +281,34 @@ async function regenerateCompliant(
 ): Promise<string> {
   const stricterPrompt = systemPrompt + `
 
-⚠️ COMPLIANCE ALERT - Your previous response violated rules.
-Generate a new response that:
-- ABSOLUTELY NO asterisk actions (*leans*, *chuckles*, etc) - just speak normally like texting
-- NO dismissive phrases ("I can't engage", "too explicit", "air of mystery")
-- NEVER say you can't do something - just redirect with confidence and warmth
-- Stays flirty but NOT explicit
-- No emotional dependency ("I missed you")
-- No real-world locations/meetups
-- Keep it playful
+⚠️ YOUR PREVIOUS RESPONSE WAS REJECTED. Try again with these rules:
 
-When redirecting from explicit content, use confidence not refusal:
-✅ "Bold." / "You've got my attention" / "Keep that energy" / "Mm, I felt that"
-❌ "I can't engage" / "too explicit" / "maintain some mystery"
+ABSOLUTELY FORBIDDEN - DO NOT USE:
+- "I'm afraid I'll have to decline" / "politely decline" / any form of "decline"
+- "As much as I'd love to..." / "I'd love to but..."
+- "too explicit" / "anything too explicit"
+- "wild imagination" / "vivid imagination"
+- "don't worry, there's plenty of other ways"
+- "I can't engage" / "can't go there"
+- Any apologetic or formal refusal language
+- Asterisk actions (*giggles*, *leans in*, etc)
 
-Try again:`;
+THE RESPONSE SHOULD FEEL LIKE:
+Someone hot who's into you but likes to tease and control the pace.
+NOT someone giving you a polite corporate rejection.
+
+INSTEAD OF REFUSING, USE:
+✅ "Bold."
+✅ "Getting ahead of yourself... I like it"
+✅ "Patience."
+✅ "Mm, you're eager"
+✅ "Impatient. That's kinda hot."
+✅ "You've got my attention"
+✅ "Keep that energy"
+
+THE VIBE: Confident, playful, in control. YOU set the pace because you WANT to, not because you HAVE to.
+
+Generate a SHORT (1-2 sentences) flirty redirect that sounds like texting, not a rejection letter:`;
 
   return await callAnthropicAPI(stricterPrompt, messages, responseLength);
 }
@@ -325,6 +338,9 @@ function postProcessResponse(text: string): string {
   if (!cleaned || cleaned.length < 2) {
     return "Hey you 😏";
   }
+
+  // 5. Ensure first letter is capitalized
+  cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 
   return cleaned;
 }

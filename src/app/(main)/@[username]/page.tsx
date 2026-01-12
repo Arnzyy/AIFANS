@@ -190,19 +190,23 @@ export default function UserProfilePage() {
       </div>
 
       {/* Subscribe Modal */}
-      {isCreator && profile && (
+      {isCreator && profile && showSubscribeModal && (
         <SubscribeModal
-          isOpen={showSubscribeModal}
+          creator={{
+            id: profile.id,
+            username: profile.username,
+            display_name: displayName,
+            avatar_url: profile.avatar_url || undefined,
+          }}
           onClose={() => setShowSubscribeModal(false)}
-          creatorId={profile.id}
-          creatorName={displayName}
-          creatorAvatar={profile.avatar_url || undefined}
           tiers={[
             {
               id: 'basic',
               name: 'Fan',
+              description: 'Access to all posts and exclusive content',
               price: creatorProfile?.subscription_price || 999,
-              features: ['Access to all posts', 'Direct messaging', 'Exclusive content'],
+              duration_months: 1,
+              is_featured: true,
             },
           ]}
         />

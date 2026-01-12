@@ -15,13 +15,17 @@ interface ChatCompletionOptions {
   maxTokens?: number;
 }
 
-// Post-process response to remove asterisk actions
+// Post-process response to remove asterisk actions and ensure proper formatting
 export function cleanResponse(text: string): string {
   let cleaned = text;
   // Remove all *action* patterns (asterisk roleplay actions)
   cleaned = cleaned.replace(/\*[^*]+\*/g, '');
   // Clean up extra whitespace
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  // Ensure first letter is capitalized
+  if (cleaned.length > 0) {
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  }
   return cleaned;
 }
 
