@@ -132,7 +132,7 @@ export const DEFAULT_TOKEN_CONFIG: TokenConfig = {
   platform_fee_tips_pct: 30,
   tokens_per_gbp_100: 250,           // 250 tokens = £1
   tip_presets_tokens: [250, 500, 1250],  // £1, £2, £5 equiv
-  min_tip_tokens: 50,
+  min_tip_tokens: 10,                // Allow small quick tips (10 = ~£0.04)
   max_tip_tokens: 25000,
 };
 
