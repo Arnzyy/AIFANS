@@ -174,9 +174,9 @@ export async function GET(
       .eq('creator_id', actualCreatorId)
       .order('created_at', { ascending: false });
 
-    // Show public + PPV content for guests/non-subscribers, all for subscribers
+    // Non-subscribers only see PPV content (purchasable), subscribers see all
     if (!hasContentSubscription) {
-      query = query.in('visibility', ['public', 'ppv']);
+      query = query.eq('visibility', 'ppv');
     }
 
     // MODERATION: Only show approved content (admins see all)
