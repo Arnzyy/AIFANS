@@ -459,97 +459,145 @@ BAD examples (too formal/long):
 // ===========================================
 
 /**
- * Generate an AI tip acknowledgement that scales with tip amount
- * Bigger tips = more enthusiastic, personalized responses
- * Uses creator's personality settings from dashboard
+ * Generate an AI tip acknowledgement using creator's persona
+ *
+ * RULES:
+ * - Never mention amounts, tokens, money, or prices
+ * - Natural gratitude, non-transactional language
+ * - Scale intensity subtly based on tip size (without mentioning it)
+ * - Vary responses to prevent repetition
+ * - Stay in character with creator's personality settings
+ * - 1-3 sentences max, casual conversational tone
  */
 export async function generateTipAcknowledgement(
   creatorName: string,
   tipAmount: number,
   recentMessages: ChatMessage[] = [],
-  personality?: AIPersonalityFull | null
+  personality?: AIPersonalityFull | null,
+  fanName?: string
 ): Promise<string> {
-  // Determine enthusiasm level based on tip amount
-  let enthusiasmLevel: string;
-  let maxLength: 'short' | 'medium' | 'long';
+  // Determine warmth level based on tip amount (without telling the AI the amount)
+  let warmthLevel: 'light' | 'genuine' | 'expressive';
+  let warmthDescription: string;
 
-  if (tipAmount >= 1000) {
-    enthusiasmLevel = 'EXTREMELY grateful and excited - this is a huge tip! Be very warm, personal, and appreciative. Make them feel special.';
-    maxLength = 'medium';
-  } else if (tipAmount >= 500) {
-    enthusiasmLevel = 'Very enthusiastic and genuinely touched - this is a generous tip! Show real appreciation.';
-    maxLength = 'medium';
-  } else if (tipAmount >= 250) {
-    enthusiasmLevel = 'Warm and appreciative - nice tip! Be sweet and thankful.';
-    maxLength = 'short';
+  if (tipAmount >= 500) {
+    warmthLevel = 'expressive';
+    warmthDescription = 'More expressive and memorable - show genuine warmth';
   } else if (tipAmount >= 100) {
-    enthusiasmLevel = 'Appreciative and flirty - thank them warmly.';
-    maxLength = 'short';
+    warmthLevel = 'genuine';
+    warmthDescription = 'Genuine appreciation - warm and sweet';
   } else {
-    enthusiasmLevel = 'Casual and cute - a quick sweet thanks.';
-    maxLength = 'short';
+    warmthLevel = 'light';
+    warmthDescription = 'Light and warm - casual acknowledgement';
   }
 
   // Build personality context if available
   let personalityContext = '';
   if (personality) {
     personalityContext = `
-YOUR PERSONALITY (from creator settings):
-- Traits: ${personality.personality_traits?.join(', ') || 'playful, friendly'}
-- Mood: ${personality.mood || 'happy'}
-- Humor: ${personality.humor_style || 'witty'}
-- Flirting pace: ${personality.pace || 5}/10
-- Speech patterns: ${personality.speech_patterns?.join(', ') || 'natural'}
-- Emoji usage: ${personality.emoji_usage || 'moderate'}
-
-Stay in character with these personality traits while thanking for the tip.
+YOUR PERSONALITY:
+- Core traits: ${personality.personality_traits?.join(', ') || 'playful, confident'}
+- Current mood: ${personality.mood || 'happy'}
+- Humor style: ${personality.humor_style || 'witty'}
+- Flirt level: ${personality.pace || 5}/10
+- Speech patterns: ${personality.speech_patterns?.join(', ') || 'casual, natural'}
+- Emoji preference: ${personality.emoji_usage || 'moderate'} (use accordingly)
 `;
   }
 
+  // Fan context
+  const fanContext = fanName ? `\nThe fan's name is ${fanName}. You may use their name occasionally (not every time).` : '';
+
   try {
-    const systemPrompt = `You are ${creatorName}, thanking a user for a tip they just sent you.
-${personalityContext}
-TIP AMOUNT: ${tipAmount} tokens
-ENTHUSIASM LEVEL: ${enthusiasmLevel}
+    const systemPrompt = `You are ${creatorName}. Someone just did something nice for you. Respond naturally.
+${personalityContext}${fanContext}
 
-RULES:
-- Mention the specific amount (${tipAmount} tokens)
-- Scale your excitement to match the tip size
-- Keep it natural, like texting - not formal
-- NO asterisks (*action*) - just natural speech
-- Stay in character with your personality settings
-- For big tips (500+), make them feel REALLY special
-- For huge tips (1000+), be genuinely touched and personal
+WARMTH LEVEL: ${warmthDescription}
 
-EXAMPLES BY TIP SIZE:
-- 50 tokens: "Aww thanks babe 💕"
-- 250 tokens: "Omg thank you! 250 tokens?! You're the sweetest 😘"
-- 500 tokens: "Wait, 500 tokens?! You're actually amazing... that just made my whole day 💕"
-- 1000+ tokens: "Oh my god... ${tipAmount} tokens?! I'm actually speechless right now. You're incredible, seriously. Thank you so much 🥺💕"
-`;
+═══════════════════════════════════════════
+CRITICAL RULES - FOLLOW EXACTLY
+═══════════════════════════════════════════
+
+NEVER mention:
+- Money, tokens, tips, amounts, prices, numbers
+- Platform mechanics or payments
+- Rewards or special treatment
+- "You didn't have to" / "That means everything" / "I can't thank you enough"
+- Comparisons to other fans
+
+NEVER imply:
+- Romantic attachment or emotional dependency
+- Real-world meetups or future promises
+- Special treatment because they were generous
+- Obligation or transactional exchange
+
+DO express:
+- Natural, warm appreciation (like thanking a friend)
+- Playful acknowledgement (within your persona)
+- Light flirtation (if appropriate to your flirt level)
+- Genuine but not over-the-top gratitude
+
+FORMAT:
+- 1-3 sentences maximum
+- Casual, conversational tone (like texting)
+- No hashtags or platform references
+- Emoji use based on your personality settings only
+- NO asterisks for actions (*action*)
+
+VARIATION RULES (to prevent robotic responses):
+- Vary between short (1 sentence) and medium (2-3 sentences) based on your mood
+- Don't always start with the same word
+- Don't always use emojis in the same position
+- Mix direct appreciation with playful acknowledgement
+
+GOOD EXAMPLES (vary style each time):
+- "You're sweet, you know that?"
+- "Okay that just made me smile"
+- "Well aren't you the best"
+- "You're too good to me"
+- "That's really sweet of you"
+- "Aw, you 💕"
+
+BAD EXAMPLES (never say these):
+- "Thanks for the 100 tokens!"
+- "You didn't have to do that!"
+- "That means so much to me"
+- "I'll remember this"
+- "You're my favorite"
+- Anything mentioning money/amounts/tips`;
 
     const contextMessages: ChatMessage[] = [
-      ...recentMessages.slice(-5),
+      ...recentMessages.slice(-3),
       {
         role: 'user',
-        content: `[User just tipped ${tipAmount} tokens. Generate a thank you message that matches the tip size and your personality.]`
+        content: `[Generate a tip response. Warmth: ${warmthLevel}. Stay in persona. 1-3 sentences. No amounts.]`
       }
     ];
 
-    const response = await callAnthropicAPI(systemPrompt, contextMessages, maxLength);
+    const response = await callAnthropicAPI(systemPrompt, contextMessages, 'short');
     return stripAsteriskActions(response);
   } catch (error) {
     console.error('Tip acknowledgement generation failed:', error);
-    // Fallback based on amount
-    if (tipAmount >= 1000) {
-      return `Oh my god... ${tipAmount} tokens?! You're incredible, thank you so much! 🥺💕`;
-    } else if (tipAmount >= 500) {
-      return `Wow ${tipAmount} tokens?! You're so generous! Thank you sweetie 😘`;
-    } else if (tipAmount >= 250) {
-      return `Aww thank you for the ${tipAmount} tokens! You're the best 💕`;
-    } else {
-      return `Thanks for the tip babe 💕`;
-    }
+    // Fallback responses that follow the rules (no amounts mentioned)
+    const fallbacks = {
+      light: [
+        "Aw, you're sweet 💕",
+        "That's really kind of you",
+        "You're too good",
+      ],
+      genuine: [
+        "You're actually the sweetest, thank you",
+        "Okay that just made my day",
+        "Well aren't you wonderful 💕",
+      ],
+      expressive: [
+        "You're incredible, seriously. Thank you 💕",
+        "That's so sweet of you... you really are the best",
+        "Wow... you're amazing, thank you so much",
+      ],
+    };
+    const options = fallbacks[warmthLevel];
+    return options[Math.floor(Math.random() * options.length)];
   }
 }
 

@@ -41,6 +41,18 @@ export async function POST(
       personality = model.ai_personality;
     }
 
+    // Get fan's display name for personalization
+    let fanName: string | undefined;
+    const { data: fanProfile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', user.id)
+      .single();
+
+    if (fanProfile?.display_name) {
+      fanName = fanProfile.display_name;
+    }
+
     // Get recent messages for context (if conversationId provided)
     let recentMessages: { role: 'user' | 'assistant'; content: string }[] = [];
     if (conversationId) {
@@ -64,7 +76,8 @@ export async function POST(
       creatorName,
       tipAmount,
       recentMessages,
-      personality
+      personality,
+      fanName
     );
 
     // Save the acknowledgement to the conversation
