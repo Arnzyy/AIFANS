@@ -12,18 +12,47 @@ export default async function FeedPage() {
   }
 
   // Get user's active subscriptions
+  // Subscriptions can be to model IDs or creator profile IDs
   const { data: subscriptions } = await supabase
     .from('subscriptions')
     .select('creator_id')
     .eq('subscriber_id', user.id)
     .eq('status', 'active');
 
-  const subscribedCreatorIds = subscriptions?.map(s => s.creator_id) || [];
+  const subscribedIds = subscriptions?.map(s => s.creator_id) || [];
 
-  // Get posts from subscribed creators
+  // Get posts from subscribed creators/models
   let posts: any[] = [];
 
-  if (subscribedCreatorIds.length > 0) {
+  if (subscribedIds.length > 0) {
+    // Subscriptions might be to model IDs, so we need to find the creator profiles for those models
+    const { data: models } = await supabase
+      .from('creator_models')
+      .select('id, creator_id')
+      .in('id', subscribedIds);
+
+    // Get the creator IDs from the models (models.creator_id points to creators.id or profile.id)
+    const creatorIdsFromModels = models?.map(m => m.creator_id) || [];
+
+    // Also get creators table to find user_ids
+    const { data: creators } = await supabase
+      .from('creators')
+      .select('id, user_id')
+      .in('id', creatorIdsFromModels);
+
+    // Build list of all possible creator IDs for posts:
+    // 1. Direct subscription IDs (could be profile IDs)
+    // 2. Creator IDs from models
+    // 3. User IDs from creators table
+    const allPossibleCreatorIds = new Set([
+      ...subscribedIds,
+      ...creatorIdsFromModels,
+      ...(creators?.map(c => c.user_id) || []),
+    ]);
+
+    // Also get posts that are linked to subscribed model IDs via model_id column
+    const subscribedModelIds = models?.map(m => m.id) || [];
+
     const { data } = await supabase
       .from('posts')
       .select(`
@@ -41,7 +70,7 @@ export default async function FeedPage() {
           avatar_url
         )
       `)
-      .in('creator_id', subscribedCreatorIds)
+      .or(`creator_id.in.(${Array.from(allPossibleCreatorIds).join(',')}),model_id.in.(${subscribedModelIds.length > 0 ? subscribedModelIds.join(',') : 'null'})`)
       .eq('is_published', true)
       .order('created_at', { ascending: false })
       .limit(20);

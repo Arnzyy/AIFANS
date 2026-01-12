@@ -59,7 +59,6 @@ const FAN_NAV_ITEMS = [
   { href: '/explore', icon: Compass, label: 'Explore' },
   { href: '/subscriptions', icon: Heart, label: 'Subscriptions' },
   { href: '/messages', icon: MessageCircle, label: 'Messages' },
-  { href: '/notifications', icon: Bell, label: 'Notifications' },
   { href: '/wallet', icon: Wallet, label: 'Wallet' },
 ];
 
@@ -86,12 +85,11 @@ const CREATOR_MOBILE_BOTTOM_NAV = [
   { href: '/dashboard/earnings', icon: PoundSterling, label: 'Earnings' },
 ];
 
-// Mobile bottom nav - fan navigation
+// Mobile bottom nav - fan navigation (no notifications - that's for creators)
 const FAN_MOBILE_BOTTOM_NAV = [
   { href: '/explore', icon: Compass, label: 'Explore' },
   { href: '/subscriptions', icon: Heart, label: 'Subs' },
   { href: '/messages', icon: MessageCircle, label: 'Messages' },
-  { href: '/notifications', icon: Bell, label: 'Alerts' },
   { href: '/wallet', icon: Wallet, label: 'Wallet' },
 ];
 
@@ -388,7 +386,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-zinc-950 border-t border-white/10 z-50 safe-area-inset-bottom">
-        <div className="grid grid-cols-5 items-center h-full">
+        <div className={`grid ${isCreatorSection ? 'grid-cols-5' : 'grid-cols-4'} items-center h-full`}>
           {(isCreatorSection ? CREATOR_MOBILE_BOTTOM_NAV : FAN_MOBILE_BOTTOM_NAV).map((item) => {
             const isActive = pathname === item.href ||
               (item.href !== '/dashboard' && item.href !== '/posts/new' && pathname?.startsWith(item.href));

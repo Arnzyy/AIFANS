@@ -103,23 +103,8 @@ export default function ModelProfilePage() {
   const [showComments, setShowComments] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // Keyboard navigation for content viewer
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (selectedPostIndex === null) return;
-
-      if (e.key === 'Escape') {
-        setSelectedPostIndex(null);
-      } else if (e.key === 'ArrowLeft' && selectedPostIndex > 0) {
-        setSelectedPostIndex(selectedPostIndex - 1);
-      } else if (e.key === 'ArrowRight' && selectedPostIndex < contentItems.length - 1) {
-        setSelectedPostIndex(selectedPostIndex + 1);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedPostIndex, contentItems.length]);
+  // Keyboard navigation for content viewer - handled in the modal component below
+  // (needs access to posts array which is built later)
 
   useEffect(() => {
     const fetchModel = async () => {
@@ -344,18 +329,27 @@ export default function ModelProfilePage() {
   // For non-subscribers: Show profile picture (unlocked) + PPV content (locked/blurred)
   // For subscribers: Show all actual content (no profile picture placeholder needed)
   const buildPosts = () => {
-    const contentPosts = contentItems.map((item) => ({
-      id: item.id,
-      postId: item.post_id,
-      imageUrl: item.thumbnail_url || item.content_url,
-      likes: Math.floor(Math.random() * 500) + 50,
-      comments: Math.floor(Math.random() * 50) + 5,
-      isLocked: !item.is_unlocked,
-      isPpv: item.is_ppv,
-      price: item.price,
-      isVideo: item.type === 'video',
-      source: item.source || 'content',
-    }));
+    // Deduplicate content items by URL
+    const seenUrls = new Set<string>();
+    const contentPosts = contentItems
+      .filter((item) => {
+        const url = item.thumbnail_url || item.content_url;
+        if (seenUrls.has(url)) return false;
+        seenUrls.add(url);
+        return true;
+      })
+      .map((item) => ({
+        id: item.id,
+        postId: item.post_id,
+        imageUrl: item.thumbnail_url || item.content_url,
+        likes: Math.floor(Math.random() * 500) + 50,
+        comments: Math.floor(Math.random() * 50) + 5,
+        isLocked: !item.is_unlocked,
+        isPpv: item.is_ppv,
+        price: item.price,
+        isVideo: item.type === 'video',
+        source: item.source || 'content',
+      }));
 
     // For subscribers with full access, just show content (no profile pic placeholder)
     if (hasFullAccess && contentPosts.length > 0) {
@@ -381,11 +375,44 @@ export default function ModelProfilePage() {
       return [profilePicPlaceholder];
     }
 
+    // Filter out any content that has same URL as avatar (avoid duplicate)
+    const filteredContent = contentPosts.filter(p => p.imageUrl !== model.avatar);
+
     // Show profile picture first, then PPV content (locked)
-    return [profilePicPlaceholder, ...contentPosts];
+    return [profilePicPlaceholder, ...filteredContent];
   };
 
   const posts = buildPosts();
+
+  // Keyboard navigation for content viewer - skip locked items
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (selectedPostIndex === null) return;
+
+      if (e.key === 'Escape') {
+        setSelectedPostIndex(null);
+      } else if (e.key === 'ArrowLeft') {
+        // Find previous unlocked item
+        for (let i = selectedPostIndex - 1; i >= 0; i--) {
+          if (!posts[i].isLocked) {
+            setSelectedPostIndex(i);
+            break;
+          }
+        }
+      } else if (e.key === 'ArrowRight') {
+        // Find next unlocked item
+        for (let i = selectedPostIndex + 1; i < posts.length; i++) {
+          if (!posts[i].isLocked) {
+            setSelectedPostIndex(i);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedPostIndex, posts]);
 
   // Create tiers for subscribe modal
   const tiers = [
@@ -781,31 +808,51 @@ export default function ModelProfilePage() {
             <X className="w-8 h-8" />
           </button>
 
-          {/* Previous button */}
-          {selectedPostIndex > 0 && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedPostIndex(selectedPostIndex - 1);
-              }}
-              className="absolute left-4 top-1/2 -translate-y-1/2 p-2 text-white/80 hover:text-white transition-colors bg-black/50 rounded-full"
-            >
-              <ChevronLeft className="w-8 h-8" />
-            </button>
-          )}
+          {/* Previous button - only show if there's a previous unlocked item */}
+          {(() => {
+            // Find previous unlocked item
+            let prevIndex = -1;
+            for (let i = selectedPostIndex - 1; i >= 0; i--) {
+              if (!posts[i].isLocked) {
+                prevIndex = i;
+                break;
+              }
+            }
+            return prevIndex >= 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedPostIndex(prevIndex);
+                }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 text-white/80 hover:text-white transition-colors bg-black/50 rounded-full"
+              >
+                <ChevronLeft className="w-8 h-8" />
+              </button>
+            );
+          })()}
 
-          {/* Next button */}
-          {selectedPostIndex < posts.length - 1 && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedPostIndex(selectedPostIndex + 1);
-              }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-white/80 hover:text-white transition-colors bg-black/50 rounded-full"
-            >
-              <ChevronRight className="w-8 h-8" />
-            </button>
-          )}
+          {/* Next button - only show if there's a next unlocked item */}
+          {(() => {
+            // Find next unlocked item
+            let nextIndex = -1;
+            for (let i = selectedPostIndex + 1; i < posts.length; i++) {
+              if (!posts[i].isLocked) {
+                nextIndex = i;
+                break;
+              }
+            }
+            return nextIndex >= 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedPostIndex(nextIndex);
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-white/80 hover:text-white transition-colors bg-black/50 rounded-full"
+              >
+                <ChevronRight className="w-8 h-8" />
+              </button>
+            );
+          })()}
 
           {/* Content */}
           <div
