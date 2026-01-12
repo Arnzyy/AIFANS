@@ -495,11 +495,12 @@ export async function generateTipAcknowledgement(
   if (personality) {
     personalityContext = `
 YOUR PERSONALITY (from creator settings):
-- Tone: ${personality.tone || 'playful'}
-- Flirtiness: ${personality.flirtiness_level || 'medium'}/10
-- Speaking style: ${personality.speaking_style || 'casual and warm'}
-- Catchphrases: ${personality.catchphrases?.join(', ') || 'none specified'}
-- Emoji usage: ${personality.emoji_style || 'moderate'}
+- Traits: ${personality.personality_traits?.join(', ') || 'playful, friendly'}
+- Mood: ${personality.mood || 'happy'}
+- Humor: ${personality.humor_style || 'witty'}
+- Flirting pace: ${personality.pace || 5}/10
+- Signature phrases: ${personality.signature_phrases || 'none specified'}
+- Emoji usage: ${personality.emoji_usage || 'moderate'}
 
 Stay in character with these personality traits while thanking for the tip.
 `;
