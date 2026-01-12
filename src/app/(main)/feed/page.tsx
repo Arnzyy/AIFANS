@@ -86,7 +86,7 @@ export default async function FeedPage() {
       creator_profiles!inner(*)
     `)
     .eq('role', 'creator')
-    .not('id', 'in', `(${[user.id, ...subscribedCreatorIds].join(',')})`)
+    .not('id', 'in', `(${[user.id, ...subscribedIds].join(',')})`)
     .limit(5);
 
   return <FeedClient initialPosts={posts} suggestedCreators={suggestedCreators || []} />;
