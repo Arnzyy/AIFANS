@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
-import { Bot, BadgeCheck, MapPin, Heart, MessageCircle, Lock, Grid3X3, Play, Star, Sparkles, ArrowLeft, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Bot, BadgeCheck, MapPin, Heart, MessageCircle, Lock, Grid3X3, Play, Star, Sparkles, ArrowLeft, X, ChevronLeft, ChevronRight, Send, Loader2 } from 'lucide-react';
 import { AI_CHAT_DISCLOSURE, MODEL_TYPES, CATEGORY_DISCLAIMER } from '@/lib/compliance/constants';
 import { SubscribeModal } from '@/components/shared/SubscribeModal';
 import { supabase } from '@/lib/supabase/client';
@@ -44,6 +44,18 @@ interface ContentItem {
   created_at: string;
 }
 
+interface Comment {
+  id: string;
+  content: string;
+  created_at: string;
+  user: {
+    id: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+}
+
 export default function ModelProfilePage() {
   const params = useParams();
   const id = params.id as string;
@@ -56,6 +68,15 @@ export default function ModelProfilePage() {
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
   const [contentLoading, setContentLoading] = useState(true);
   const [selectedPostIndex, setSelectedPostIndex] = useState<number | null>(null);
+
+  // Like/Comment state
+  const [likeStatus, setLikeStatus] = useState<Record<string, { liked: boolean; count: number }>>({});
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   // Keyboard navigation for content viewer
   useEffect(() => {
@@ -81,6 +102,7 @@ export default function ModelProfilePage() {
 
       // Check if user is admin (full access to all content)
       const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
       setIsAdmin(isAdminUser(user?.email));
 
       try {
@@ -121,6 +143,120 @@ export default function ModelProfilePage() {
 
     fetchModel();
   }, [id]);
+
+  // Load like status when content viewer opens
+  useEffect(() => {
+    if (selectedPostIndex !== null && contentItems[selectedPostIndex]) {
+      const contentId = contentItems[selectedPostIndex].id;
+      loadLikeStatus(contentId);
+      loadComments(contentId);
+    }
+    // Reset comments view when closing
+    if (selectedPostIndex === null) {
+      setShowComments(false);
+      setComments([]);
+    }
+  }, [selectedPostIndex]);
+
+  const loadLikeStatus = async (contentId: string) => {
+    try {
+      const res = await fetch(`/api/content/${contentId}/like`);
+      if (res.ok) {
+        const data = await res.json();
+        setLikeStatus(prev => ({
+          ...prev,
+          [contentId]: { liked: data.liked, count: data.likeCount }
+        }));
+      }
+    } catch (err) {
+      console.error('Error loading like status:', err);
+    }
+  };
+
+  const toggleLike = async (contentId: string) => {
+    if (!currentUser) return;
+
+    const current = likeStatus[contentId] || { liked: false, count: 0 };
+    const newLiked = !current.liked;
+
+    // Optimistic update
+    setLikeStatus(prev => ({
+      ...prev,
+      [contentId]: { liked: newLiked, count: current.count + (newLiked ? 1 : -1) }
+    }));
+
+    try {
+      const res = await fetch(`/api/content/${contentId}/like`, {
+        method: newLiked ? 'POST' : 'DELETE',
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setLikeStatus(prev => ({
+          ...prev,
+          [contentId]: { liked: data.liked, count: data.likeCount }
+        }));
+      }
+    } catch (err) {
+      // Revert on error
+      setLikeStatus(prev => ({
+        ...prev,
+        [contentId]: current
+      }));
+    }
+  };
+
+  const loadComments = async (contentId: string) => {
+    setCommentsLoading(true);
+    try {
+      const res = await fetch(`/api/content/${contentId}/comments`);
+      if (res.ok) {
+        const data = await res.json();
+        setComments(data.comments || []);
+      }
+    } catch (err) {
+      console.error('Error loading comments:', err);
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const submitComment = async () => {
+    if (!currentUser || !newComment.trim() || selectedPostIndex === null) return;
+
+    const contentId = contentItems[selectedPostIndex].id;
+    setSubmittingComment(true);
+
+    try {
+      const res = await fetch(`/api/content/${contentId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: newComment.trim() }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setComments(prev => [...prev, data.comment]);
+        setNewComment('');
+      }
+    } catch (err) {
+      console.error('Error submitting comment:', err);
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const formatTimeAgo = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
+    return date.toLocaleDateString();
+  };
 
   if (loading) {
     return (
