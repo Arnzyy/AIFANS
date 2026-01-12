@@ -15,20 +15,36 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0')
 
     if (type === 'feed' && user) {
-      // Get posts from subscribed creators
+      // Get posts from subscribed creators/models
       const { data: subscriptions } = await supabase
         .from('subscriptions')
         .select('creator_id')
         .eq('subscriber_id', user.id)
         .eq('status', 'active')
 
-      const creatorIds = subscriptions?.map(s => s.creator_id) || []
+      const subscribedIds = subscriptions?.map(s => s.creator_id) || []
 
-      if (creatorIds.length === 0) {
+      if (subscribedIds.length === 0) {
         return NextResponse.json({ posts: [], total: 0 })
       }
 
-      const { data: posts, count } = await supabase
+      // Subscriptions might be to model IDs, so look up models to get creator profile IDs
+      const { data: models } = await supabase
+        .from('creator_models')
+        .select('id, creator_id')
+        .in('id', subscribedIds)
+
+      const creatorProfileIds = models?.map(m => m.creator_id).filter(Boolean) || []
+      const subscribedModelIds = models?.map(m => m.id) || []
+
+      // Combine all possible creator IDs
+      const allPossibleCreatorIds = new Set([
+        ...subscribedIds,
+        ...creatorProfileIds,
+      ])
+
+      // Build query
+      let query = supabase
         .from('posts')
         .select(`
           *,
@@ -39,10 +55,21 @@ export async function GET(request: NextRequest) {
             id, name, display_name, avatar_url
           )
         `, { count: 'exact' })
-        .in('creator_id', creatorIds)
         .eq('is_published', true)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1)
+
+      // Filter by creator_id OR model_id
+      const creatorIdList = Array.from(allPossibleCreatorIds).join(',')
+      const modelIdList = subscribedModelIds.length > 0 ? subscribedModelIds.join(',') : ''
+
+      if (modelIdList) {
+        query = query.or(`creator_id.in.(${creatorIdList}),model_id.in.(${modelIdList})`)
+      } else {
+        query = query.in('creator_id', Array.from(allPossibleCreatorIds))
+      }
+
+      const { data: posts, count } = await query
 
       // Check which PPV posts are unlocked
       if (user && posts) {
