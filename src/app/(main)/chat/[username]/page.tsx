@@ -7,12 +7,13 @@ import { supabase } from '@/lib/supabase/client';
 import { AI_CHAT_DISCLOSURE } from '@/lib/compliance/constants';
 import { getCreatorByUsername } from '@/lib/data/creators';
 import { formatDistanceToNow } from 'date-fns';
-import { Lock, Sparkles, LogIn, Heart, RotateCcw } from 'lucide-react';
+import { Lock, Sparkles, LogIn, Heart, RotateCcw, Images } from 'lucide-react';
 import { TipButton } from '@/components/tokens/TipButton';
 import { ChatAccessGate } from '@/components/chat/ChatAccessGate';
 import { PurchaseSessionModal } from '@/components/chat/PurchaseSessionModal';
 import { InlineTokenBalance } from '@/components/chat/ChatTokenBalance';
 import { SubscribeModal } from '@/components/shared/SubscribeModal';
+import { InChatContentBrowser } from '@/components/chat/InChatContentBrowser';
 import { isAdminUser } from '@/lib/auth/admin';
 import type { ChatAccess, UnlockOption, MessagePack } from '@/lib/chat';
 
@@ -113,6 +114,9 @@ export default function AIChatPage() {
   // Quick tip state
   const [quickTipSending, setQuickTipSending] = useState<number | null>(null);
   const [quickTipSuccess, setQuickTipSuccess] = useState<number | null>(null);
+
+  // Content browser state
+  const [showContentBrowser, setShowContentBrowser] = useState(false);
 
   useEffect(() => {
     loadChat();
@@ -980,6 +984,17 @@ export default function AIChatPage() {
             />
           )}
 
+          {/* Gallery Button - view creator's content */}
+          {creator && creator.id.includes('-') && creator.id.length >= 30 && (
+            <button
+              onClick={() => setShowContentBrowser(true)}
+              className="p-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 transition"
+              title="View content"
+            >
+              <Images className="w-5 h-5 text-purple-400" />
+            </button>
+          )}
+
           {/* Clear chat button (visual only - keeps history & memories) */}
           {messages.length > 0 && (
             <button
@@ -1317,6 +1332,21 @@ export default function AIChatPage() {
           defaultType="chat"
           isGuest={!currentUser}
           redirectPath={`/chat/${username}`}
+        />
+      )}
+
+      {/* In-Chat Content Browser */}
+      {creator && (
+        <InChatContentBrowser
+          creatorId={creator.id}
+          creatorName={creator.display_name || creator.username}
+          creatorAvatar={creator.avatar_url || undefined}
+          isOpen={showContentBrowser}
+          onClose={() => setShowContentBrowser(false)}
+          onSubscribe={() => {
+            setShowContentBrowser(false);
+            setShowSubscribeModal(true);
+          }}
         />
       )}
     </div>

@@ -364,7 +364,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
         <div className="hidden md:block p-4 border-t border-white/10">
           {user.isVerifiedCreator && isCreatorSection && (
             <Link
-              href={`/@${user.username}`}
+              href={`/u/${user.username}`}
               className="flex items-center gap-3 px-3 py-2 text-sm text-gray-400 hover:text-white transition"
             >
               View Public Profile →

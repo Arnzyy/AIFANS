@@ -46,7 +46,7 @@ export default async function BrowsePage() {
           return (
             <Link
               key={creator.user_id}
-              href={`/@${profile.username}`}
+              href={`/u/${profile.username}`}
               className="bg-zinc-900 rounded-xl border border-white/10 hover:border-white/20 transition overflow-hidden"
             >
               <div className="h-32 bg-gradient-to-br from-purple-500/30 to-pink-500/30" />
