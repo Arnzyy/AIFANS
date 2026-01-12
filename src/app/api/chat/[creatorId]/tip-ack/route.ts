@@ -41,16 +41,31 @@ export async function POST(
       personality = model.ai_personality;
     }
 
-    // Get fan's display name for personalization
+    // Get fan's preferred name from memory first (they may have told the AI a different name)
+    // Fall back to profile display_name if no memory preference
     let fanName: string | undefined;
-    const { data: fanProfile } = await supabase
-      .from('profiles')
-      .select('display_name')
-      .eq('id', user.id)
+
+    // Check memory for preferred name (this is what they told the AI to call them)
+    const { data: memory } = await supabase
+      .from('user_memory')
+      .select('preferred_name')
+      .eq('subscriber_id', user.id)
+      .eq('creator_id', creatorId)
       .single();
 
-    if (fanProfile?.display_name) {
-      fanName = fanProfile.display_name;
+    if (memory?.preferred_name) {
+      fanName = memory.preferred_name;
+    } else {
+      // Fall back to profile display name
+      const { data: fanProfile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', user.id)
+        .single();
+
+      if (fanProfile?.display_name) {
+        fanName = fanProfile.display_name;
+      }
     }
 
     // Get recent messages for context (if conversationId provided)

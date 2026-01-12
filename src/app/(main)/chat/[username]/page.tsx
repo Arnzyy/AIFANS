@@ -118,6 +118,42 @@ export default function AIChatPage() {
   // Content browser state
   const [showContentBrowser, setShowContentBrowser] = useState(false);
 
+  // iOS viewport height fix - handles keyboard dismiss properly
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Handle iOS visual viewport changes (keyboard show/hide)
+  useEffect(() => {
+    const updateViewportHeight = () => {
+      // Use visualViewport if available (handles iOS keyboard properly)
+      const vh = window.visualViewport?.height || window.innerHeight;
+      setViewportHeight(vh);
+
+      // Also update CSS variable for any child elements that need it
+      document.documentElement.style.setProperty('--chat-vh', `${vh}px`);
+    };
+
+    // Initial set
+    updateViewportHeight();
+
+    // Listen to visual viewport changes (keyboard, zoom, etc.)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewportHeight);
+      window.visualViewport.addEventListener('scroll', updateViewportHeight);
+    }
+
+    // Fallback for browsers without visualViewport
+    window.addEventListener('resize', updateViewportHeight);
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateViewportHeight);
+        window.visualViewport.removeEventListener('scroll', updateViewportHeight);
+      }
+      window.removeEventListener('resize', updateViewportHeight);
+    };
+  }, []);
+
   useEffect(() => {
     loadChat();
   }, [username]);
@@ -905,7 +941,11 @@ export default function AIChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-dvh max-h-dvh bg-black overflow-hidden">
+    <div
+      ref={containerRef}
+      className="flex flex-col bg-black overflow-hidden"
+      style={{ height: viewportHeight ? `${viewportHeight}px` : '100dvh' }}
+    >
       {/* Quick Tip Success Toast */}
       {quickTipSuccess && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
