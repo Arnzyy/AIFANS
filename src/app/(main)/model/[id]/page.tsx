@@ -131,6 +131,7 @@ export default function ModelProfilePage() {
       setIsAdmin(isAdminUser(user?.email));
 
       try {
+        // Fetch model data first (needed to check if model exists)
         const res = await fetch(`/api/models/${id}`);
         console.log('[ModelProfilePage] API response status:', res.status);
         if (!res.ok) {
@@ -139,54 +140,48 @@ export default function ModelProfilePage() {
           if (res.status === 404) {
             setModel(null);
           }
+          setLoading(false);
           return;
         }
         const data = await res.json();
         console.log('[ModelProfilePage] Got model data:', data.model?.name);
         setModel(data.model);
         setIsSubscribed(data.isSubscribed);
+        setLoading(false); // Show profile immediately while other data loads
 
-        // Fetch content for this model (content API now includes both content items AND posts)
-        try {
-          const contentRes = await fetch(`/api/creators/${id}/content`);
-          if (contentRes.ok) {
-            const contentData = await contentRes.json();
-            console.log('[ModelProfilePage] Got content:', contentData.content?.length, 'items');
-            setContentItems(contentData.content || []);
-          }
-        } catch (contentErr) {
-          console.error('[ModelProfilePage] Error fetching content:', contentErr);
-        } finally {
-          setContentLoading(false);
+        // Fetch content, stats, and PPV offers IN PARALLEL for faster loading
+        const [contentRes, statsRes, ppvRes] = await Promise.all([
+          fetch(`/api/creators/${id}/content`).catch(() => null),
+          fetch(`/api/models/${id}/stats`).catch(() => null),
+          fetch(`/api/models/${id}/ppv`).catch(() => null),
+        ]);
+
+        // Process content
+        if (contentRes?.ok) {
+          const contentData = await contentRes.json();
+          console.log('[ModelProfilePage] Got content:', contentData.content?.length, 'items');
+          setContentItems(contentData.content || []);
+        }
+        setContentLoading(false);
+
+        // Process stats
+        if (statsRes?.ok) {
+          const statsData = await statsRes.json();
+          setStats(statsData);
         }
 
-        // Fetch stats for this model
-        try {
-          const statsRes = await fetch(`/api/models/${id}/stats`);
-          if (statsRes.ok) {
-            const statsData = await statsRes.json();
-            setStats(statsData);
-          }
-        } catch (statsErr) {
-          console.error('[ModelProfilePage] Error fetching stats:', statsErr);
+        // Process PPV offers
+        if (ppvRes?.ok) {
+          const ppvData = await ppvRes.json();
+          setPpvOffers(ppvData.offers || []);
         }
+        setPpvLoading(false);
 
-        // Fetch PPV offers for this model
-        try {
-          const ppvRes = await fetch(`/api/models/${id}/ppv`);
-          if (ppvRes.ok) {
-            const ppvData = await ppvRes.json();
-            setPpvOffers(ppvData.offers || []);
-          }
-        } catch (ppvErr) {
-          console.error('[ModelProfilePage] Error fetching PPV offers:', ppvErr);
-        } finally {
-          setPpvLoading(false);
-        }
       } catch (error) {
         console.error('[ModelProfilePage] Error fetching model:', error);
-      } finally {
         setLoading(false);
+        setContentLoading(false);
+        setPpvLoading(false);
       }
     };
 

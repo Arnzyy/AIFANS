@@ -116,59 +116,33 @@ export async function GET(
     let hasContentSubscription = isAdmin; // Admins have full access
 
     if (!isAdmin && user) {
-      // Check subscription - subscriptions use the creator's profile/user_id
-      // Try with creatorUserId first (the profile ID that foreign key requires)
-      let { data: subscription } = creatorUserId
-        ? await supabase
-            .from('subscriptions')
-            .select('id, subscription_type')
-            .eq('subscriber_id', user.id)
-            .eq('creator_id', creatorUserId)
-            .eq('status', 'active')
-            .in('subscription_type', ['content', 'bundle'])
-            .limit(1)
-            .maybeSingle()
-        : { data: null };
-
-      // If not found, try with actualCreatorId (creators table ID)
-      if (!subscription) {
-        const { data: creatorSub } = await supabase
-          .from('subscriptions')
-          .select('id, subscription_type')
-          .eq('subscriber_id', user.id)
-          .eq('creator_id', actualCreatorId)
-          .eq('status', 'active')
-          .in('subscription_type', ['content', 'bundle'])
-          .limit(1)
-          .maybeSingle();
-        subscription = creatorSub;
+      // Check subscription - run all possible ID checks IN PARALLEL for speed
+      const possibleCreatorIds = [actualCreatorId];
+      if (creatorUserId && creatorUserId !== actualCreatorId) {
+        possibleCreatorIds.push(creatorUserId);
+      }
+      if (modelId && modelId !== actualCreatorId && modelId !== creatorUserId) {
+        possibleCreatorIds.push(modelId);
       }
 
-      // If still not found and we have a model ID, try with model ID
-      if (!subscription && modelId) {
-        const { data: modelSub } = await supabase
-          .from('subscriptions')
-          .select('id, subscription_type')
-          .eq('subscriber_id', user.id)
-          .eq('creator_id', modelId)
-          .eq('status', 'active')
-          .in('subscription_type', ['content', 'bundle'])
-          .limit(1)
-          .maybeSingle();
-        subscription = modelSub;
-      }
+      // Single query with IN clause instead of multiple sequential queries
+      const { data: subscription } = await supabase
+        .from('subscriptions')
+        .select('id, subscription_type')
+        .eq('subscriber_id', user.id)
+        .in('creator_id', possibleCreatorIds)
+        .eq('status', 'active')
+        .in('subscription_type', ['content', 'bundle'])
+        .limit(1)
+        .maybeSingle();
 
       hasContentSubscription = !!subscription;
       debugInfo.subscriptionFound = !!subscription;
-      debugInfo.checkedCreatorUserId = creatorUserId;
-      debugInfo.checkedCreatorId = actualCreatorId;
-      debugInfo.checkedModelId = modelId;
+      debugInfo.checkedIds = possibleCreatorIds;
     }
 
-    // Build query for content items
-    // Note: Show ALL creator's content on model profiles
-    // This allows creators to upload once and content appears on all their models
-    let query = supabase
+    // Build content items query
+    let contentQuery = supabase
       .from('content_items')
       .select('*')
       .eq('creator_id', actualCreatorId)
@@ -176,20 +150,26 @@ export async function GET(
 
     // Non-subscribers only see PPV content (purchasable), subscribers see all
     if (!hasContentSubscription) {
-      query = query.eq('visibility', 'ppv');
+      contentQuery = contentQuery.eq('visibility', 'ppv');
     }
 
     // MODERATION: Only show approved content (admins see all)
     if (!isAdmin) {
-      query = query.eq('moderation_status', 'approved');
+      contentQuery = contentQuery.eq('moderation_status', 'approved');
     }
 
-    const { data: items, error: contentError } = await query;
+    // Run content items, PPV entitlements, and PPV offers queries IN PARALLEL
+    const [contentResult, entitlementsResult, ppvOffersResult] = await Promise.all([
+      contentQuery,
+      user
+        ? supabase.from('ppv_entitlements').select('offer_id, content_ids').eq('user_id', user.id)
+        : Promise.resolve({ data: null }),
+      supabase.from('ppv_offers').select('id, price_tokens, content_ids').eq('creator_id', actualCreatorId).eq('is_active', true),
+    ]);
+
+    const { data: items, error: contentError } = contentResult;
 
     debugInfo.itemsFound = items?.length || 0;
-    if (items && items.length > 0) {
-      debugInfo.firstItemCreatorId = items[0].creator_id;
-    }
 
     if (contentError) {
       console.error('Content fetch error:', contentError);
@@ -199,57 +179,16 @@ export async function GET(
       );
     }
 
-    // If no items found and this is a model, try getting content through the creator's user_id
-    if ((!items || items.length === 0) && model) {
-      // Get the creator to find their user_id
-      const { data: creatorForUser } = await supabase
-        .from('creators')
-        .select('id, user_id')
-        .eq('id', model.creator_id)
-        .single();
-
-      if (creatorForUser) {
-        // Check if content might be stored with user_id as creator_id (data mismatch)
-        const { data: altItems } = await supabase
-          .from('content_items')
-          .select('*')
-          .eq('creator_id', creatorForUser.user_id)
-          .order('created_at', { ascending: false });
-
-        debugInfo.altLookupByUserId = altItems?.length || 0;
-        debugInfo.creatorUserId = creatorForUser.user_id;
-
-        // Also try just getting all content and logging creator_ids
-        const { data: allContent } = await supabase
-          .from('content_items')
-          .select('id, creator_id')
-          .limit(10);
-        debugInfo.sampleContentCreatorIds = allContent?.map(c => c.creator_id);
-      }
-    }
-
-    // Get PPV entitlements for this user (if logged in)
+    // Build set of unlocked content IDs from PPV purchases
     const unlockedContentIds = new Set<string>();
-    if (user) {
-      const { data: entitlements } = await supabase
-        .from('ppv_entitlements')
-        .select('offer_id, content_ids')
-        .eq('user_id', user.id);
-
-      // Build set of unlocked content IDs from PPV purchases
-      entitlements?.forEach((ent) => {
-        if (ent.content_ids && Array.isArray(ent.content_ids)) {
-          ent.content_ids.forEach((id: string) => unlockedContentIds.add(id));
-        }
-      });
-    }
+    entitlementsResult.data?.forEach((ent: any) => {
+      if (ent.content_ids && Array.isArray(ent.content_ids)) {
+        ent.content_ids.forEach((id: string) => unlockedContentIds.add(id));
+      }
+    });
 
     // Get PPV prices for items
-    const { data: ppvOffers } = await supabase
-      .from('ppv_offers')
-      .select('id, price_tokens, content_ids')
-      .eq('creator_id', actualCreatorId)
-      .eq('is_active', true);
+    const ppvOffers = ppvOffersResult.data;
 
     // Map content_id to price
     const contentPriceMap = new Map<string, number>();
@@ -289,59 +228,54 @@ export async function GET(
 
     // Also fetch posts from this creator that have media
     // IMPORTANT: Posts are ONLY for subscribers - non-subscribers should not see any posts
-    // The only exception is PPV posts which should show (blurred) so subscribers can purchase them
     let contentFromPosts: any[] = [];
 
     // Only fetch posts if user has subscription (or is admin)
     if (hasContentSubscription || isAdmin) {
-      // Check for unlocked post IDs (PPV post purchases)
-      const unlockedPostIds = new Set<string>();
-      if (user) {
-        const { data: postPurchases } = await supabase
-          .from('post_purchases')
-          .select('post_id')
-          .eq('buyer_id', user.id);
-
-        postPurchases?.forEach((p) => unlockedPostIds.add(p.post_id));
-      }
-
-      // Fetch posts with media - try both actualCreatorId and creatorUserId
+      // Build list of possible creator IDs for posts
       const possibleCreatorIds = [actualCreatorId];
       if (creatorUserId && creatorUserId !== actualCreatorId) {
         possibleCreatorIds.push(creatorUserId);
       }
 
-      for (const cid of possibleCreatorIds) {
-        const { data: postsWithMedia } = await supabase
+      // Run post purchases and posts queries IN PARALLEL
+      const [postPurchasesResult, postsResult] = await Promise.all([
+        user
+          ? supabase.from('post_purchases').select('post_id').eq('buyer_id', user.id)
+          : Promise.resolve({ data: null }),
+        supabase
           .from('posts')
           .select('*')
-          .eq('creator_id', cid)
+          .in('creator_id', possibleCreatorIds)
           .eq('is_published', true)
           .not('media_urls', 'is', null)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false }),
+      ]);
 
-        if (postsWithMedia && postsWithMedia.length > 0) {
-          contentFromPosts = postsWithMedia
-            .filter((post: any) => post.media_urls && post.media_urls.length > 0)
-            .map((post: any) => ({
-              id: `post-${post.id}`,
-              post_id: post.id,
-              creator_id: post.creator_id,
-              type: 'image' as const,
-              thumbnail_url: post.media_urls[0],
-              content_url: post.media_urls[0],
-              is_ppv: post.is_ppv || false,
-              price: post.ppv_price ? post.ppv_price / 100 : undefined,
-              title: post.text_content?.substring(0, 50),
-              // For PPV posts: locked unless purchased OR admin
-              // For non-PPV posts: unlocked for subscribers (they already have access)
-              is_unlocked: isAdmin || (!post.is_ppv) || unlockedPostIds.has(post.id),
-              created_at: post.created_at,
-              source: 'post' as const,
-            }));
-          break; // Found posts, stop looking
-        }
-      }
+      // Build set of unlocked post IDs
+      const unlockedPostIds = new Set<string>();
+      postPurchasesResult.data?.forEach((p: any) => unlockedPostIds.add(p.post_id));
+
+      // Transform posts to content format
+      const postsWithMedia = postsResult.data || [];
+      contentFromPosts = postsWithMedia
+        .filter((post: any) => post.media_urls && post.media_urls.length > 0)
+        .map((post: any) => ({
+          id: `post-${post.id}`,
+          post_id: post.id,
+          creator_id: post.creator_id,
+          type: 'image' as const,
+          thumbnail_url: post.media_urls[0],
+          content_url: post.media_urls[0],
+          is_ppv: post.is_ppv || false,
+          price: post.ppv_price ? post.ppv_price / 100 : undefined,
+          title: post.text_content?.substring(0, 50),
+          // For PPV posts: locked unless purchased OR admin
+          // For non-PPV posts: unlocked for subscribers (they already have access)
+          is_unlocked: isAdmin || (!post.is_ppv) || unlockedPostIds.has(post.id),
+          created_at: post.created_at,
+          source: 'post' as const,
+        }));
     }
 
     // Merge and deduplicate by thumbnail URL (avoid showing same image twice)
