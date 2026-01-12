@@ -81,16 +81,13 @@ export async function GET(
     }
 
     // Build query for content items
+    // Note: Show ALL creator's content on model profiles
+    // This allows creators to upload once and content appears on all their models
     let query = supabase
       .from('content_items')
       .select('*')
       .eq('creator_id', actualCreatorId)
       .order('created_at', { ascending: false });
-
-    // If looking at a specific model, filter by model_id
-    if (modelId) {
-      query = query.eq('model_id', modelId);
-    }
 
     // Only show public content if no subscription
     if (!hasContentSubscription) {

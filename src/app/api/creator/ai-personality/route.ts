@@ -24,7 +24,7 @@ export async function GET() {
   return NextResponse.json({ personalities: personalities || [] });
 }
 
-// POST /api/creator/ai-personality - Create new AI personality
+// POST /api/creator/ai-personality - Create or update AI personality (upsert)
 export async function POST(request: NextRequest) {
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -55,75 +55,100 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'At least one personality trait is required' }, { status: 400 });
   }
 
-  // Check for existing personality
-  const { data: existing } = await supabase
+  const personalityData = {
+    creator_id: user.id,
+    model_id: body.model_id || null,
+    persona_name: body.persona_name,
+    age: body.age,
+    height_cm: body.height_cm,
+    body_type: body.body_type,
+    hair_color: body.hair_color,
+    hair_style: body.hair_style,
+    eye_color: body.eye_color,
+    skin_tone: body.skin_tone,
+    style_vibes: body.style_vibes,
+    distinguishing_features: body.distinguishing_features,
+    personality_traits: body.personality_traits,
+    energy_level: body.energy_level,
+    humor_style: body.humor_style,
+    intelligence_vibe: body.intelligence_vibe,
+    mood: body.mood,
+    backstory: body.backstory,
+    occupation: body.occupation,
+    interests: body.interests,
+    music_taste: body.music_taste,
+    guilty_pleasures: body.guilty_pleasures,
+    flirting_style: body.flirting_style,
+    dynamic: body.dynamic,
+    attracted_to: body.attracted_to,
+    love_language: body.love_language,
+    pace: body.pace,
+    vibe_creates: body.vibe_creates,
+    turn_ons: body.turn_ons,
+    vocabulary_level: body.vocabulary_level,
+    emoji_usage: body.emoji_usage,
+    response_length: body.response_length,
+    speech_patterns: body.speech_patterns,
+    accent_flavor: body.accent_flavor,
+    signature_phrases: body.signature_phrases,
+    topics_loves: body.topics_loves,
+    topics_avoids: body.topics_avoids,
+    when_complimented: body.when_complimented,
+    when_heated: body.when_heated,
+    pet_peeves: body.pet_peeves,
+    is_active: body.is_active ?? true,
+  };
+
+  // Check for existing personality for this creator (and model if specified)
+  let existingQuery = supabase
     .from('ai_personalities')
     .select('id')
-    .eq('creator_id', user.id)
-    .single();
+    .eq('creator_id', user.id);
 
-  if (existing) {
-    return NextResponse.json(
-      { error: 'AI personality already exists. Use PUT to update.' },
-      { status: 409 }
-    );
+  // If model_id is provided, check for that specific model's personality
+  if (body.model_id) {
+    existingQuery = existingQuery.eq('model_id', body.model_id);
+  } else {
+    existingQuery = existingQuery.is('model_id', null);
   }
 
-  // Insert new personality
-  const { data: personality, error } = await supabase
-    .from('ai_personalities')
-    .insert({
-      creator_id: user.id,
-      model_id: body.model_id || null,
-      persona_name: body.persona_name,
-      age: body.age,
-      height_cm: body.height_cm,
-      body_type: body.body_type,
-      hair_color: body.hair_color,
-      hair_style: body.hair_style,
-      eye_color: body.eye_color,
-      skin_tone: body.skin_tone,
-      style_vibes: body.style_vibes,
-      distinguishing_features: body.distinguishing_features,
-      personality_traits: body.personality_traits,
-      energy_level: body.energy_level,
-      humor_style: body.humor_style,
-      intelligence_vibe: body.intelligence_vibe,
-      mood: body.mood,
-      backstory: body.backstory,
-      occupation: body.occupation,
-      interests: body.interests,
-      music_taste: body.music_taste,
-      guilty_pleasures: body.guilty_pleasures,
-      flirting_style: body.flirting_style,
-      dynamic: body.dynamic,
-      attracted_to: body.attracted_to,
-      love_language: body.love_language,
-      pace: body.pace,
-      vibe_creates: body.vibe_creates,
-      turn_ons: body.turn_ons,
-      vocabulary_level: body.vocabulary_level,
-      emoji_usage: body.emoji_usage,
-      response_length: body.response_length,
-      speech_patterns: body.speech_patterns,
-      accent_flavor: body.accent_flavor,
-      signature_phrases: body.signature_phrases,
-      topics_loves: body.topics_loves,
-      topics_avoids: body.topics_avoids,
-      when_complimented: body.when_complimented,
-      when_heated: body.when_heated,
-      pet_peeves: body.pet_peeves,
-      is_active: body.is_active ?? true,
-    })
-    .select()
-    .single();
+  const { data: existing } = await existingQuery.maybeSingle();
+
+  let personality;
+  let error;
+
+  if (existing) {
+    // Update existing personality
+    const result = await supabase
+      .from('ai_personalities')
+      .update({
+        ...personalityData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id)
+      .select()
+      .single();
+
+    personality = result.data;
+    error = result.error;
+  } else {
+    // Insert new personality
+    const result = await supabase
+      .from('ai_personalities')
+      .insert(personalityData)
+      .select()
+      .single();
+
+    personality = result.data;
+    error = result.error;
+  }
 
   if (error) {
-    console.error('Error creating personality:', error);
+    console.error('Error saving personality:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(personality, { status: 201 });
+  return NextResponse.json(personality, { status: existing ? 200 : 201 });
 }
 
 // PUT /api/creator/ai-personality - Update AI personality

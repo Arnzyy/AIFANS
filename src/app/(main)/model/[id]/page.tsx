@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
-import { Bot, BadgeCheck, MapPin, Heart, MessageCircle, Lock, Grid3X3, Play, Star, Sparkles, ArrowLeft } from 'lucide-react';
+import { Bot, BadgeCheck, MapPin, Heart, MessageCircle, Lock, Grid3X3, Play, Star, Sparkles, ArrowLeft, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AI_CHAT_DISCLOSURE, MODEL_TYPES, CATEGORY_DISCLAIMER } from '@/lib/compliance/constants';
 import { SubscribeModal } from '@/components/shared/SubscribeModal';
 import { supabase } from '@/lib/supabase/client';
@@ -33,6 +33,17 @@ interface Model {
   tags: Tag[];
 }
 
+interface ContentItem {
+  id: string;
+  type: 'image' | 'video';
+  thumbnail_url: string;
+  content_url: string;
+  is_ppv: boolean;
+  price?: number;
+  is_unlocked: boolean;
+  created_at: string;
+}
+
 export default function ModelProfilePage() {
   const params = useParams();
   const id = params.id as string;
@@ -42,6 +53,27 @@ export default function ModelProfilePage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [contentItems, setContentItems] = useState<ContentItem[]>([]);
+  const [contentLoading, setContentLoading] = useState(true);
+  const [selectedPostIndex, setSelectedPostIndex] = useState<number | null>(null);
+
+  // Keyboard navigation for content viewer
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (selectedPostIndex === null) return;
+
+      if (e.key === 'Escape') {
+        setSelectedPostIndex(null);
+      } else if (e.key === 'ArrowLeft' && selectedPostIndex > 0) {
+        setSelectedPostIndex(selectedPostIndex - 1);
+      } else if (e.key === 'ArrowRight' && selectedPostIndex < contentItems.length - 1) {
+        setSelectedPostIndex(selectedPostIndex + 1);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedPostIndex, contentItems.length]);
 
   useEffect(() => {
     const fetchModel = async () => {
@@ -66,6 +98,20 @@ export default function ModelProfilePage() {
         console.log('[ModelProfilePage] Got model data:', data.model?.name);
         setModel(data.model);
         setIsSubscribed(data.isSubscribed);
+
+        // Fetch content for this model
+        try {
+          const contentRes = await fetch(`/api/creators/${id}/content`);
+          if (contentRes.ok) {
+            const contentData = await contentRes.json();
+            console.log('[ModelProfilePage] Got content:', contentData.content?.length, 'items');
+            setContentItems(contentData.content || []);
+          }
+        } catch (contentErr) {
+          console.error('[ModelProfilePage] Error fetching content:', contentErr);
+        } finally {
+          setContentLoading(false);
+        }
       } catch (error) {
         console.error('[ModelProfilePage] Error fetching model:', error);
       } finally {
@@ -104,16 +150,25 @@ export default function ModelProfilePage() {
   // Check if user has access (subscribed or admin)
   const hasFullAccess = isSubscribed || isAdmin;
 
-  // Mock posts based on model (will be replaced with real content)
-  // First 2 posts are preview (free), rest require subscription
-  const posts = Array.from({ length: 9 }, (_, i) => ({
-    id: `${model.id}-${i}`,
-    imageUrl: model.avatar,
-    likes: Math.floor(Math.random() * 500) + 50,
-    comments: Math.floor(Math.random() * 50) + 5,
-    isLocked: i >= 2 && !hasFullAccess, // Lock content after first 2 unless subscribed/admin
-    isVideo: i % 4 === 0,
-  }));
+  // Use real content if available, otherwise show placeholder with avatar
+  const posts = contentItems.length > 0
+    ? contentItems.map((item, i) => ({
+        id: item.id,
+        imageUrl: item.thumbnail_url || item.content_url,
+        likes: Math.floor(Math.random() * 500) + 50, // TODO: real likes from DB
+        comments: Math.floor(Math.random() * 50) + 5, // TODO: real comments from DB
+        isLocked: item.is_ppv && !item.is_unlocked && !hasFullAccess,
+        isVideo: item.type === 'video',
+      }))
+    : // Fallback: show avatar as placeholder when no content uploaded
+      Array.from({ length: 3 }, (_, i) => ({
+        id: `placeholder-${i}`,
+        imageUrl: model.avatar,
+        likes: 0,
+        comments: 0,
+        isLocked: i >= 1 && !hasFullAccess,
+        isVideo: false,
+      }));
 
   // Create tiers for subscribe modal
   const tiers = [
@@ -329,9 +384,10 @@ export default function ModelProfilePage() {
           </div>
 
           <div className="grid grid-cols-3 gap-1 md:gap-2">
-            {posts.map((post) => (
+            {posts.map((post, index) => (
               <div
                 key={post.id}
+                onClick={() => !post.isLocked && setSelectedPostIndex(index)}
                 className="relative aspect-square bg-white/5 overflow-hidden group cursor-pointer"
               >
                 <img
@@ -370,8 +426,84 @@ export default function ModelProfilePage() {
               </div>
             ))}
           </div>
+
+          {/* Empty state */}
+          {posts.length === 0 && !contentLoading && (
+            <div className="text-center py-12 text-gray-500">
+              <Grid3X3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No content yet</p>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Content Viewer Modal */}
+      {selectedPostIndex !== null && posts[selectedPostIndex] && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          onClick={() => setSelectedPostIndex(null)}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setSelectedPostIndex(null)}
+            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white transition-colors z-10"
+          >
+            <X className="w-8 h-8" />
+          </button>
+
+          {/* Previous button */}
+          {selectedPostIndex > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedPostIndex(selectedPostIndex - 1);
+              }}
+              className="absolute left-4 top-1/2 -translate-y-1/2 p-2 text-white/80 hover:text-white transition-colors bg-black/50 rounded-full"
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </button>
+          )}
+
+          {/* Next button */}
+          {selectedPostIndex < posts.length - 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedPostIndex(selectedPostIndex + 1);
+              }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-white/80 hover:text-white transition-colors bg-black/50 rounded-full"
+            >
+              <ChevronRight className="w-8 h-8" />
+            </button>
+          )}
+
+          {/* Content */}
+          <div
+            className="max-w-4xl max-h-[90vh] w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {posts[selectedPostIndex].isVideo ? (
+              <video
+                src={posts[selectedPostIndex].imageUrl}
+                controls
+                autoPlay
+                className="w-full h-full max-h-[90vh] object-contain"
+              />
+            ) : (
+              <img
+                src={posts[selectedPostIndex].imageUrl}
+                alt=""
+                className="w-full h-full max-h-[90vh] object-contain"
+              />
+            )}
+
+            {/* Counter */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/50 rounded-full text-sm">
+              {selectedPostIndex + 1} / {posts.length}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Subscribe Modal */}
       {showSubscribeModal && (

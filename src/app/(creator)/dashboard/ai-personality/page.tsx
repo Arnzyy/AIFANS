@@ -32,8 +32,9 @@ export default function AIPersonalityPage() {
       const response = await fetch('/api/creator/ai-personality');
       if (response.ok) {
         const data = await response.json();
-        if (data) {
-          setExistingPersonality(data);
+        // API returns { personalities: [...] } - extract the first one
+        if (data.personalities && data.personalities.length > 0) {
+          setExistingPersonality(data.personalities[0]);
         }
       }
     } catch (error) {
