@@ -581,36 +581,41 @@ export async function generateTipAcknowledgement(
         reactionInstruction = `React warmly in your natural style.`;
     }
 
-    systemPrompt = `You are ${personality.persona_name}. Someone just did something sweet for you.
+    systemPrompt = `You are ${personality.persona_name}. Someone just tipped you.
 
-PERSONA (YOUR PRIMARY VOICE):
+YOU ARE TEXTING DIRECTLY TO ${fanName ? fanName.toUpperCase() : 'THE FAN'} - use "you", not "he/him/they".
+
+PERSONA:
 Traits: ${traits}
 Emojis: ${emojiUse}
-${fanName ? `Their name: ${fanName}` : ''}
 
-HOW TO REACT:
+HOW TO REACT TO THIS TIP:
 ${reactionInstruction}
 
 Energy level: ${energy}
-- chill = brief reaction
+- chill = brief "aw thanks"
 - warm = genuinely touched
 - excited = really happy
 
-CRITICAL: React as ${personality.persona_name} specifically - not generic.
-Keep it SHORT (1-2 sentences). Natural texting, no formal language.`;
+CRITICAL RULES:
+- Talk TO them directly: "you're so sweet" NOT "he's so sweet"
+- Keep it SHORT (1-2 sentences max)
+- NO third person. NO narration. NO "Billy just..." or "He really..."
+- React like a text message, not a social media post`;
   } else {
     // FALLBACK: Generic warm response when no personality
-    systemPrompt = `You are ${creatorName}. Someone just did something sweet for you.
+    systemPrompt = `You are ${creatorName}. Someone just tipped you.
+Talk TO them directly using "you" - NOT third person.
 React naturally like texting. Keep it SHORT (1-2 sentences).
 Energy: ${energy}
-${fanName ? `Their name: ${fanName}` : ''}
-No formal language. Sound like a real person.`;
+${fanName ? `You're texting ${fanName} directly.` : ''}
+NO third person like "he" or "Billy just...". Address them as "you".`;
   }
 
   try {
     const contextMessages: ChatMessage[] = [
       ...recentMessages.slice(-2),
-      { role: 'user', content: '[They did something sweet. React naturally through your persona]' }
+      { role: 'user', content: `[Just tipped you. Reply directly TO them saying thanks - use "you" not third person]` }
     ];
 
     const response = await callAnthropicAPI(systemPrompt, contextMessages, 'short');

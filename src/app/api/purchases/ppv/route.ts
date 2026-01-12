@@ -1,16 +1,11 @@
 // ===========================================
 // API ROUTE: /api/purchases/ppv/route.ts
-// PPV content purchase endpoint
+// PPV content purchase using WALLET TOKENS
 // ===========================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import Stripe from 'stripe';
-import { recordEarning } from '@/lib/tax/tax-service';
-
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY)
-  : null;
+import { getWallet } from '@/lib/tokens/token-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,7 +31,7 @@ export async function POST(request: NextRequest) {
     // Get content details from posts table
     const { data: content } = await supabase
       .from('posts')
-      .select('id, caption, ppv_price, user_id')
+      .select('id, caption, ppv_price, user_id, creator_id, creator:profiles!posts_creator_id_fkey(username, display_name)')
       .eq('id', content_id)
       .eq('is_ppv', true)
       .single();
@@ -45,20 +40,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Content not found' }, { status: 404 });
     }
 
-    if (content.user_id !== creator_id) {
-      return NextResponse.json({ error: 'Content mismatch' }, { status: 400 });
-    }
-
-    // Check if already purchased
+    // Check if already purchased (check both tables for backwards compatibility)
     const { data: existingPurchase } = await supabase
+      .from('post_purchases')
+      .select('id')
+      .eq('post_id', content_id)
+      .eq('buyer_id', user.id)
+      .single();
+
+    const { data: legacyPurchase } = await supabase
       .from('ppv_purchases')
       .select('id')
       .eq('user_id', user.id)
       .eq('post_id', content_id)
       .single();
 
-    if (existingPurchase) {
-      // Already unlocked - just return success
+    if (existingPurchase || legacyPurchase) {
       return NextResponse.json({
         success: true,
         already_owned: true,
@@ -66,89 +63,98 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const price = content.ppv_price || 0;
+    // ppv_price is in pence (e.g., 200 = £2.00)
+    // Convert to tokens: 250 tokens = £1 = 100 pence
+    // So: pence * 2.5 = tokens
+    const priceInPence = content.ppv_price || 0;
+    const priceInTokens = Math.round(priceInPence * 2.5);
 
-    // If no Stripe configured or price is 0, unlock directly (dev mode)
-    if (!stripe || price === 0) {
-      // Record purchase
-      await supabase.from('ppv_purchases').insert({
-        user_id: user.id,
-        post_id: content_id,
-        amount: price,
-      });
+    // Get user's wallet
+    const wallet = await getWallet(supabase, user.id);
+    const balance = wallet.balance_tokens;
 
-      // Record creator earnings (for DAC7)
-      if (price > 0) {
-        const platformFee = price * 0.2; // 20% platform fee for content
-        await recordEarning(supabase, {
-          creator_id: creator_id,
-          user_id: user.id,
-          gross_amount: price,
-          platform_fee: platformFee,
-          type: 'ppv',
-          reference_id: content_id,
-        });
-      }
-
+    // Check if user has enough tokens
+    if (balance < priceInTokens) {
       return NextResponse.json({
-        success: true,
-        message: 'Content unlocked!',
-      });
+        error: 'Insufficient tokens',
+        insufficientBalance: true,
+        balance,
+        required: priceInTokens,
+        shortfall: priceInTokens - balance,
+      }, { status: 400 });
     }
 
-    // Get user's Stripe customer
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('stripe_customer_id')
-      .eq('id', user.id)
-      .single();
+    // Deduct tokens from wallet
+    const newBalance = balance - priceInTokens;
+    const { error: walletError } = await supabase
+      .from('token_wallets')
+      .update({
+        balance_tokens: newBalance,
+        lifetime_spent: (wallet.lifetime_spent || 0) + priceInTokens,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', user.id);
 
-    // Create checkout session
-    const session = await stripe.checkout.sessions.create({
-      customer: profile?.stripe_customer_id || undefined,
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'gbp',
-            product_data: {
-              name: content.caption || 'Premium Content',
-              description: `PPV content unlock`,
-            },
-            unit_amount: Math.round(price * 100),
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/chat/${creator_id}?purchase=success&content=${content_id}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/chat/${creator_id}?purchase=cancelled`,
-      metadata: {
-        user_id: user.id,
-        content_id: content_id,
-        creator_id: creator_id,
-        type: 'ppv',
-      },
+    if (walletError) {
+      console.error('Wallet update error:', walletError);
+      return NextResponse.json({ error: 'Failed to process payment' }, { status: 500 });
+    }
+
+    // Log transaction in token ledger
+    await supabase.from('token_ledger').insert({
+      user_id: user.id,
+      type: 'DEBIT',
+      reason: 'PPV_UNLOCK',
+      amount_tokens: priceInTokens,
+      balance_after: newBalance,
+      description: `Unlocked PPV content from ${content.creator?.display_name || content.creator?.username || 'creator'}`,
+    });
+
+    // Create purchase record in post_purchases (unified table)
+    const { error: purchaseError } = await supabase
+      .from('post_purchases')
+      .insert({
+        post_id: content_id,
+        buyer_id: user.id,
+        price_paid: priceInPence / 100, // Convert pence to pounds decimal
+      });
+
+    if (purchaseError) {
+      console.error('Purchase record error:', purchaseError);
+      // Refund the tokens if purchase record fails
+      await supabase
+        .from('token_wallets')
+        .update({
+          balance_tokens: balance,
+          lifetime_spent: wallet.lifetime_spent || 0,
+        })
+        .eq('user_id', user.id);
+      return NextResponse.json({ error: 'Failed to record purchase' }, { status: 500 });
+    }
+
+    // Credit creator (70% share)
+    const platformFee = 0.3;
+    const creatorShare = Math.floor(priceInTokens * (1 - platformFee));
+    const creatorShareGbpMinor = Math.floor(priceInPence * (1 - platformFee));
+    const actualCreatorId = content.creator_id || content.user_id;
+
+    await supabase.from('creator_payout_ledger').insert({
+      creator_id: actualCreatorId,
+      type: 'ppv_sale',
+      amount_tokens: creatorShare,
+      amount_gbp_minor: creatorShareGbpMinor,
+      status: 'pending',
+      reference_id: content_id,
     });
 
     return NextResponse.json({
-      requires_checkout: true,
-      checkout_url: session.url,
+      success: true,
+      newBalance,
+      tokensSpent: priceInTokens,
+      message: 'Content unlocked!',
     });
   } catch (error: any) {
     console.error('PPV purchase error:', error);
-
-    // Handle Stripe card errors
-    if (error.type === 'StripeCardError') {
-      return NextResponse.json(
-        {
-          error: error.message,
-          requires_action: error.code === 'authentication_required',
-        },
-        { status: 402 }
-      );
-    }
-
     return NextResponse.json({ error: 'Purchase failed' }, { status: 500 });
   }
 }

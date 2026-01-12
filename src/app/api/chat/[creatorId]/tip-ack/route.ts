@@ -29,16 +29,17 @@ export async function POST(
       return NextResponse.json({ error: 'Missing tipAmount or creatorName' }, { status: 400 });
     }
 
-    // Get creator's personality settings
+    // Get creator's personality settings from ai_personalities table
     let personality = null;
-    const { data: model } = await supabase
-      .from('creator_models')
-      .select('ai_personality')
-      .eq('id', creatorId)
+    const { data: personalityData } = await supabase
+      .from('ai_personalities')
+      .select('*')
+      .eq('creator_id', creatorId)
+      .eq('is_active', true)
       .single();
 
-    if (model?.ai_personality) {
-      personality = model.ai_personality;
+    if (personalityData) {
+      personality = personalityData;
     }
 
     // Get fan's preferred name from memory first (they may have told the AI a different name)
