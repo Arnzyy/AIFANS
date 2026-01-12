@@ -100,7 +100,8 @@ export function PostDetailClient({ post, currentUserId, hasAccess, isUnlocked }:
   const showMedia = isUnlocked || !post.is_ppv;
   const displayName = displayEntity.display_name;
   const profileLink = displayEntity.isModel ? `/model/${displayEntity.id}` : `/${creator.username}`;
-  const chatLink = displayEntity.isModel ? `/chat/${displayEntity.username}` : `/chat/${creator.username}`;
+  // For models, chat uses the model ID; for creators, chat uses username
+  const chatLink = displayEntity.isModel ? `/chat/${displayEntity.id}` : `/chat/${creator.username}`;
 
   return (
     <div className="pb-20">
