@@ -142,10 +142,10 @@ export function TipModal({
   const canAfford = amount <= currentBalance;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/80" onClick={onClose} />
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+      <div className="fixed inset-0 bg-black/80" onClick={onClose} />
 
-      <div className="relative bg-zinc-900 rounded-2xl max-w-sm w-full overflow-hidden">
+      <div className="relative bg-zinc-900 rounded-2xl max-w-sm w-full overflow-hidden mx-auto my-auto">
         {/* Header */}
         <div className="bg-gradient-to-r from-pink-500/20 to-red-500/20 p-6">
           <button
