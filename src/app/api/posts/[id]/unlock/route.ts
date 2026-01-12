@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { stripe, toCents } from '@/lib/stripe';
-import { getCurrency, convertCurrency } from '@/lib/stripe/currency';
+import { getWallet } from '@/lib/tokens/token-service';
 
-// POST /api/posts/[id]/unlock - Create Stripe Checkout for PPV unlock
+// POST /api/posts/[id]/unlock - Unlock PPV post using wallet tokens
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -44,74 +43,98 @@ export async function POST(
       return NextResponse.json({ error: 'Already purchased' }, { status: 400 });
     }
 
-    // Detect currency from request geo
-    const country = request.geo?.country;
-    const currency = getCurrency(country);
+    // Convert price to tokens (ppv_price is stored in pence, e.g., 200 = £2.00)
+    // 250 tokens = £1 = 100 pence, so: pence * 2.5 = tokens
+    const priceInPence = post.ppv_price;
+    const priceInTokens = Math.round(priceInPence * 2.5);
 
-    // Convert price (stored in GBP decimal, convert to cents then to user currency)
-    const priceInCents = toCents(post.ppv_price);
-    const convertedPrice = convertCurrency(priceInCents, 'gbp', currency);
+    // Get user's wallet balance
+    const wallet = await getWallet(supabase, user.id);
+    const balance = wallet.balance_tokens;
 
-    // Get or create Stripe customer
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('stripe_customer_id, email')
-      .eq('id', user.id)
-      .single();
-
-    let stripeCustomerId = profile?.stripe_customer_id;
-
-    if (!stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        email: profile?.email || user.email,
-        metadata: { supabase_user_id: user.id },
-      });
-      stripeCustomerId = customer.id;
-
-      await supabase
-        .from('profiles')
-        .update({ stripe_customer_id: stripeCustomerId })
-        .eq('id', user.id);
+    // Check if user has enough tokens
+    if (balance < priceInTokens) {
+      return NextResponse.json({
+        error: 'Insufficient tokens',
+        insufficientBalance: true,
+        balance,
+        required: priceInTokens,
+        shortfall: priceInTokens - balance,
+      }, { status: 400 });
     }
 
-    // Create Stripe Checkout Session for PPV
-    const session = await stripe.checkout.sessions.create({
-      customer: stripeCustomerId,
-      mode: 'payment',
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: currency,
-            product_data: {
-              name: `Unlock Post from ${post.creator?.display_name || post.creator?.username}`,
-              description: 'PPV Content Unlock',
-            },
-            unit_amount: convertedPrice,
-          },
-          quantity: 1,
-        },
-      ],
-      metadata: {
-        user_id: user.id,
-        creator_id: post.creator_id,
+    // Deduct tokens from wallet
+    const newBalance = balance - priceInTokens;
+    const { error: walletError } = await supabase
+      .from('token_wallets')
+      .update({
+        balance_tokens: newBalance,
+        lifetime_spent: (wallet.lifetime_spent || 0) + priceInTokens,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', user.id);
+
+    if (walletError) {
+      console.error('Wallet update error:', walletError);
+      return NextResponse.json({ error: 'Failed to process payment' }, { status: 500 });
+    }
+
+    // Log transaction in token ledger
+    await supabase.from('token_ledger').insert({
+      user_id: user.id,
+      type: 'DEBIT',
+      reason: 'PPV_UNLOCK',
+      amount_tokens: priceInTokens,
+      balance_after: newBalance,
+      description: `Unlocked PPV post from ${post.creator?.display_name || post.creator?.username || 'creator'}`,
+    });
+
+    // Create purchase record (price_paid is in decimal GBP)
+    const { error: purchaseError } = await supabase
+      .from('post_purchases')
+      .insert({
         post_id: postId,
-        type: 'ppv',
-        original_price_gbp: post.ppv_price.toString(),
-      },
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}&type=ppv&post_id=${postId}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/cancel`,
+        buyer_id: user.id,
+        price_paid: priceInPence / 100, // Convert pence to pounds decimal
+      });
+
+    if (purchaseError) {
+      console.error('Purchase record error:', purchaseError);
+      // Refund the tokens if purchase record fails
+      await supabase
+        .from('token_wallets')
+        .update({
+          balance_tokens: balance,
+          lifetime_spent: wallet.lifetime_spent || 0,
+        })
+        .eq('user_id', user.id);
+      return NextResponse.json({ error: 'Failed to create purchase record' }, { status: 500 });
+    }
+
+    // Credit creator (70% share)
+    const platformFee = 0.3;
+    const creatorShare = Math.floor(priceInTokens * (1 - platformFee));
+    const creatorShareGbpMinor = Math.floor(priceInPence * (1 - platformFee));
+
+    await supabase.from('creator_payout_ledger').insert({
+      creator_id: post.creator_id,
+      type: 'ppv_sale',
+      amount_tokens: creatorShare,
+      amount_gbp_minor: creatorShareGbpMinor,
+      status: 'pending',
+      reference_id: postId,
     });
 
     return NextResponse.json({
-      checkoutUrl: session.url,
-      sessionId: session.id,
+      success: true,
+      newBalance,
+      tokensSpent: priceInTokens,
     });
 
   } catch (error: any) {
     console.error('PPV unlock error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to create PPV checkout' },
+      { error: error.message || 'Failed to unlock post' },
       { status: 500 }
     );
   }

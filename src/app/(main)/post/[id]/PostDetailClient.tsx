@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
-import { Heart, MessageCircle, Bookmark, Share2, MessageSquare, Lock, X } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, Share2, MessageSquare, Lock, X, ImageIcon } from 'lucide-react';
 
 interface PostDetailClientProps {
   post: any;
@@ -41,6 +41,11 @@ export function PostDetailClient({ post, currentUserId, hasAccess, isUnlocked }:
   const [submitting, setSubmitting] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [unlocked, setUnlocked] = useState(isUnlocked);
+  const [insufficientBalance, setInsufficientBalance] = useState<{
+    balance: number;
+    required: number;
+    shortfall: number;
+  } | null>(null);
 
   const handleLike = async () => {
     setIsLiked(!isLiked);
@@ -77,6 +82,7 @@ export function PostDetailClient({ post, currentUserId, hasAccess, isUnlocked }:
   const handleUnlock = async () => {
     if (purchasing) return;
     setPurchasing(true);
+    setInsufficientBalance(null);
 
     try {
       const res = await fetch(`/api/posts/${post.id}/unlock`, {
@@ -86,18 +92,22 @@ export function PostDetailClient({ post, currentUserId, hasAccess, isUnlocked }:
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || 'Failed to unlock post');
+        if (data.insufficientBalance) {
+          setInsufficientBalance({
+            balance: data.balance,
+            required: data.required,
+            shortfall: data.shortfall,
+          });
+        } else {
+          alert(data.error || 'Failed to unlock post');
+        }
         return;
       }
 
       if (data.success) {
         setUnlocked(true);
-        alert('Post unlocked successfully!');
         // Refresh the page to show unlocked content
         window.location.reload();
-      } else if (data.checkoutUrl) {
-        // Redirect to Stripe checkout
-        window.location.href = data.checkoutUrl;
       }
     } catch (err) {
       console.error('Unlock error:', err);
@@ -188,25 +198,76 @@ export function PostDetailClient({ post, currentUserId, hasAccess, isUnlocked }:
       {mediaUrls.length > 0 && (
         <div className="relative">
           {!showMedia ? (
-            // PPV locked
+            // PPV locked - Fanvue-inspired design
             <div className="relative aspect-[4/3] bg-white/5 overflow-hidden">
               <img
                 src={mediaUrls[0]}
                 alt=""
-                className="w-full h-full object-cover blur-xl scale-110"
+                className="w-full h-full object-cover blur-2xl scale-125 opacity-60"
               />
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
-                <Lock className="w-12 h-12 text-white/60 mb-4" />
-                <p className="font-semibold text-xl mb-2">Premium Content</p>
-                <p className="text-gray-400 mb-4">{mediaUrls.length} {mediaUrls.length === 1 ? 'item' : 'items'}</p>
-                <button
-                  onClick={handleUnlock}
-                  disabled={purchasing}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {purchasing ? 'Processing...' : `Unlock for ${Math.round((post.ppv_price || 0) * 2.5)} tokens`}
-                </button>
-                <p className="text-xs text-gray-400 mt-2">= £{((post.ppv_price || 0) / 100).toFixed(2)}</p>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                {/* Frosted glass card */}
+                <div className="bg-black/30 backdrop-blur-md rounded-2xl px-10 py-8 flex flex-col items-center border border-white/10">
+                  {/* Avatar with lock badge */}
+                  <div className="relative mb-5">
+                    <div className="w-20 h-20 rounded-full bg-white/10 overflow-hidden ring-2 ring-white/20">
+                      {displayEntity.avatar_url ? (
+                        <img
+                          src={displayEntity.avatar_url}
+                          alt={displayName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-3xl">
+                          {displayName.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-white rounded-full flex items-center justify-center">
+                      <Lock className="w-4 h-4 text-gray-800" />
+                    </div>
+                  </div>
+
+                  <p className="font-semibold text-white text-lg mb-1">Unlock to view</p>
+                  <div className="flex items-center gap-1.5 text-gray-300 text-sm mb-5">
+                    <ImageIcon className="w-4 h-4" />
+                    <span>{mediaUrls.length} {mediaUrls.length === 1 ? 'Image' : 'Images'}</span>
+                  </div>
+
+                  {insufficientBalance ? (
+                    <div className="text-center">
+                      <p className="text-red-400 text-sm mb-2">
+                        Insufficient tokens ({insufficientBalance.balance} / {insufficientBalance.required})
+                      </p>
+                      <p className="text-gray-400 text-xs mb-4">
+                        You need {insufficientBalance.shortfall} more tokens
+                      </p>
+                      <Link
+                        href="/wallet"
+                        className="px-6 py-2.5 bg-white text-gray-900 rounded-full text-sm font-semibold hover:bg-gray-100 transition-colors inline-block"
+                      >
+                        Top Up Wallet
+                      </Link>
+                      <button
+                        onClick={() => setInsufficientBalance(null)}
+                        className="block mx-auto mt-3 text-xs text-gray-400 hover:text-white"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleUnlock}
+                        disabled={purchasing}
+                        className="px-6 py-2.5 bg-white text-gray-900 rounded-full text-sm font-semibold hover:bg-gray-100 transition-colors disabled:opacity-50"
+                      >
+                        {purchasing ? 'Processing...' : `${Math.round((post.ppv_price || 0) * 2.5)} tokens`}
+                      </button>
+                      <p className="text-xs text-gray-400 mt-2">£{((post.ppv_price || 0) / 100).toFixed(2)}</p>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           ) : (

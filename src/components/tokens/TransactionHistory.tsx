@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowUpRight, ArrowDownLeft, Loader2, Package, Heart, MessageCircle, RefreshCw } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, Loader2, Package, Heart, MessageCircle, RefreshCw, Unlock } from 'lucide-react';
 import { TokenLedgerEntry, formatTokensAsGbp } from '@/lib/tokens/types';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -43,6 +43,8 @@ export function TransactionHistory({ limit = 20 }: TransactionHistoryProps) {
       case 'REFUND':
       case 'ADJUSTMENT':
         return RefreshCw;
+      case 'PPV_UNLOCK':
+        return Unlock;
       default:
         return Package;
     }

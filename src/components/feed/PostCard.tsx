@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MoreHorizontal, Eye, EyeOff, Flag, Share2, Bookmark, X } from 'lucide-react';
+import { MoreHorizontal, Eye, EyeOff, Flag, Share2, Bookmark, X, Lock, ImageIcon } from 'lucide-react';
 
 interface PostCardProps {
   post: any;
@@ -201,25 +201,52 @@ export function PostCard({ post, onHide }: PostCardProps) {
         {post.media_urls && post.media_urls.length > 0 && (
           <div className="relative">
             {post.is_ppv && !post.is_unlocked ? (
-              // PPV locked - show blurred image with unlock button
-              <div className="relative aspect-[4/3] bg-white/5 overflow-hidden">
+              // PPV locked - Fanvue-inspired design
+              <div className="relative aspect-[4/3] bg-white/5 overflow-hidden rounded-lg">
                 <img
                   src={post.media_urls[0]}
                   alt=""
-                  className="w-full h-full object-cover blur-xl scale-110"
+                  className="w-full h-full object-cover blur-2xl scale-125 opacity-60"
                 />
                 <div
-                  className="absolute inset-0 flex flex-col items-center justify-center bg-black/40"
+                  className="absolute inset-0 flex flex-col items-center justify-center"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <span className="text-4xl mb-3">🔒</span>
-                  <p className="font-medium mb-2">Premium Content</p>
-                  <button className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-                    Unlock for {Math.round((post.ppv_price || 0) * 2.5)} tokens
-                  </button>
-                  <p className="text-xs text-gray-400 mt-1">
-                    = £{((post.ppv_price || 0) / 100).toFixed(2)}
-                  </p>
+                  {/* Frosted glass card */}
+                  <div className="bg-black/30 backdrop-blur-md rounded-2xl px-8 py-6 flex flex-col items-center border border-white/10">
+                    {/* Avatar with lock badge */}
+                    <div className="relative mb-4">
+                      <div className="w-16 h-16 rounded-full bg-white/10 overflow-hidden ring-2 ring-white/20">
+                        {displayEntity.avatar_url ? (
+                          <img
+                            src={displayEntity.avatar_url}
+                            alt={displayEntity.display_name || displayEntity.username}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-2xl">
+                            {(displayEntity.display_name || displayEntity.username).charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center">
+                        <Lock className="w-3.5 h-3.5 text-gray-800" />
+                      </div>
+                    </div>
+
+                    <p className="font-medium text-white mb-1">Unlock to view</p>
+                    <div className="flex items-center gap-1.5 text-gray-300 text-sm mb-4">
+                      <ImageIcon className="w-4 h-4" />
+                      <span>{post.media_urls.length} {post.media_urls.length === 1 ? 'Image' : 'Images'}</span>
+                    </div>
+
+                    <button className="px-6 py-2.5 bg-white text-gray-900 rounded-full text-sm font-semibold hover:bg-gray-100 transition-colors">
+                      {Math.round((post.ppv_price || 0) * 2.5)} tokens
+                    </button>
+                    <p className="text-xs text-gray-400 mt-2">
+                      £{((post.ppv_price || 0) / 100).toFixed(2)}
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : (

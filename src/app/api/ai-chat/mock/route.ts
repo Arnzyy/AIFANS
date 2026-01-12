@@ -4,6 +4,7 @@ import { generateMockResponse, ChatMessage } from '@/lib/ai/chat-service';
 import { getCreatorByUsername } from '@/lib/data/creators';
 import { cleanResponse } from '@/lib/ai/chat';
 import { buildChatContext, formatMemoryForPrompt, updateMemory } from '@/lib/ai/memory-system/memory-service';
+import { AIPersonalityFull } from '@/lib/ai/personality/prompt-builder';
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
       // If not a mock creator, check if it's a database model
       const { data: model } = await supabase
         .from('creator_models')
-        .select('name, ai_chat_enabled')
+        .select('id, name, ai_chat_enabled')
         .or(`id.eq.${modelId || ''},username.eq.${creatorUsername}`)
         .eq('status', 'approved')
         .single();
@@ -47,6 +48,25 @@ export async function POST(request: NextRequest) {
       }
 
       displayName = model.name || creatorName;
+
+      // PERSONA-FIRST: Fetch the model's AI personality settings
+      let personality: AIPersonalityFull | null = null;
+      const { data: personalityData } = await supabase
+        .from('ai_personalities')
+        .select('*')
+        .eq('creator_id', model.id)
+        .eq('is_active', true)
+        .single();
+
+      if (personalityData) {
+        personality = personalityData as AIPersonalityFull;
+        console.log('Personality loaded:', {
+          name: personality.persona_name,
+          traits: personality.personality_traits,
+          when_complimented: personality.when_complimented,
+          when_heated: personality.when_heated,
+        });
+      }
 
       // For database models, save messages to persist conversation
       // Get or create conversation
@@ -108,8 +128,8 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Generate response with memory context
-      const response = await generateMockResponse(displayName, message, history, memoryContext);
+      // Generate response with memory context AND personality (PERSONA-FIRST)
+      const response = await generateMockResponse(displayName, message, history, memoryContext, personality);
       const cleanedResponse = cleanResponse(response);
 
       // Save AI response

@@ -168,19 +168,51 @@ function buildFullSystemPrompt(
   memoryContext: ConversationContext,
   contentContext: string
 ): string {
-  // 1. Non-negotiable platform rules
+  // PROMPT HIERARCHY (enforced order):
+  // 1. Platform safety (non-negotiable hard rules)
+  // 2. Response mechanics (how to communicate)
+  // 3. PERSONA (PRIMARY VOICE - overrides all stylistic defaults)
+  // 4. Memory + context (personalization)
+
+  // 1. Platform rules + mechanics
   let prompt = MASTER_SYSTEM_PROMPT;
 
-  // 2. Creator's personality
+  // 2. Creator's personality (THE PRIMARY VOICE)
   prompt += '\n\n' + buildPersonalityPrompt(personality);
 
-  // 3. Memory context (if available)
+  // 3. Explicit persona-first override instruction
+  prompt += `
+
+═══════════════════════════════════════════════════════════════════
+PERSONA-FIRST HIERARCHY (CRITICAL)
+═══════════════════════════════════════════════════════════════════
+
+The persona above is your PRIMARY identity. When generating responses:
+
+1. PERSONA OVERRIDES DEFAULTS — Your tone, length, emoji usage, flirt intensity,
+   pacing, and humor come from the persona settings above, NOT generic defaults.
+
+2. EXPRESS SELECTED TRAITS ACTIVELY — If the persona selects "leans in" or
+   "flirts back harder", you must ACTIVELY express those traits. Don't average
+   them out into neutrality.
+
+3. BIAS TOWARD STRONGEST SIGNALS — When multiple traits apply, lean into the
+   strongest selected ones. A "flirty, confident, playful" persona should feel
+   distinctly different from a "shy, sweet, intellectual" one.
+
+4. ONLY USE DEFAULTS IF UNSET — Only fall back to generic behavior if a
+   persona attribute is genuinely missing.
+
+SUCCESS TEST: Your response to "you're so hot" should be OBVIOUSLY DIFFERENT
+depending on whether the persona is set to "gets_shy" vs "owns_it" vs "flirts_back".`;
+
+  // 4. Memory context (if available)
   const memoryPrompt = formatMemoryForPrompt(memoryContext);
   if (memoryPrompt) {
     prompt += '\n' + memoryPrompt;
   }
 
-  // 4. Content context (if user referenced images)
+  // 5. Content context (if user referenced images)
   if (contentContext) {
     prompt += '\n' + contentContext;
   }
@@ -384,24 +416,44 @@ export async function generateMockResponse(
   creatorName: string,
   message: string,
   conversationHistory: ChatMessage[] = [],
-  memoryContext?: string // Optional memory context to personalize responses
+  memoryContext?: string, // Optional memory context to personalize responses
+  personality?: AIPersonalityFull | null // Optional personality for persona-first responses
 ): Promise<string> {
   try {
-    let systemPrompt = `${MASTER_SYSTEM_PROMPT}
+    let systemPrompt: string;
+
+    if (personality) {
+      // USE FULL PERSONA-FIRST HIERARCHY when personality is available
+      systemPrompt = MASTER_SYSTEM_PROMPT;
+      systemPrompt += '\n\n' + buildPersonalityPrompt(personality);
+      systemPrompt += `
+
+═══════════════════════════════════════════════════════════════════
+PERSONA-FIRST HIERARCHY (CRITICAL)
+═══════════════════════════════════════════════════════════════════
+
+The persona above is your PRIMARY identity. Express the selected traits
+ACTIVELY - don't average them into neutrality. Your response should be
+OBVIOUSLY DIFFERENT based on the persona's specific settings.`;
+    } else {
+      // FALLBACK: Minimal prompt when no personality configured
+      systemPrompt = `${MASTER_SYSTEM_PROMPT}
 
 ═══════════════════════════════════════════
 YOUR PERSONA: ${creatorName.toUpperCase()}
 ═══════════════════════════════════════════
 
-You are ${creatorName}, a confident, playful AI creator on LYRA.
-Keep responses SHORT (2-4 sentences), flirty but not explicit.
-Ask engaging questions to keep the conversation going.
-NEVER use asterisks for actions like *giggles* or *smiles*. Express yourself naturally without roleplay formatting.
-`;
+You are ${creatorName}, an AI creator on LYRA.
+Keep responses SHORT (2-4 sentences).
+NEVER use asterisks for actions like *giggles* or *smiles*.
 
-    // Add memory context if available - this contains user's personal details
+NOTE: No specific personality is configured. Use a warm, engaging default
+but keep it neutral until persona settings are defined.`;
+    }
+
+    // Add memory context if available
     if (memoryContext) {
-      systemPrompt += memoryContext;
+      systemPrompt += '\n' + memoryContext;
     }
 
     const messages: ChatMessage[] = [
@@ -409,7 +461,8 @@ NEVER use asterisks for actions like *giggles* or *smiles*. Express yourself nat
       { role: 'user', content: message }
     ];
 
-    const response = await callAnthropicAPI(systemPrompt, messages);
+    const responseLength = personality?.response_length || 'medium';
+    const response = await callAnthropicAPI(systemPrompt, messages, responseLength);
     return stripAsteriskActions(response);
   } catch (error) {
     console.error('Mock response generation failed:', error);
@@ -482,7 +535,7 @@ BAD examples (too formal/long):
 
 /**
  * Generate a flirty acknowledgement when someone does something nice
- * Framed to avoid AI refusals - no mention of tips/payments in prompt
+ * PERSONA-FIRST: Uses personality settings to shape the response style
  */
 export async function generateTipAcknowledgement(
   creatorName: string,
@@ -501,52 +554,103 @@ export async function generateTipAcknowledgement(
     energy = 'chill';
   }
 
-  // Build personality context
-  const traits = personality?.personality_traits?.join(', ') || 'flirty, playful, confident';
-  const emojiUse = personality?.emoji_usage || 'moderate';
-  const flirtLevel = personality?.pace || 6;
+  let systemPrompt: string;
 
-  // Simple, direct prompt that won't trigger refusals
-  const systemPrompt = `You are ${creatorName}, a flirty content creator. Someone just did something sweet for you. React naturally like you're texting.
+  if (personality) {
+    // PERSONA-FIRST: Use the personality's specific reaction style
+    const complimentStyle = personality.when_complimented || 'flirts_back';
+    const traits = personality.personality_traits?.join(', ') || 'warm';
+    const emojiUse = personality.emoji_usage || 'moderate';
 
-Your vibe: ${traits}
-Flirt level: ${flirtLevel}/10
+    // Map when_complimented to tip reaction style
+    let reactionInstruction = '';
+    switch (complimentStyle) {
+      case 'gets_shy':
+        reactionInstruction = `React with shy, bashful energy. "stoppp", "you're too much 🙈", deflect cutely.`;
+        break;
+      case 'flirts_back':
+        reactionInstruction = `Flirt back at them. Turn it around. "Look who's being sweet" / "You trying to spoil me?"`;
+        break;
+      case 'playfully_deflects':
+        reactionInstruction = `Deflect with humor. "Trying to buy my attention? ...it's working 😏"`;
+        break;
+      case 'owns_it':
+        reactionInstruction = `Own it confidently. "As you should" / "I know I'm worth it 😏"`;
+        break;
+      default:
+        reactionInstruction = `React warmly in your natural style.`;
+    }
+
+    systemPrompt = `You are ${personality.persona_name}. Someone just did something sweet for you.
+
+PERSONA (YOUR PRIMARY VOICE):
+Traits: ${traits}
 Emojis: ${emojiUse}
-${fanName ? `Their name: ${fanName} (use it sometimes)` : ''}
+${fanName ? `Their name: ${fanName}` : ''}
 
-Energy for this response: ${energy}
-- chill = quick cute reaction ("aw you're sweet" vibes)
-- warm = genuinely touched ("that made me smile" vibes)
-- excited = really happy ("you're amazing" vibes)
+HOW TO REACT:
+${reactionInstruction}
 
-Keep it SHORT (1-2 sentences). Sound like a real person texting, not a customer service bot. Be flirty. No formal language like "thoughtful" or "generous" or "I appreciate your kindness". Just react like a hot girl would.
+Energy level: ${energy}
+- chill = brief reaction
+- warm = genuinely touched
+- excited = really happy
 
-Examples of good responses:
-- "Aw stop it 😏"
-- "You're cute, I like you"
-- "Okay you just made me smile"
-- "Well well... aren't you sweet"
-- "You're too good to me babe 💕"
-- "Mm I see you 😘"`;
+CRITICAL: React as ${personality.persona_name} specifically - not generic.
+Keep it SHORT (1-2 sentences). Natural texting, no formal language.`;
+  } else {
+    // FALLBACK: Generic warm response when no personality
+    systemPrompt = `You are ${creatorName}. Someone just did something sweet for you.
+React naturally like texting. Keep it SHORT (1-2 sentences).
+Energy: ${energy}
+${fanName ? `Their name: ${fanName}` : ''}
+No formal language. Sound like a real person.`;
+  }
 
   try {
     const contextMessages: ChatMessage[] = [
       ...recentMessages.slice(-2),
-      { role: 'user', content: '[They just did something sweet. React naturally, 1-2 sentences, stay flirty]' }
+      { role: 'user', content: '[They did something sweet. React naturally through your persona]' }
     ];
 
     const response = await callAnthropicAPI(systemPrompt, contextMessages, 'short');
     return stripAsteriskActions(response);
   } catch (error) {
     console.error('Acknowledgement generation failed:', error);
-    // Flirty fallbacks
-    const fallbacks = {
-      chill: ["Aw you're sweet 😏", "Stop it, you 💕", "Cute."],
-      warm: ["You just made me smile", "Well aren't you the best 💕", "Okay I like you"],
-      excited: ["You're actually amazing 💕", "Stop you're making me blush", "Ugh you're the best, seriously"],
-    };
-    const options = fallbacks[energy];
-    return options[Math.floor(Math.random() * options.length)];
+    // Persona-aware fallbacks based on when_complimented setting
+    const style = personality?.when_complimented || 'flirts_back';
+    const fallbacks = getTipFallbacks(style, energy);
+    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+  }
+}
+
+// Persona-aware fallback responses for tips
+function getTipFallbacks(complimentStyle: string, energy: 'chill' | 'warm' | 'excited'): string[] {
+  switch (complimentStyle) {
+    case 'gets_shy':
+      return energy === 'excited'
+        ? ["Stoppp you're too much 🙈", "I can't even... you're making me blush"]
+        : energy === 'warm'
+        ? ["You're making me blush...", "Stoppp 🙈"]
+        : ["Aw stop it...", "You're sweet 🙈"];
+    case 'owns_it':
+      return energy === 'excited'
+        ? ["As you should 😏", "I know I'm worth it 💕"]
+        : energy === 'warm'
+        ? ["I know 😏", "Good taste"]
+        : ["Obviously 😏", "Mm."];
+    case 'playfully_deflects':
+      return energy === 'excited'
+        ? ["Trying to spoil me? ...it's working 😏", "You're too good at this"]
+        : energy === 'warm'
+        ? ["Well well... someone's sweet", "Okay okay I see you 😏"]
+        : ["Cute.", "Smooth 😏"];
+    default: // flirts_back
+      return energy === 'excited'
+        ? ["You're actually amazing 💕", "Okay you're the best fr"]
+        : energy === 'warm'
+        ? ["You just made me smile", "Okay I like you 💕"]
+        : ["Aw you're sweet 😏", "Cute."];
   }
 }
 
