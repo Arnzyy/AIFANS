@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
             id, username, display_name, avatar_url
           ),
           model:creator_models(
-            id, name, display_name, avatar_url
+            id, name, avatar_url
           )
         `, { count: 'exact' })
         .eq('is_published', true)

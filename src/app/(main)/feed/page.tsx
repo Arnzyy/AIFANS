@@ -72,7 +72,6 @@ export default async function FeedPage() {
         model:creator_models(
           id,
           name,
-          display_name,
           avatar_url
         )
       `)

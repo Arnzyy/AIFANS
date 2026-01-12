@@ -32,7 +32,6 @@ export default async function PostPage({ params }: PageProps) {
       model:creator_models(
         id,
         name,
-        display_name,
         avatar_url
       )
     `)
