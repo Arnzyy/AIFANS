@@ -101,13 +101,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Log transaction in token ledger
+    const creatorInfo = content.creator as { display_name?: string; username?: string } | null;
     await supabase.from('token_ledger').insert({
       user_id: user.id,
       type: 'DEBIT',
       reason: 'PPV_UNLOCK',
       amount_tokens: priceInTokens,
       balance_after: newBalance,
-      description: `Unlocked PPV content from ${content.creator?.display_name || content.creator?.username || 'creator'}`,
+      description: `Unlocked PPV content from ${creatorInfo?.display_name || creatorInfo?.username || 'creator'}`,
     });
 
     // Create purchase record in post_purchases (unified table)
