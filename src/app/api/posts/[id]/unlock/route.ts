@@ -6,9 +6,10 @@ import { getCurrency, convertCurrency } from '@/lib/stripe/currency';
 // POST /api/posts/[id]/unlock - Create Stripe Checkout for PPV unlock
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id: postId } = await params;
     const supabase = await createServerClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -20,7 +21,7 @@ export async function POST(
     const { data: post } = await supabase
       .from('posts')
       .select('*, creator:profiles!posts_creator_id_fkey(username, display_name)')
-      .eq('id', params.id)
+      .eq('id', postId)
       .single();
 
     if (!post) {
@@ -35,7 +36,7 @@ export async function POST(
     const { data: existing } = await supabase
       .from('post_purchases')
       .select('id')
-      .eq('post_id', params.id)
+      .eq('post_id', postId)
       .eq('buyer_id', user.id)
       .single();
 
@@ -94,11 +95,11 @@ export async function POST(
       metadata: {
         user_id: user.id,
         creator_id: post.creator_id,
-        post_id: params.id,
+        post_id: postId,
         type: 'ppv',
         original_price_gbp: post.ppv_price.toString(),
       },
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}&type=ppv&post_id=${params.id}`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}&type=ppv&post_id=${postId}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/cancel`,
     });
 

@@ -39,6 +39,8 @@ export function PostDetailClient({ post, currentUserId, hasAccess, isUnlocked }:
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
+  const [unlocked, setUnlocked] = useState(isUnlocked);
 
   const handleLike = async () => {
     setIsLiked(!isLiked);
@@ -72,6 +74,39 @@ export function PostDetailClient({ post, currentUserId, hasAccess, isUnlocked }:
     }
   };
 
+  const handleUnlock = async () => {
+    if (purchasing) return;
+    setPurchasing(true);
+
+    try {
+      const res = await fetch(`/api/posts/${post.id}/unlock`, {
+        method: 'POST',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || 'Failed to unlock post');
+        return;
+      }
+
+      if (data.success) {
+        setUnlocked(true);
+        alert('Post unlocked successfully!');
+        // Refresh the page to show unlocked content
+        window.location.reload();
+      } else if (data.checkoutUrl) {
+        // Redirect to Stripe checkout
+        window.location.href = data.checkoutUrl;
+      }
+    } catch (err) {
+      console.error('Unlock error:', err);
+      alert('Failed to unlock post. Please try again.');
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!comment.trim() || submitting) return;
@@ -97,7 +132,7 @@ export function PostDetailClient({ post, currentUserId, hasAccess, isUnlocked }:
   };
 
   const mediaUrls = post.media_urls || [];
-  const showMedia = isUnlocked || !post.is_ppv;
+  const showMedia = unlocked || !post.is_ppv;
   const displayName = displayEntity.display_name;
   const profileLink = displayEntity.isModel ? `/model/${displayEntity.id}` : `/${creator.username}`;
   // For models, chat uses the model ID; for creators, chat uses username
@@ -164,8 +199,12 @@ export function PostDetailClient({ post, currentUserId, hasAccess, isUnlocked }:
                 <Lock className="w-12 h-12 text-white/60 mb-4" />
                 <p className="font-semibold text-xl mb-2">Premium Content</p>
                 <p className="text-gray-400 mb-4">{mediaUrls.length} {mediaUrls.length === 1 ? 'item' : 'items'}</p>
-                <button className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl font-medium hover:opacity-90 transition-opacity">
-                  Unlock for {Math.round((post.ppv_price || 0) * 2.5)} tokens
+                <button
+                  onClick={handleUnlock}
+                  disabled={purchasing}
+                  className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {purchasing ? 'Processing...' : `Unlock for ${Math.round((post.ppv_price || 0) * 2.5)} tokens`}
                 </button>
                 <p className="text-xs text-gray-400 mt-2">= £{((post.ppv_price || 0) / 100).toFixed(2)}</p>
               </div>
