@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
+import { isAdminUser } from '@/lib/auth/admin';
 
 export async function GET(
   request: NextRequest,
@@ -59,18 +60,25 @@ export async function GET(
       }
     }
 
-    // Check subscription status (content or bundle)
-    const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select('id, subscription_type')
-      .eq('subscriber_id', user.id)
-      .eq('creator_id', actualCreatorId)
-      .eq('status', 'active')
-      .in('subscription_type', ['content', 'bundle'])
-      .limit(1)
-      .single();
+    // Check if user is admin (full access)
+    const isAdmin = isAdminUser(user.email);
 
-    const hasContentSubscription = !!subscription;
+    // Check subscription status (content or bundle)
+    let hasContentSubscription = isAdmin; // Admins have full access
+
+    if (!isAdmin) {
+      const { data: subscription } = await supabase
+        .from('subscriptions')
+        .select('id, subscription_type')
+        .eq('subscriber_id', user.id)
+        .eq('creator_id', actualCreatorId)
+        .eq('status', 'active')
+        .in('subscription_type', ['content', 'bundle'])
+        .limit(1)
+        .single();
+
+      hasContentSubscription = !!subscription;
+    }
 
     // Build query for content items
     let query = supabase
@@ -134,7 +142,8 @@ export async function GET(
     // Transform to expected format
     const content = (items || []).map((item) => {
       const isPpv = item.visibility === 'ppv';
-      const isUnlocked = !isPpv || unlockedContentIds.has(item.id);
+      // Admins see all content as unlocked
+      const isUnlocked = isAdmin || !isPpv || unlockedContentIds.has(item.id);
       const price = contentPriceMap.get(item.id);
 
       return {
