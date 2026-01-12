@@ -54,6 +54,10 @@ export async function POST(request: NextRequest) {
           folder = getPostMediaPath(user.id, postId)
         }
         break
+      case 'content':
+        // Creator content library (photos/videos for PPV, subscribers)
+        folder = `content/${user.id}`
+        break
       case 'message':
         folder = `messages/${user.id}`
         break

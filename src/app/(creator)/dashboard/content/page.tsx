@@ -71,7 +71,6 @@ export default function ContentLibraryPage() {
     setUploading(true);
     setUploadProgress(0);
 
-    const supabase = createClient();
     const totalFiles = files.length;
     let completed = 0;
 
@@ -91,27 +90,39 @@ export default function ContentLibraryPage() {
           continue;
         }
 
-        // Upload to Supabase Storage
-        const fileExt = file.name.split('.').pop();
-        const fileName = `content/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        // Get presigned URL from R2
+        const presignRes = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: file.name,
+            type: 'content',
+          }),
+        });
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('content')
-          .upload(fileName, file, {
-            cacheControl: '3600',
-            upsert: false,
-          });
-
-        if (uploadError) {
-          console.error('Upload error:', uploadError);
-          setError(`Failed to upload ${file.name}`);
+        if (!presignRes.ok) {
+          const err = await presignRes.json();
+          console.error('Presign error:', err);
+          setError(`Failed to get upload URL for ${file.name}`);
           continue;
         }
 
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from('content')
-          .getPublicUrl(uploadData.path);
+        const { uploadUrl, publicUrl } = await presignRes.json();
+
+        // Upload directly to R2
+        const uploadRes = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: file,
+          headers: {
+            'Content-Type': file.type,
+          },
+        });
+
+        if (!uploadRes.ok) {
+          console.error('R2 upload error:', uploadRes.status);
+          setError(`Failed to upload ${file.name}`);
+          continue;
+        }
 
         // Create content item in database
         const res = await fetch('/api/creator/content', {
@@ -119,7 +130,7 @@ export default function ContentLibraryPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: isVideo ? 'video' : 'image',
-            url: urlData.publicUrl,
+            url: publicUrl,
             title: file.name.replace(/\.[^/.]+$/, ''),
             visibility: 'subscribers',
             is_nsfw: false,
