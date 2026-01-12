@@ -747,9 +747,12 @@ export default function AIChatPage() {
     }
   };
 
-  // Handle tip sent - add AI acknowledgement
+  // Handle tip sent - add AI acknowledgement and update balance
   const handleTipSent = (amount: number, newBalance: number) => {
     if (!creator) return;
+
+    // Update header balance
+    setTokenBalance(newBalance);
 
     // Add AI thank you message
     const thankYouMessages = [
