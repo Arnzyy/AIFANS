@@ -253,6 +253,15 @@ export default function AIChatPage() {
                     // Reverse to show in chronological order (oldest first)
                     if (existingMessages) existingMessages.reverse();
 
+                    // Check if user has ANY message history (before filtering)
+                    // This determines if they're a returning user (don't show opening message)
+                    const hasAnyHistory = existingMessages && existingMessages.length > 0;
+                    if (hasAnyHistory) {
+                      hasExistingMessages = true;
+                      setShowDisclosure(false); // Already chatted before
+                      setOpeningMessage(''); // Don't show opening message for returning users
+                    }
+
                     // Filter out messages before the "cleared at" timestamp (visual clear persistence)
                     const clearedAt = getChatClearedAt(conv.id);
                     let filteredMessages = existingMessages || [];
@@ -263,8 +272,8 @@ export default function AIChatPage() {
                       );
                     }
 
+                    // Only show filtered messages in UI
                     if (filteredMessages.length > 0) {
-                      hasExistingMessages = true;
                       // Transform to Message format
                       const msgs = filteredMessages.map((m: any) => ({
                         id: m.id,
