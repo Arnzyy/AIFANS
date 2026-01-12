@@ -601,8 +601,8 @@ export default function ModelProfilePage() {
           </div>
         </div>
 
-        {/* PPV Offers Section */}
-        {ppvOffers.length > 0 && (
+        {/* PPV Offers Section - Only show to non-subscribers since they already have access to this content */}
+        {!isSubscribed && ppvOffers.length > 0 && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
               <Lock className="w-5 h-5 text-purple-400" />
