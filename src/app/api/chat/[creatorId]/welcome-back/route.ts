@@ -41,14 +41,20 @@ export async function POST(
       return NextResponse.json({ welcomeMessage: '' });
     }
 
-    // Check if the last message was from the AI and was recent (within 5 mins)
-    // If so, don't generate a welcome back - the conversation is still "live"
     const lastMessage = messages[0];
     const lastMessageTime = new Date(lastMessage.created_at).getTime();
     const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
 
+    // Don't generate welcome back if:
+    // 1. Conversation is still active (last message < 5 mins ago)
+    // 2. Last message was from AI (they haven't replied yet - don't spam welcomes)
     if (lastMessageTime > fiveMinutesAgo) {
-      // Conversation is still active, no welcome back needed
+      return NextResponse.json({ welcomeMessage: '' });
+    }
+
+    if (lastMessage.role === 'assistant') {
+      // AI already sent the last message - user hasn't replied
+      // Don't keep sending welcome messages, wait for user to respond
       return NextResponse.json({ welcomeMessage: '' });
     }
 
