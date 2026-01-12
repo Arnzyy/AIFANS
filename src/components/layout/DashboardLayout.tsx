@@ -192,11 +192,11 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
                   {/* Menu Items */}
                   <div className="p-2">
                     <Link
-                      href={`/@${user.username}`}
+                      href="/settings"
                       className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 active:bg-white/10 transition"
                     >
                       <UserCircle className="w-4 h-4" />
-                      My Profile
+                      Edit Profile
                     </Link>
 
                     {user.isVerifiedCreator ? (

@@ -2,8 +2,30 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
+import { Globe, Check, X } from 'lucide-react';
+
+// Common timezones
+const TIMEZONES = [
+  { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
+  { value: 'Europe/London', label: 'London (GMT/BST)' },
+  { value: 'Europe/Paris', label: 'Paris (CET/CEST)' },
+  { value: 'Europe/Berlin', label: 'Berlin (CET/CEST)' },
+  { value: 'America/New_York', label: 'New York (EST/EDT)' },
+  { value: 'America/Chicago', label: 'Chicago (CST/CDT)' },
+  { value: 'America/Denver', label: 'Denver (MST/MDT)' },
+  { value: 'America/Los_Angeles', label: 'Los Angeles (PST/PDT)' },
+  { value: 'America/Toronto', label: 'Toronto (EST/EDT)' },
+  { value: 'America/Vancouver', label: 'Vancouver (PST/PDT)' },
+  { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
+  { value: 'Asia/Shanghai', label: 'Shanghai (CST)' },
+  { value: 'Asia/Singapore', label: 'Singapore (SGT)' },
+  { value: 'Asia/Dubai', label: 'Dubai (GST)' },
+  { value: 'Asia/Kolkata', label: 'India (IST)' },
+  { value: 'Australia/Sydney', label: 'Sydney (AEST/AEDT)' },
+  { value: 'Australia/Melbourne', label: 'Melbourne (AEST/AEDT)' },
+  { value: 'Pacific/Auckland', label: 'Auckland (NZST/NZDT)' },
+];
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -17,7 +39,11 @@ export default function SettingsPage() {
   // Profile settings
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
+  const [originalUsername, setOriginalUsername] = useState('');
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
   const [bio, setBio] = useState('');
+  const [timezone, setTimezone] = useState('UTC');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
@@ -33,6 +59,44 @@ export default function SettingsPage() {
   useEffect(() => {
     loadSettings();
   }, []);
+
+  // Debounced username check
+  useEffect(() => {
+    if (username === originalUsername) {
+      setUsernameAvailable(null);
+      return;
+    }
+
+    if (username.length < 3) {
+      setUsernameAvailable(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      checkUsernameAvailability(username);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [username, originalUsername]);
+
+  const checkUsernameAvailability = async (usernameToCheck: string) => {
+    setCheckingUsername(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', usernameToCheck.toLowerCase())
+        .maybeSingle();
+
+      if (error) throw error;
+      setUsernameAvailable(!data);
+    } catch (err) {
+      console.error('Error checking username:', err);
+      setUsernameAvailable(null);
+    } finally {
+      setCheckingUsername(false);
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -51,7 +115,9 @@ export default function SettingsPage() {
       if (profile) {
         setDisplayName(profile.display_name || '');
         setUsername(profile.username || '');
+        setOriginalUsername(profile.username || '');
         setBio(profile.bio || '');
+        setTimezone(profile.timezone || 'UTC');
         setAvatarUrl(profile.avatar_url || '');
         setEmailNotifications(profile.email_notifications ?? true);
         setPushNotifications(profile.push_notifications ?? true);
@@ -76,6 +142,22 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
+    // Validate username if changed
+    if (username !== originalUsername) {
+      if (username.length < 3) {
+        setError('Username must be at least 3 characters');
+        return;
+      }
+      if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+        setError('Username can only contain letters, numbers, and underscores');
+        return;
+      }
+      if (usernameAvailable === false) {
+        setError('Username is already taken');
+        return;
+      }
+    }
+
     setSaving(true);
     setError('');
     setSuccess('');
@@ -103,25 +185,36 @@ export default function SettingsPage() {
       }
 
       // Update profile
+      const updateData: any = {
+        display_name: displayName || null,
+        bio: bio || null,
+        timezone: timezone,
+        avatar_url: finalAvatarUrl || null,
+        email_notifications: emailNotifications,
+        push_notifications: pushNotifications,
+        marketing_emails: marketingEmails,
+        profile_public: profilePublic,
+        show_online_status: showOnlineStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      // Only update username if changed and available
+      if (username !== originalUsername && usernameAvailable) {
+        updateData.username = username.toLowerCase();
+      }
+
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({
-          display_name: displayName || null,
-          bio: bio || null,
-          avatar_url: finalAvatarUrl || null,
-          email_notifications: emailNotifications,
-          push_notifications: pushNotifications,
-          marketing_emails: marketingEmails,
-          profile_public: profilePublic,
-          show_online_status: showOnlineStatus,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', user.id);
 
       if (updateError) throw updateError;
 
       setSuccess('Settings saved successfully!');
       setAvatarFile(null);
+      if (username !== originalUsername && usernameAvailable) {
+        setOriginalUsername(username.toLowerCase());
+      }
 
     } catch (err: any) {
       setError(err.message || 'Failed to save settings');
@@ -147,8 +240,8 @@ export default function SettingsPage() {
     <div className="max-w-2xl mx-auto px-4 py-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-gray-400 mt-1">Manage your account preferences</p>
+        <h1 className="text-2xl font-bold">Edit Profile</h1>
+        <p className="text-gray-400 mt-1">Manage your account and preferences</p>
       </div>
 
       {error && (
@@ -210,17 +303,48 @@ export default function SettingsPage() {
                 className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 outline-none transition-colors"
                 placeholder="Your display name"
               />
+              <p className="text-xs text-gray-500 mt-1">This is how others will see you</p>
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-2">Username</label>
-              <input
-                type="text"
-                value={username}
-                disabled
-                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-gray-500 cursor-not-allowed"
-              />
-              <p className="text-xs text-gray-500 mt-1">Username cannot be changed</p>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                  className={`w-full px-4 py-3 rounded-lg bg-white/5 border outline-none transition-colors ${
+                    username !== originalUsername
+                      ? usernameAvailable === true
+                        ? 'border-green-500'
+                        : usernameAvailable === false
+                        ? 'border-red-500'
+                        : 'border-white/10 focus:border-purple-500'
+                      : 'border-white/10 focus:border-purple-500'
+                  }`}
+                  placeholder="username"
+                />
+                {username !== originalUsername && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {checkingUsername ? (
+                      <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                    ) : usernameAvailable === true ? (
+                      <Check className="w-5 h-5 text-green-500" />
+                    ) : usernameAvailable === false ? (
+                      <X className="w-5 h-5 text-red-500" />
+                    ) : null}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {username !== originalUsername
+                  ? usernameAvailable === true
+                    ? 'Username is available!'
+                    : usernameAvailable === false
+                    ? 'Username is already taken'
+                    : 'Letters, numbers, and underscores only'
+                  : 'Your unique @username'}
+              </p>
             </div>
 
             <div>
@@ -234,6 +358,29 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+        </section>
+
+        {/* Timezone Section */}
+        <section className="p-6 rounded-xl bg-white/5 border border-white/10">
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <Globe className="w-5 h-5" />
+            Timezone
+          </h2>
+          <p className="text-sm text-gray-400 mb-4">
+            Set your timezone for personalized time-based greetings
+          </p>
+
+          <select
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+            className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 outline-none transition-colors appearance-none cursor-pointer"
+          >
+            {TIMEZONES.map((tz) => (
+              <option key={tz.value} value={tz.value} className="bg-zinc-900">
+                {tz.label}
+              </option>
+            ))}
+          </select>
         </section>
 
         {/* Notifications Section */}
@@ -344,7 +491,7 @@ export default function SettingsPage() {
         <div className="flex justify-end">
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || (username !== originalUsername && usernameAvailable === false)}
             className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save Changes'}
