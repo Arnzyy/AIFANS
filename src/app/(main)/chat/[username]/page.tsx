@@ -99,6 +99,10 @@ export default function AIChatPage() {
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [accessLoading, setAccessLoading] = useState(false);
 
+  // Quick tip state
+  const [quickTipSending, setQuickTipSending] = useState<number | null>(null);
+  const [quickTipSuccess, setQuickTipSuccess] = useState<number | null>(null);
+
   useEffect(() => {
     loadChat();
   }, [username]);
@@ -747,34 +751,115 @@ export default function AIChatPage() {
     }
   };
 
-  // Handle tip sent - add AI acknowledgement and update balance
-  const handleTipSent = (amount: number, newBalance: number) => {
+  // Handle tip sent - generate AI acknowledgement based on tip amount and personality
+  const handleTipSent = async (amount: number, newBalance: number) => {
     if (!creator) return;
 
-    // Update header balance
+    // Update header balance immediately
     setTokenBalance(newBalance);
 
-    // Add AI thank you message
-    const thankYouMessages = [
-      `Omg thank you so much for the ${amount} tokens babe! 💕 You're amazing!`,
-      `Wow ${amount} tokens?! You're so generous! Thank you sweetie 😘`,
-      `Aww thank you for the tip! ${amount} tokens means so much to me 💖`,
-      `You just made my day! Thank you for ${amount} tokens! 🥰`,
-      `Such a sweetheart! Thanks for the ${amount} token tip! 💋`,
-    ];
+    // Show typing indicator while generating acknowledgement
+    setTyping(true);
 
-    const randomMessage = thankYouMessages[Math.floor(Math.random() * thankYouMessages.length)];
+    try {
+      // Call API to generate AI acknowledgement based on tip amount + personality
+      const response = await fetch(`/api/chat/${creator.id}/tip-ack`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipAmount: amount,
+          conversationId,
+          creatorName: creator.display_name || creator.username,
+        }),
+      });
 
-    const tipAckMsg: Message = {
-      id: `tip-ack-${Date.now()}`,
-      content: randomMessage,
-      sender_id: creator.id,
-      receiver_id: currentUser?.id || '',
-      created_at: new Date().toISOString(),
-      is_ai_generated: true
-    };
+      if (response.ok) {
+        const data = await response.json();
+        if (data.acknowledgement) {
+          const tipAckMsg: Message = {
+            id: `tip-ack-${Date.now()}`,
+            content: data.acknowledgement,
+            sender_id: creator.id,
+            receiver_id: currentUser?.id || '',
+            created_at: new Date().toISOString(),
+            is_ai_generated: true
+          };
+          setMessages(prev => [...prev, tipAckMsg]);
+        }
+      } else {
+        // Fallback if API fails - simple thank you
+        const fallbackMsg: Message = {
+          id: `tip-ack-${Date.now()}`,
+          content: `Thank you so much for the ${amount} tokens! You're amazing 💕`,
+          sender_id: creator.id,
+          receiver_id: currentUser?.id || '',
+          created_at: new Date().toISOString(),
+          is_ai_generated: true
+        };
+        setMessages(prev => [...prev, fallbackMsg]);
+      }
+    } catch (error) {
+      console.error('Failed to generate tip acknowledgement:', error);
+      // Fallback message
+      const fallbackMsg: Message = {
+        id: `tip-ack-${Date.now()}`,
+        content: `Thank you for the ${amount} tokens! 💖`,
+        sender_id: creator.id,
+        receiver_id: currentUser?.id || '',
+        created_at: new Date().toISOString(),
+        is_ai_generated: true
+      };
+      setMessages(prev => [...prev, fallbackMsg]);
+    } finally {
+      setTyping(false);
+    }
+  };
 
-    setMessages(prev => [...prev, tipAckMsg]);
+  // Send quick tip directly without modal
+  const sendQuickTip = async (amount: number) => {
+    if (!creator || quickTipSending) return;
+
+    // Check balance first
+    if (amount > tokenBalance) {
+      router.push('/wallet?add=true&return=/chat/' + username);
+      return;
+    }
+
+    setQuickTipSending(amount);
+
+    try {
+      const res = await fetch('/api/tips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          creator_id: creator.id,
+          amount_tokens: amount,
+          thread_id: conversationId,
+          chat_mode: 'nsfw',
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.error?.includes('Insufficient')) {
+          router.push('/wallet?add=true&return=/chat/' + username);
+        }
+        return;
+      }
+
+      // Show success briefly
+      setQuickTipSuccess(amount);
+      setTimeout(() => setQuickTipSuccess(null), 2000);
+
+      // Trigger AI acknowledgement
+      handleTipSent(amount, data.new_balance);
+
+    } catch (error) {
+      console.error('Quick tip failed:', error);
+    } finally {
+      setQuickTipSending(null);
+    }
   };
 
   if (loading) {
@@ -787,6 +872,25 @@ export default function AIChatPage() {
 
   return (
     <div className="flex flex-col h-dvh max-h-dvh bg-black overflow-hidden">
+      {/* Quick Tip Success Toast */}
+      {quickTipSuccess && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
+          <div className="bg-zinc-900 border border-green-500/30 rounded-2xl p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center">
+                <svg className="w-7 h-7 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div className="text-center">
+                <p className="font-bold text-lg">Tip Sent!</p>
+                <p className="text-gray-400 text-sm">{creator?.display_name || creator?.username} will love it 💕</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
         <div className="flex items-center gap-3 px-3 md:px-4 h-14 md:h-16">
@@ -992,13 +1096,17 @@ export default function AIChatPage() {
                 {[25, 50, 100, 250].map((amount) => (
                   <button
                     key={amount}
-                    onClick={() => {
-                      const tipButton = document.querySelector('[data-tip-button]') as HTMLButtonElement;
-                      if (tipButton) tipButton.click();
-                    }}
-                    className="px-2 md:px-3 py-1 md:py-1.5 bg-pink-500/20 hover:bg-pink-500/40 active:bg-pink-500/50 rounded-lg text-pink-300 text-[11px] md:text-sm font-medium transition whitespace-nowrap flex items-center gap-0.5 md:gap-1 flex-shrink-0"
+                    onClick={() => sendQuickTip(amount)}
+                    disabled={quickTipSending === amount}
+                    className={`px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-[11px] md:text-sm font-medium transition whitespace-nowrap flex items-center gap-0.5 md:gap-1 flex-shrink-0 ${
+                      quickTipSuccess === amount
+                        ? 'bg-green-500/30 text-green-300'
+                        : quickTipSending === amount
+                        ? 'bg-pink-500/30 text-pink-200 animate-pulse'
+                        : 'bg-pink-500/20 hover:bg-pink-500/40 active:bg-pink-500/50 text-pink-300'
+                    }`}
                   >
-                    🪙{amount}
+                    {quickTipSuccess === amount ? '✓' : quickTipSending === amount ? '...' : '🪙'}{amount}
                   </button>
                 ))}
               </div>

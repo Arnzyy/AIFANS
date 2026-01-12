@@ -454,5 +454,103 @@ BAD examples (too formal/long):
   }
 }
 
+// ===========================================
+// TIP ACKNOWLEDGEMENT GENERATOR
+// ===========================================
+
+/**
+ * Generate an AI tip acknowledgement that scales with tip amount
+ * Bigger tips = more enthusiastic, personalized responses
+ * Uses creator's personality settings from dashboard
+ */
+export async function generateTipAcknowledgement(
+  creatorName: string,
+  tipAmount: number,
+  recentMessages: ChatMessage[] = [],
+  personality?: AIPersonalityFull | null
+): Promise<string> {
+  // Determine enthusiasm level based on tip amount
+  let enthusiasmLevel: string;
+  let maxLength: 'short' | 'medium' | 'long';
+
+  if (tipAmount >= 1000) {
+    enthusiasmLevel = 'EXTREMELY grateful and excited - this is a huge tip! Be very warm, personal, and appreciative. Make them feel special.';
+    maxLength = 'medium';
+  } else if (tipAmount >= 500) {
+    enthusiasmLevel = 'Very enthusiastic and genuinely touched - this is a generous tip! Show real appreciation.';
+    maxLength = 'medium';
+  } else if (tipAmount >= 250) {
+    enthusiasmLevel = 'Warm and appreciative - nice tip! Be sweet and thankful.';
+    maxLength = 'short';
+  } else if (tipAmount >= 100) {
+    enthusiasmLevel = 'Appreciative and flirty - thank them warmly.';
+    maxLength = 'short';
+  } else {
+    enthusiasmLevel = 'Casual and cute - a quick sweet thanks.';
+    maxLength = 'short';
+  }
+
+  // Build personality context if available
+  let personalityContext = '';
+  if (personality) {
+    personalityContext = `
+YOUR PERSONALITY (from creator settings):
+- Tone: ${personality.tone || 'playful'}
+- Flirtiness: ${personality.flirtiness_level || 'medium'}/10
+- Speaking style: ${personality.speaking_style || 'casual and warm'}
+- Catchphrases: ${personality.catchphrases?.join(', ') || 'none specified'}
+- Emoji usage: ${personality.emoji_style || 'moderate'}
+
+Stay in character with these personality traits while thanking for the tip.
+`;
+  }
+
+  try {
+    const systemPrompt = `You are ${creatorName}, thanking a user for a tip they just sent you.
+${personalityContext}
+TIP AMOUNT: ${tipAmount} tokens
+ENTHUSIASM LEVEL: ${enthusiasmLevel}
+
+RULES:
+- Mention the specific amount (${tipAmount} tokens)
+- Scale your excitement to match the tip size
+- Keep it natural, like texting - not formal
+- NO asterisks (*action*) - just natural speech
+- Stay in character with your personality settings
+- For big tips (500+), make them feel REALLY special
+- For huge tips (1000+), be genuinely touched and personal
+
+EXAMPLES BY TIP SIZE:
+- 50 tokens: "Aww thanks babe 💕"
+- 250 tokens: "Omg thank you! 250 tokens?! You're the sweetest 😘"
+- 500 tokens: "Wait, 500 tokens?! You're actually amazing... that just made my whole day 💕"
+- 1000+ tokens: "Oh my god... ${tipAmount} tokens?! I'm actually speechless right now. You're incredible, seriously. Thank you so much 🥺💕"
+`;
+
+    const contextMessages: ChatMessage[] = [
+      ...recentMessages.slice(-5),
+      {
+        role: 'user',
+        content: `[User just tipped ${tipAmount} tokens. Generate a thank you message that matches the tip size and your personality.]`
+      }
+    ];
+
+    const response = await callAnthropicAPI(systemPrompt, contextMessages, maxLength);
+    return stripAsteriskActions(response);
+  } catch (error) {
+    console.error('Tip acknowledgement generation failed:', error);
+    // Fallback based on amount
+    if (tipAmount >= 1000) {
+      return `Oh my god... ${tipAmount} tokens?! You're incredible, thank you so much! 🥺💕`;
+    } else if (tipAmount >= 500) {
+      return `Wow ${tipAmount} tokens?! You're so generous! Thank you sweetie 😘`;
+    } else if (tipAmount >= 250) {
+      return `Aww thank you for the ${tipAmount} tokens! You're the best 💕`;
+    } else {
+      return `Thanks for the tip babe 💕`;
+    }
+  }
+}
+
 export { checkCompliance };
 export type { ChatMessage, ChatRequest, ChatResponse };

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -19,6 +20,23 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+
+  // Fetch wallet balance on mount and when pathname changes
+  useEffect(() => {
+    const fetchBalance = async () => {
+      try {
+        const res = await fetch('/api/wallet');
+        if (res.ok) {
+          const data = await res.json();
+          setWalletBalance(data.balance || 0);
+        }
+      } catch (error) {
+        console.error('Failed to fetch wallet balance:', error);
+      }
+    };
+    fetchBalance();
+  }, [pathname]);
 
   // Chat pages have their own full-screen layout
   const isChatPage = pathname.startsWith('/chat/');
@@ -62,7 +80,9 @@ export default function MainLayout({
               className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
             >
               <Gem className="w-4 h-4 text-purple-400" />
-              <span className="text-sm">0 credits</span>
+              <span className="text-sm">
+                {walletBalance !== null ? walletBalance.toLocaleString() : '...'} credits
+              </span>
             </Link>
             <Link
               href="/notifications"
