@@ -133,22 +133,79 @@ async function checkSubscriptionAccess(
   userId: string,
   creatorId: string
 ): Promise<ChatAccess> {
-  const { data: subscription, error } = await supabase
-    .from('subscriptions')
-    .select(`
-      id,
-      status,
-      messages_used_this_period,
-      period_messages_reset_at,
-      current_period_start,
-      tier:subscription_tiers(monthly_message_allowance)
-    `)
-    .eq('subscriber_id', userId)
-    .eq('creator_id', creatorId)
-    .eq('status', 'active')
+  // The creatorId might be a model ID, creator ID, or profile ID
+  // We need to find the profile ID (user_id) that subscriptions reference
+  let profileIdToCheck: string | null = null;
+
+  console.log('[checkSubscriptionAccess] Input creatorId:', creatorId, 'userId:', userId);
+
+  // First, check if creatorId is a model ID
+  const { data: model, error: modelError } = await supabase
+    .from('creator_models')
+    .select('id, creator_id')
+    .eq('id', creatorId)
     .single();
 
+  console.log('[checkSubscriptionAccess] Model lookup:', model ? `Found model, creator_id: ${model.creator_id}` : 'Not a model', modelError?.message || '');
+
+  if (model) {
+    // It's a model - get the creator's profile ID
+    const { data: creator, error: creatorError } = await supabase
+      .from('creators')
+      .select('id, user_id')
+      .eq('id', model.creator_id)
+      .single();
+
+    console.log('[checkSubscriptionAccess] Creator lookup:', creator ? `Found creator, user_id: ${creator.user_id}` : 'Creator not found', creatorError?.message || '');
+    profileIdToCheck = creator?.user_id || null;
+  } else {
+    // Check if it's a creator ID
+    const { data: creator } = await supabase
+      .from('creators')
+      .select('id, user_id')
+      .eq('id', creatorId)
+      .single();
+
+    if (creator) {
+      profileIdToCheck = creator.user_id;
+      console.log('[checkSubscriptionAccess] Found creator directly, user_id:', creator.user_id);
+    } else {
+      // Maybe it's already a profile ID - check profiles table
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', creatorId)
+        .single();
+      if (profile) {
+        profileIdToCheck = profile.id;
+        console.log('[checkSubscriptionAccess] Found profile directly:', profile.id);
+      }
+    }
+  }
+
+  // If we couldn't resolve to a profile ID, try direct lookup as fallback
+  if (!profileIdToCheck) {
+    console.log('[checkSubscriptionAccess] Could not resolve profile ID, using creatorId as fallback');
+    profileIdToCheck = creatorId;
+  }
+
+  console.log('[checkSubscriptionAccess] Checking subscription for subscriber:', userId, 'creator:', profileIdToCheck);
+
+  // Simple subscription check - just see if an active subscription exists
+  // Only select columns that exist in the table
+  const { data: subscription, error } = await supabase
+    .from('subscriptions')
+    .select('id, status, subscription_type')
+    .eq('subscriber_id', userId)
+    .eq('creator_id', profileIdToCheck)
+    .eq('status', 'active')
+    .in('subscription_type', ['chat', 'bundle'])
+    .maybeSingle();
+
+  console.log('[checkSubscriptionAccess] Subscription result:', subscription ? `Found: ${subscription.id}, type: ${subscription.subscription_type}` : 'Not found', error?.message || '');
+
   if (error || !subscription) {
+    console.log('[checkSubscriptionAccess] No subscription - returning no access');
     return {
       hasAccess: false,
       accessType: 'none',
@@ -160,27 +217,12 @@ async function checkSubscriptionAccess(
     };
   }
 
-  // Handle tier - can be array or object from Supabase join
-  const tierData = subscription.tier;
-  const tier = Array.isArray(tierData) ? tierData[0] : tierData;
-  const allowance = (tier as { monthly_message_allowance: number | null } | null)?.monthly_message_allowance ?? CHAT_CONFIG.default_monthly_allowance;
-  const used = subscription.messages_used_this_period ?? 0;
+  console.log('[checkSubscriptionAccess] Found subscription! Returning access');
 
-  // Check if we're in a new billing period (messages should reset)
-  const resetAt = subscription.period_messages_reset_at
-    ? new Date(subscription.period_messages_reset_at)
-    : null;
-  const periodStart = subscription.current_period_start
-    ? new Date(subscription.current_period_start)
-    : new Date();
-
-  const needsReset = !resetAt || resetAt < periodStart;
-  const effectiveUsed = needsReset ? 0 : used;
-
-  // null allowance means unlimited
-  const remaining = allowance === null ? null : Math.max(0, allowance - effectiveUsed);
-  const canSend = remaining === null || remaining > 0;
-  const isLow = remaining !== null && remaining <= CHAT_CONFIG.low_message_warning_threshold;
+  // Subscribers get unlimited messages for now
+  const remaining: number | null = null; // null = unlimited
+  const canSend = true;
+  const isLow = false;
 
   return {
     hasAccess: true,

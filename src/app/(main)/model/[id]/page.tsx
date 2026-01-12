@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
-import { Bot, BadgeCheck, MapPin, Heart, MessageCircle, Lock, Grid3X3, Play, Star, Sparkles, ArrowLeft, X, ChevronLeft, ChevronRight, Send, Loader2 } from 'lucide-react';
+import { Bot, BadgeCheck, MapPin, Heart, MessageCircle, Lock, Grid3X3, Play, Star, Sparkles, ArrowLeft, X, ChevronLeft, ChevronRight, Send, Loader2, Image as ImageIcon, Video } from 'lucide-react';
 import { AI_CHAT_DISCLOSURE, MODEL_TYPES, CATEGORY_DISCLAIMER } from '@/lib/compliance/constants';
 import { SubscribeModal } from '@/components/shared/SubscribeModal';
 import { supabase } from '@/lib/supabase/client';
@@ -56,6 +56,14 @@ interface Comment {
   };
 }
 
+interface ModelStats {
+  subscriberCount: number;
+  imageCount: number;
+  videoCount: number;
+  totalLikes: number;
+  postCount: number;
+}
+
 export default function ModelProfilePage() {
   const params = useParams();
   const id = params.id as string;
@@ -68,6 +76,7 @@ export default function ModelProfilePage() {
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
   const [contentLoading, setContentLoading] = useState(true);
   const [selectedPostIndex, setSelectedPostIndex] = useState<number | null>(null);
+  const [stats, setStats] = useState<ModelStats | null>(null);
 
   // Like/Comment state
   const [likeStatus, setLikeStatus] = useState<Record<string, { liked: boolean; count: number }>>({});
@@ -127,12 +136,24 @@ export default function ModelProfilePage() {
           if (contentRes.ok) {
             const contentData = await contentRes.json();
             console.log('[ModelProfilePage] Got content:', contentData.content?.length, 'items');
+            console.log('[ModelProfilePage] Debug info:', contentData._debug);
             setContentItems(contentData.content || []);
           }
         } catch (contentErr) {
           console.error('[ModelProfilePage] Error fetching content:', contentErr);
         } finally {
           setContentLoading(false);
+        }
+
+        // Fetch stats for this model
+        try {
+          const statsRes = await fetch(`/api/models/${id}/stats`);
+          if (statsRes.ok) {
+            const statsData = await statsRes.json();
+            setStats(statsData);
+          }
+        } catch (statsErr) {
+          console.error('[ModelProfilePage] Error fetching stats:', statsErr);
         }
       } catch (error) {
         console.error('[ModelProfilePage] Error fetching model:', error);
@@ -258,6 +279,16 @@ export default function ModelProfilePage() {
     return date.toLocaleDateString();
   };
 
+  const formatCount = (num: number) => {
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(num >= 10000000 ? 0 : 2).replace(/\.?0+$/, '') + 'M';
+    }
+    if (num >= 1000) {
+      return (num / 1000).toFixed(num >= 10000 ? 0 : 1).replace(/\.?0+$/, '') + 'K';
+    }
+    return num.toString();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -354,6 +385,37 @@ export default function ModelProfilePage() {
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+
+        {/* Stats bar - OnlyFans style */}
+        {stats && (
+          <div className="absolute top-0 left-0 right-0 bg-black/70 backdrop-blur-sm">
+            <div className="flex items-center justify-center gap-6 md:gap-8 py-2.5 text-white">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 opacity-80" />
+                <span className="font-semibold">{formatCount(stats.imageCount)}</span>
+              </div>
+              <span className="text-white/30">|</span>
+              <div className="flex items-center gap-2">
+                <Video className="w-4 h-4 opacity-80" />
+                <span className="font-semibold">{formatCount(stats.videoCount)}</span>
+              </div>
+              <span className="text-white/30">|</span>
+              <div className="flex items-center gap-2">
+                <Heart className="w-4 h-4 opacity-80" />
+                <span className="font-semibold">{formatCount(stats.totalLikes)}</span>
+              </div>
+              {stats.subscriberCount > 0 && (
+                <>
+                  <span className="text-white/30">|</span>
+                  <div className="flex items-center gap-2">
+                    <Star className="w-4 h-4 text-yellow-400" />
+                    <span className="font-semibold">{formatCount(stats.subscriberCount)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Profile info */}

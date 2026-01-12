@@ -32,6 +32,12 @@ export async function GET(
 
     let actualCreatorId = creatorId;
     let modelId: string | null = null;
+    let creatorUserId: string | null = null; // The creator's profile/user ID for subscription checks
+
+    // Debug info to return in response
+    const debugInfo: Record<string, unknown> = {
+      inputId: creatorId,
+    };
 
     // First check if this is a model ID
     const { data: model } = await supabase
@@ -40,21 +46,51 @@ export async function GET(
       .eq('id', creatorId)
       .single();
 
-    console.log('[Content API] Looking up ID:', creatorId);
-    console.log('[Content API] Found model:', model?.id, 'creator_id:', model?.creator_id);
+    debugInfo.foundModel = model ? { id: model.id, creator_id: model.creator_id } : null;
 
     if (model) {
       // It's a model - get content for this specific model
-      actualCreatorId = model.creator_id;
       modelId = model.id;
 
-      // Also get the creator record to verify
-      const { data: creatorRecord } = await supabase
+      // The model.creator_id might be:
+      // 1. A creators.id (correct)
+      // 2. A user_id/profiles.id (legacy/incorrect)
+      // We need to find the actual creator record either way
+
+      // First try: creator_id is actually a creators.id
+      const { data: creatorById } = await supabase
         .from('creators')
         .select('id, user_id')
         .eq('id', model.creator_id)
         .single();
-      console.log('[Content API] Creator record:', creatorRecord?.id, 'user_id:', creatorRecord?.user_id);
+
+      if (creatorById) {
+        // Model correctly points to creators table
+        actualCreatorId = creatorById.id;
+        creatorUserId = creatorById.user_id; // Save for subscription check
+        debugInfo.creatorRecord = creatorById;
+        debugInfo.lookupMethod = 'direct_creator_id';
+      } else {
+        // Second try: creator_id is actually a user_id
+        const { data: creatorByUserId } = await supabase
+          .from('creators')
+          .select('id, user_id')
+          .eq('user_id', model.creator_id)
+          .single();
+
+        if (creatorByUserId) {
+          // Model points to user_id - use the actual creators.id
+          actualCreatorId = creatorByUserId.id;
+          creatorUserId = creatorByUserId.user_id; // Save for subscription check
+          debugInfo.creatorRecord = creatorByUserId;
+          debugInfo.lookupMethod = 'user_id_fallback';
+        } else {
+          // No creator found - use the model's creator_id directly
+          // (content might be stored with user_id)
+          actualCreatorId = model.creator_id;
+          debugInfo.lookupMethod = 'raw_model_creator_id';
+        }
+      }
     } else {
       // Check if it's a valid creator ID
       const { data: creator } = await supabase
@@ -73,7 +109,7 @@ export async function GET(
       }
     }
 
-    console.log('[Content API] Final actualCreatorId:', actualCreatorId);
+    debugInfo.actualCreatorId = actualCreatorId;
 
     // Check if user is admin (full access)
     const isAdmin = isAdminUser(user.email);
@@ -82,17 +118,53 @@ export async function GET(
     let hasContentSubscription = isAdmin; // Admins have full access
 
     if (!isAdmin) {
-      const { data: subscription } = await supabase
-        .from('subscriptions')
-        .select('id, subscription_type')
-        .eq('subscriber_id', user.id)
-        .eq('creator_id', actualCreatorId)
-        .eq('status', 'active')
-        .in('subscription_type', ['content', 'bundle'])
-        .limit(1)
-        .single();
+      // Check subscription - subscriptions use the creator's profile/user_id
+      // Try with creatorUserId first (the profile ID that foreign key requires)
+      let { data: subscription } = creatorUserId
+        ? await supabase
+            .from('subscriptions')
+            .select('id, subscription_type')
+            .eq('subscriber_id', user.id)
+            .eq('creator_id', creatorUserId)
+            .eq('status', 'active')
+            .in('subscription_type', ['content', 'bundle'])
+            .limit(1)
+            .maybeSingle()
+        : { data: null };
+
+      // If not found, try with actualCreatorId (creators table ID)
+      if (!subscription) {
+        const { data: creatorSub } = await supabase
+          .from('subscriptions')
+          .select('id, subscription_type')
+          .eq('subscriber_id', user.id)
+          .eq('creator_id', actualCreatorId)
+          .eq('status', 'active')
+          .in('subscription_type', ['content', 'bundle'])
+          .limit(1)
+          .maybeSingle();
+        subscription = creatorSub;
+      }
+
+      // If still not found and we have a model ID, try with model ID
+      if (!subscription && modelId) {
+        const { data: modelSub } = await supabase
+          .from('subscriptions')
+          .select('id, subscription_type')
+          .eq('subscriber_id', user.id)
+          .eq('creator_id', modelId)
+          .eq('status', 'active')
+          .in('subscription_type', ['content', 'bundle'])
+          .limit(1)
+          .maybeSingle();
+        subscription = modelSub;
+      }
 
       hasContentSubscription = !!subscription;
+      debugInfo.subscriptionFound = !!subscription;
+      debugInfo.checkedCreatorUserId = creatorUserId;
+      debugInfo.checkedCreatorId = actualCreatorId;
+      debugInfo.checkedModelId = modelId;
     }
 
     // Build query for content items
@@ -111,10 +183,9 @@ export async function GET(
 
     const { data: items, error: contentError } = await query;
 
-    console.log('[Content API] Query creator_id:', actualCreatorId);
-    console.log('[Content API] Found items:', items?.length || 0);
+    debugInfo.itemsFound = items?.length || 0;
     if (items && items.length > 0) {
-      console.log('[Content API] First item creator_id:', items[0].creator_id);
+      debugInfo.firstItemCreatorId = items[0].creator_id;
     }
 
     if (contentError) {
@@ -127,8 +198,6 @@ export async function GET(
 
     // If no items found and this is a model, try getting content through the creator's user_id
     if ((!items || items.length === 0) && model) {
-      console.log('[Content API] No items found, trying user_id lookup...');
-
       // Get the creator to find their user_id
       const { data: creatorForUser } = await supabase
         .from('creators')
@@ -144,14 +213,15 @@ export async function GET(
           .eq('creator_id', creatorForUser.user_id)
           .order('created_at', { ascending: false });
 
-        console.log('[Content API] Alt lookup (by user_id):', altItems?.length || 0);
+        debugInfo.altLookupByUserId = altItems?.length || 0;
+        debugInfo.creatorUserId = creatorForUser.user_id;
 
         // Also try just getting all content and logging creator_ids
         const { data: allContent } = await supabase
           .from('content_items')
           .select('id, creator_id')
           .limit(10);
-        console.log('[Content API] Sample content creator_ids:', allContent?.map(c => c.creator_id));
+        debugInfo.sampleContentCreatorIds = allContent?.map(c => c.creator_id);
       }
     }
 
@@ -211,6 +281,7 @@ export async function GET(
     return NextResponse.json({
       content,
       hasContentSubscription,
+      _debug: debugInfo,
     });
   } catch (error) {
     console.error('Get creator content error:', error);

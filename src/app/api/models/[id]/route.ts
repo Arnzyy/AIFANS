@@ -81,16 +81,57 @@ export async function GET(
       if (isAdminUser(user.email)) {
         isSubscribed = true;
       } else {
-        // Subscriptions are stored with model.id as creator_id (not the human creator's ID)
-        const { data: subscription } = await supabase
-          .from('subscriptions')
-          .select('id')
-          .eq('subscriber_id', user.id)
-          .eq('creator_id', model.id)
-          .eq('status', 'active')
+        // Get the creator's profile ID (user_id) for subscription lookup
+        // Subscriptions are stored with creator's profile_id due to foreign key constraint
+        let creatorProfileId: string | null = null;
+
+        // First try: model.creator_id points to creators table
+        const { data: creatorRecord } = await supabase
+          .from('creators')
+          .select('id, user_id')
+          .eq('id', model.creator_id)
           .single();
 
-        isSubscribed = !!subscription;
+        if (creatorRecord) {
+          creatorProfileId = creatorRecord.user_id;
+        } else {
+          // Fallback: model.creator_id might already be a user_id
+          const { data: creatorByUserId } = await supabase
+            .from('creators')
+            .select('id, user_id')
+            .eq('user_id', model.creator_id)
+            .single();
+          if (creatorByUserId) {
+            creatorProfileId = creatorByUserId.user_id;
+          }
+        }
+
+        // Check subscription using creator's profile ID
+        if (creatorProfileId) {
+          const { data: subscription } = await supabase
+            .from('subscriptions')
+            .select('id, subscription_type')
+            .eq('subscriber_id', user.id)
+            .eq('creator_id', creatorProfileId)
+            .eq('status', 'active')
+            .in('subscription_type', ['chat', 'bundle'])
+            .maybeSingle();
+
+          isSubscribed = !!subscription;
+        }
+
+        // Also check with model.id as fallback (legacy support)
+        if (!isSubscribed) {
+          const { data: modelSub } = await supabase
+            .from('subscriptions')
+            .select('id')
+            .eq('subscriber_id', user.id)
+            .eq('creator_id', model.id)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          isSubscribed = !!modelSub;
+        }
       }
     }
 

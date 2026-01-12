@@ -398,6 +398,18 @@ export default function AIChatPage() {
                   ],
                   isLowMessages: false,
                 });
+
+                // Fetch token balance for display in paywall
+                try {
+                  const walletRes = await fetch('/api/wallet');
+                  if (walletRes.ok) {
+                    const walletData = await walletRes.json();
+                    setTokenBalance(walletData.balance || 0);
+                  }
+                } catch (walletErr) {
+                  console.error('[AIChatPage] Error fetching wallet:', walletErr);
+                }
+
                 // Show AI-generated opening message as preview
                 try {
                   const openingRes = await fetch(`/api/models/${username}/opening-message`);

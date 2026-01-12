@@ -1,9 +1,8 @@
 // Admin access helper for testing accounts
 // Add emails here that should have full access to all content
 
-const ADMIN_EMAILS = [
-  'example@gmail.com',
-  'olly@gmail.com',
+const ADMIN_EMAILS: string[] = [
+  // Add admin emails here for full platform access
 ];
 
 /**
