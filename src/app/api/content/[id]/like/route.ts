@@ -72,10 +72,12 @@ export async function POST(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Update like count on content_items
-  await supabase.rpc('increment_content_likes', { content_id: id }).catch(() => {
-    // RPC may not exist yet, that's OK
-  });
+  // Update like count on content_items (RPC may not exist yet, that's OK)
+  try {
+    await supabase.rpc('increment_content_likes', { content_id: id });
+  } catch {
+    // Ignore - RPC may not exist
+  }
 
   // Get new count
   const { count } = await supabase
@@ -110,10 +112,12 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Update like count on content_items
-  await supabase.rpc('decrement_content_likes', { content_id: id }).catch(() => {
-    // RPC may not exist yet, that's OK
-  });
+  // Update like count on content_items (RPC may not exist yet, that's OK)
+  try {
+    await supabase.rpc('decrement_content_likes', { content_id: id });
+  } catch {
+    // Ignore - RPC may not exist
+  }
 
   // Get new count
   const { count } = await supabase
