@@ -19,6 +19,7 @@ export default async function PostPage({ params }: PageProps) {
   }
 
   // Fetch the post with creator and model info
+  console.log('[PostPage] Fetching post:', id);
   const { data: post, error } = await supabase
     .from('posts')
     .select(`
@@ -38,16 +39,25 @@ export default async function PostPage({ params }: PageProps) {
     .eq('id', id)
     .single();
 
+  console.log('[PostPage] Post query result:', post ? `Found: ${post.id}` : 'Not found', error?.message || '');
+
   if (error || !post) {
+    console.log('[PostPage] Returning notFound');
     notFound();
   }
 
-  // Check if user has access (is subscribed to creator)
+  // Check if user has access (is subscribed to creator OR subscribed to the post's model)
+  // Subscriptions can be to creator profile IDs or model IDs
+  const possibleSubIds = [post.creator_id];
+  if (post.model_id) {
+    possibleSubIds.push(post.model_id);
+  }
+
   const { data: subscription } = await supabase
     .from('subscriptions')
     .select('id')
     .eq('subscriber_id', user.id)
-    .eq('creator_id', post.creator_id)
+    .in('creator_id', possibleSubIds)
     .eq('status', 'active')
     .maybeSingle();
 
