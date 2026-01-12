@@ -13,8 +13,11 @@ export default function NewPostPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [isPPV, setIsPPV] = useState(false);
-  const [ppvPrice, setPpvPrice] = useState('');
+  const [ppvTokens, setPpvTokens] = useState('');
   const [isScheduled, setIsScheduled] = useState(false);
+
+  // Token to GBP conversion (250 tokens = £1)
+  const ppvPriceGbp = ppvTokens ? (parseInt(ppvTokens) / 250).toFixed(2) : '0.00';
   const [scheduleDate, setScheduleDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -48,8 +51,8 @@ export default function NewPostPage() {
       return;
     }
 
-    if (isPPV && (!ppvPrice || parseFloat(ppvPrice) < 1)) {
-      setError('PPV price must be at least £1');
+    if (isPPV && (!ppvTokens || parseInt(ppvTokens) < 100)) {
+      setError('PPV price must be at least 100 tokens');
       return;
     }
 
@@ -103,7 +106,7 @@ export default function NewPostPage() {
           textContent: content.trim() || null,
           mediaUrls: mediaUrls, // Include the uploaded media!
           isPpv: isPPV,
-          ppvPrice: isPPV ? Math.round(parseFloat(ppvPrice) * 100) : null,
+          ppvPrice: isPPV ? Math.round((parseInt(ppvTokens) / 250) * 100) : null, // Convert tokens to pence
           isPublished: !isScheduled,
           scheduledAt: isScheduled ? new Date(scheduleDate).toISOString() : null,
         }),
@@ -234,16 +237,19 @@ export default function NewPostPage() {
 
             {isPPV && (
               <div className="mt-4 pt-4 border-t border-white/10">
-                <label className="block text-sm font-medium mb-2">Price (£)</label>
+                <label className="block text-sm font-medium mb-2">Price (tokens)</label>
                 <input
                   type="number"
-                  min="1"
-                  step="0.01"
-                  value={ppvPrice}
-                  onChange={(e) => setPpvPrice(e.target.value)}
-                  placeholder="5.00"
+                  min="100"
+                  step="1"
+                  value={ppvTokens}
+                  onChange={(e) => setPpvTokens(e.target.value)}
+                  placeholder="500"
                   className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors"
                 />
+                <p className="text-sm text-gray-400 mt-2">
+                  = £{ppvPriceGbp} <span className="text-gray-500">(250 tokens = £1)</span>
+                </p>
               </div>
             )}
           </div>
