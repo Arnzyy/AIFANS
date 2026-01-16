@@ -1076,8 +1076,8 @@ export default function AIChatPage() {
         </div>
       )}
 
-      {/* Messages - pt accounts for fixed header + disclosure, pb-48 for fixed input area + tip bar */}
-      <div className={`flex-1 min-h-0 overflow-y-auto px-4 pb-48 ${showDisclosure ? 'pt-28 md:pt-32' : 'pt-16 md:pt-20'}`}>
+      {/* Messages - pt accounts for fixed header + disclosure, pb-4 for bottom spacing */}
+      <div className={`flex-1 min-h-0 overflow-y-auto px-4 pb-4 ${showDisclosure ? 'pt-28 md:pt-32' : 'pt-16 md:pt-20'}`}>
         <div className="max-w-2xl mx-auto space-y-4">
           {messages.length === 0 && !openingMessage ? (
             <div className="text-center py-6 md:py-12">
@@ -1186,8 +1186,8 @@ export default function AIChatPage() {
         </div>
       </div>
 
-      {/* Input Area with Tip Bar - Fixed positioning for mobile keyboard */}
-      <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black pb-[env(safe-area-inset-bottom)] z-40">
+      {/* Input Area with Tip Bar - Flex child for iOS keyboard compatibility */}
+      <div className="flex-shrink-0 border-t border-white/10 bg-black pb-[env(safe-area-inset-bottom)]">
         {/* Quick Tip Bar - Mobile Optimized */}
         {creator && creator.id.includes('-') && creator.id.length >= 30 && (
           <div className="px-2 md:px-4 py-1.5 md:py-2 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border-b border-white/5">
