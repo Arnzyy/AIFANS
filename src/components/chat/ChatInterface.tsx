@@ -143,9 +143,9 @@ export function ChatInterface({
   };
 
   return (
-    <div className="flex flex-col h-full bg-black">
-      {/* Chat Header - Sticky like WhatsApp */}
-      <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 border-b border-white/10 bg-zinc-950">
+    <div className="flex flex-col h-dvh overflow-hidden bg-black">
+      {/* Chat Header - flex-shrink-0 keeps it fixed */}
+      <div className="flex-shrink-0 z-20 flex items-center justify-between px-4 py-3 border-b border-white/10 bg-zinc-950">
         <div className="flex items-center gap-3">
           <div className="relative">
             <img
@@ -248,8 +248,8 @@ export function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="p-4 border-t border-white/10 bg-zinc-950">
+      {/* Input Area - flex-shrink-0 keeps it fixed at bottom */}
+      <div className="flex-shrink-0 p-4 border-t border-white/10 bg-zinc-950">
         <div className="flex items-center gap-2">
           {/* Content button */}
           <button
