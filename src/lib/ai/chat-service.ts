@@ -229,10 +229,10 @@ depending on whether the persona is set to "gets_shy" vs "owns_it" vs "flirts_ba
  */
 function getMaxTokensForLength(responseLength: 'short' | 'medium' | 'long' = 'medium'): number {
   switch (responseLength) {
-    case 'short': return 100;  // 1-2 sentences
-    case 'medium': return 250; // 2-4 sentences
-    case 'long': return 500;   // Detailed responses
-    default: return 250;
+    case 'short': return 50;   // ~35 words - punchy one-liners
+    case 'medium': return 120; // ~90 words - conversational
+    case 'long': return 250;   // ~180 words - detailed
+    default: return 120;
   }
 }
 

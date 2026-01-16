@@ -5,6 +5,19 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+// Service client for bypassing RLS when checking flags
+let serviceClient: SupabaseClient | null = null;
+
+function getServiceClient(): SupabaseClient {
+  if (!serviceClient) {
+    serviceClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return serviceClient;
+}
+
 // ===========================================
 // TYPES
 // ===========================================
@@ -151,12 +164,14 @@ export const FEATURE_FLAGS = {
 
 /**
  * Quick check for enhanced chat v2 flag
+ * Uses service client to bypass RLS
  */
 export async function useEnhancedChatV2(
   supabase: SupabaseClient,
   userId?: string
 ): Promise<boolean> {
-  const service = new FeatureFlagService(supabase);
+  // Use service client to bypass RLS when checking flags
+  const service = new FeatureFlagService(getServiceClient());
   return service.isEnabled(FEATURE_FLAGS.ENHANCED_CHAT_V2, userId);
 }
 
