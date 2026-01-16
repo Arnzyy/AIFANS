@@ -118,41 +118,8 @@ export default function AIChatPage() {
   // Content browser state
   const [showContentBrowser, setShowContentBrowser] = useState(false);
 
-  // iOS viewport height fix - handles keyboard dismiss properly
-  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  // Container ref for scroll management
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // Handle iOS visual viewport changes (keyboard show/hide)
-  useEffect(() => {
-    const updateViewportHeight = () => {
-      // Use visualViewport if available (handles iOS keyboard properly)
-      const vh = window.visualViewport?.height || window.innerHeight;
-      setViewportHeight(vh);
-
-      // Also update CSS variable for any child elements that need it
-      document.documentElement.style.setProperty('--chat-vh', `${vh}px`);
-    };
-
-    // Initial set
-    updateViewportHeight();
-
-    // Listen to visual viewport changes (keyboard, zoom, etc.)
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateViewportHeight);
-      window.visualViewport.addEventListener('scroll', updateViewportHeight);
-    }
-
-    // Fallback for browsers without visualViewport
-    window.addEventListener('resize', updateViewportHeight);
-
-    return () => {
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', updateViewportHeight);
-        window.visualViewport.removeEventListener('scroll', updateViewportHeight);
-      }
-      window.removeEventListener('resize', updateViewportHeight);
-    };
-  }, []);
 
   useEffect(() => {
     loadChat();
@@ -955,8 +922,7 @@ export default function AIChatPage() {
   return (
     <div
       ref={containerRef}
-      className="flex flex-col bg-black overflow-hidden"
-      style={{ height: viewportHeight ? `${viewportHeight}px` : '100dvh' }}
+      className="flex flex-col h-dvh max-h-dvh overflow-hidden bg-black"
     >
       {/* Quick Tip Success Toast */}
       {quickTipSuccess && (
@@ -977,8 +943,8 @@ export default function AIChatPage() {
         </div>
       )}
 
-      {/* Header - Fixed for iOS compatibility */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-black/95 backdrop-blur-xl">
+      {/* Header - flex-shrink-0 keeps it fixed without position:fixed */}
+      <header className="flex-shrink-0 border-b border-white/10 bg-black z-10">
         <div className="flex items-center gap-3 px-3 md:px-4 h-14 md:h-16">
           <Link
             href={isModelChat ? `/model/${creator?.id}` : `/${creator?.username}`}
@@ -1067,18 +1033,18 @@ export default function AIChatPage() {
         </div>
       </header>
 
-      {/* AI Disclosure Banner - Fixed below header */}
+      {/* AI Disclosure Banner - flex-shrink-0 keeps it in place */}
       {showDisclosure && (
-        <div className="fixed top-14 md:top-16 left-0 right-0 z-40 px-3 md:px-4 py-2 md:py-3 bg-purple-500/10 border-b border-purple-500/20">
+        <div className="flex-shrink-0 px-3 md:px-4 py-2 md:py-3 bg-purple-500/10 border-b border-purple-500/20">
           <p className="text-xs md:text-sm text-center text-purple-200">
             {AI_CHAT_DISCLOSURE.medium}
           </p>
         </div>
       )}
 
-      {/* Messages - pt accounts for fixed header + disclosure, pb-48 for fixed input area */}
-      <div className={`flex-1 min-h-0 overflow-y-auto px-4 pb-48 ${showDisclosure ? 'pt-28 md:pt-32' : 'pt-16 md:pt-20'}`}>
-        <div className="max-w-2xl mx-auto space-y-4">
+      {/* Messages - WhatsApp style: flex-1 overflow-y-auto, inner justify-end anchors to bottom */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
+        <div className="flex-1 flex flex-col justify-end min-h-full px-4 py-4 gap-3 max-w-2xl mx-auto w-full">
           {messages.length === 0 && !openingMessage ? (
             <div className="text-center py-6 md:py-12">
               <div className="mb-3 md:mb-4">
@@ -1186,8 +1152,8 @@ export default function AIChatPage() {
         </div>
       </div>
 
-      {/* Input Area with Tip Bar - Fixed for iOS keyboard compatibility */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-black pb-[env(safe-area-inset-bottom)]">
+      {/* Input Area with Tip Bar - flex-shrink-0 for WhatsApp style layout */}
+      <div className="flex-shrink-0 border-t border-white/10 bg-black pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {/* Quick Tip Bar - Mobile Optimized */}
         {creator && creator.id.includes('-') && creator.id.length >= 30 && (
           <div className="px-2 md:px-4 py-1.5 md:py-2 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border-b border-white/5">
