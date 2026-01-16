@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase/server';
+import { createServerClient, createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { AIPersonalityFull } from '@/lib/ai/personality/types';
 
@@ -11,8 +11,11 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Use admin client to bypass RLS
+  const adminSupabase = createAdminClient();
+
   // Return all personalities for this creator
-  const { data: personalities, error } = await supabase
+  const { data: personalities, error } = await adminSupabase
     .from('ai_personalities')
     .select('*')
     .eq('creator_id', user.id);
@@ -33,8 +36,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Use admin client to bypass RLS for database operations
+  const adminSupabase = createAdminClient();
+
+  // Debug: Check if service role is configured
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('SUPABASE_SERVICE_ROLE_KEY is not set!');
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+  }
+
   // Verify creator role
-  const { data: profile } = await supabase
+  const { data: profile } = await adminSupabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
@@ -100,7 +112,7 @@ export async function POST(request: NextRequest) {
   };
 
   // Check for existing personality for this creator (and model if specified)
-  let existingQuery = supabase
+  let existingQuery = adminSupabase
     .from('ai_personalities')
     .select('id')
     .eq('creator_id', user.id);
@@ -119,7 +131,7 @@ export async function POST(request: NextRequest) {
 
   if (existing) {
     // Update existing personality
-    const result = await supabase
+    const result = await adminSupabase
       .from('ai_personalities')
       .update({
         ...personalityData,
@@ -133,7 +145,7 @@ export async function POST(request: NextRequest) {
     error = result.error;
   } else {
     // Insert new personality
-    const result = await supabase
+    const result = await adminSupabase
       .from('ai_personalities')
       .insert(personalityData)
       .select()
@@ -144,8 +156,20 @@ export async function POST(request: NextRequest) {
   }
 
   if (error) {
-    console.error('Error saving personality:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('PERSONALITY SAVE ERROR:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      full: error
+    });
+    return NextResponse.json({
+      error: error.message || 'Unknown database error',
+      details: error.details || null,
+      hint: error.hint || null,
+      code: error.code || null,
+      debug: JSON.stringify(error)
+    }, { status: 500 });
   }
 
   return NextResponse.json(personality, { status: existing ? 200 : 201 });
@@ -160,6 +184,9 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Use admin client to bypass RLS
+  const adminSupabase = createAdminClient();
+
   const body: AIPersonalityFull = await request.json();
 
   // Validate required fields
@@ -172,7 +199,7 @@ export async function PUT(request: NextRequest) {
   }
 
   // Update personality
-  const { data: personality, error } = await supabase
+  const { data: personality, error } = await adminSupabase
     .from('ai_personalities')
     .update({
       model_id: body.model_id || null,
@@ -238,8 +265,11 @@ export async function DELETE() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Use admin client to bypass RLS
+  const adminSupabase = createAdminClient();
+
   // Soft delete by deactivating
-  const { error } = await supabase
+  const { error } = await adminSupabase
     .from('ai_personalities')
     .update({ is_active: false })
     .eq('creator_id', user.id);

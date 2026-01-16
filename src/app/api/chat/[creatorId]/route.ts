@@ -52,13 +52,15 @@ export async function POST(
     // Get AI personality - check ai_personalities first, then creator_models
     let personality: any = null;
 
-    // First try ai_personalities table (for real human creators)
+    // First try ai_personalities table - check BOTH creator_id AND model_id
+    // For creator_models (like Lyra), the personality is linked via model_id
+    // For regular human creators, it's linked via creator_id
     const { data: aiPersonality } = await supabase
       .from('ai_personalities')
       .select('*')
-      .eq('creator_id', creatorId)
+      .or(`creator_id.eq.${creatorId},model_id.eq.${creatorId}`)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
     if (aiPersonality) {
       personality = aiPersonality;
