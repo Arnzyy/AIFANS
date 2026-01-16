@@ -109,3 +109,17 @@
   -webkit-mask-composite: xor;
   mask-composite: exclude;
 }
+
+/* iOS keyboard fix - prevents black gap between keyboard and input */
+@supports (-webkit-touch-callout: none) {
+  .h-dvh, [class*="h-dvh"] {
+    height: -webkit-fill-available;
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Prevent visual viewport issues on iOS */
+html, body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}

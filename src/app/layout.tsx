@@ -6,6 +6,13 @@ import { AgeGate } from '@/components/shared/AgeGate';
 
 const inter = Inter({ subsets: ['latin'] });
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  interactiveWidget: 'resizes-content',
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.joinlyra.com'),
   title: 'LYRA - AI Model Subscription Platform',
