@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/server';
+import { createServerClient, createAdminClient } from '@/lib/supabase/server';
 import { createAdminService } from '@/lib/creators';
 
 export interface FeatureFlag {
@@ -28,7 +28,9 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { data: flags, error } = await supabase
+    // Use admin client to bypass RLS
+    const adminSupabase = createAdminClient();
+    const { data: flags, error } = await adminSupabase
       .from('feature_flags')
       .select('*')
       .order('flag_name', { ascending: true });
@@ -67,22 +69,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Flag name required' }, { status: 400 });
     }
 
-    const updates: Record<string, unknown> = {
-      updated_at: new Date().toISOString(),
-    };
+    // Use admin client to bypass RLS for admin operations
+    const adminSupabase = createAdminClient();
 
-    if (typeof is_enabled === 'boolean') {
-      updates.is_enabled = is_enabled;
-    }
-    if (typeof rollout_percentage === 'number') {
-      updates.rollout_percentage = Math.max(0, Math.min(100, rollout_percentage));
-    }
-    if (typeof description === 'string') {
-      updates.description = description;
-    }
-
-    // Use upsert to handle both create and update, working around RLS
-    const { data: existing } = await supabase
+    // Get existing flag data
+    const { data: existing } = await adminSupabase
       .from('feature_flags')
       .select('*')
       .eq('flag_name', flag_name)
@@ -98,7 +89,7 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    const { data: flag, error } = await supabase
+    const { data: flag, error } = await adminSupabase
       .from('feature_flags')
       .upsert(upsertData, { onConflict: 'flag_name' })
       .select()
@@ -138,7 +129,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Flag name required' }, { status: 400 });
     }
 
-    const { data: flag, error } = await supabase
+    // Use admin client to bypass RLS
+    const adminSupabase = createAdminClient();
+    const { data: flag, error } = await adminSupabase
       .from('feature_flags')
       .upsert({
         flag_name,
