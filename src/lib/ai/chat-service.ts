@@ -130,14 +130,15 @@ export async function generateChatResponse(
   ];
 
   // 7. Generate AI response (use personality's response_length setting)
-  let aiResponse = await callAnthropicAPI(systemPrompt, messages, personality.response_length);
+  const responseLength = (personality.response_length as 'short' | 'medium' | 'long') || 'medium';
+  let aiResponse = await callAnthropicAPI(systemPrompt, messages, responseLength);
 
   // 8. Compliance check
   const complianceResult = checkCompliance(aiResponse);
 
   if (!complianceResult.passed) {
     console.warn('Compliance issues:', complianceResult.issues);
-    aiResponse = await regenerateCompliant(systemPrompt, messages, complianceResult.issues, personality.response_length);
+    aiResponse = await regenerateCompliant(systemPrompt, messages, complianceResult.issues, responseLength);
   }
 
   // 8.5. Post-processing: Strip any remaining asterisk actions as failsafe
