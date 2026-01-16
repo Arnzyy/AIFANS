@@ -1,0 +1,229 @@
+// ===========================================
+// PROMPT BUILDER SERVICE
+// Assembles the complete prompt with all dynamic context
+// ===========================================
+
+import { SupabaseClient } from '@supabase/supabase-js';
+import {
+  MASTER_SYSTEM_PROMPT_V2,
+  buildDynamicContext,
+  ConversationStateContext,
+  UserPreferenceContext
+} from './master-prompt-v2';
+import { ConversationStateService } from './conversation-state';
+import { EnhancedMemoryService } from './memory-service';
+import { UserPreferencesService } from './user-preferences';
+import { MessageAnalyticsService, countEmojis, getFirstWord, endsWithQuestion } from './message-analytics';
+import { getFewShotExamples, ANTI_PATTERN_EXAMPLES, LENGTH_GUIDE } from './few-shot-examples';
+import { buildPersonalityPrompt } from '../personality/prompt-builder';
+import { AIPersonalityFull } from '../personality/prompt-builder';
+
+// ===========================================
+// TYPE DEFINITIONS
+// ===========================================
+
+export interface ChatContext {
+  conversationId: string;
+  userId: string;
+  personaId: string;
+  persona: AIPersonalityFull;
+  currentMessage: string;
+  previousBotMessageId?: string;
+  abTestVariant?: string;
+}
+
+export interface BuiltPrompt {
+  systemPrompt: string;
+  analyticsId: string;
+}
+
+// ===========================================
+// PROMPT BUILDER SERVICE
+// ===========================================
+
+export class PromptBuilderService {
+  private stateService: ConversationStateService;
+  private memoryService: EnhancedMemoryService;
+  private prefsService: UserPreferencesService;
+  private analyticsService: MessageAnalyticsService;
+
+  constructor(private supabase: SupabaseClient) {
+    this.stateService = new ConversationStateService(supabase);
+    this.memoryService = new EnhancedMemoryService(supabase);
+    this.prefsService = new UserPreferencesService(supabase);
+    this.analyticsService = new MessageAnalyticsService(supabase);
+  }
+
+  // ===========================================
+  // BUILD COMPLETE PROMPT
+  // ===========================================
+
+  async buildPrompt(context: ChatContext): Promise<BuiltPrompt> {
+    const startTime = Date.now();
+
+    // 1. Get or create conversation state
+    const state = await this.stateService.getState(
+      context.conversationId,
+      context.userId,
+      context.personaId
+    );
+
+    // 2. Update state with incoming user message
+    await this.stateService.updateWithUserMessage(
+      context.conversationId,
+      context.currentMessage
+    );
+
+    // 3. Get user preferences
+    const prefs = await this.prefsService.getPreferences(
+      context.userId,
+      context.personaId
+    );
+
+    // 4. Generate guidance from state
+    const stateGuidance = this.stateService.generateGuidance(state);
+
+    // 5. Generate preference hints
+    const prefHints = this.prefsService.generatePreferenceHints(prefs);
+
+    // 6. Get relevant memories
+    const memories = await this.memoryService.getRelevantMemories(
+      context.userId,
+      context.personaId,
+      context.currentMessage,
+      state.messagesThisSession
+    );
+    const memoryContext = this.memoryService.formatMemoriesForPrompt(memories);
+
+    // 7. Get few-shot examples for current heat level
+    const fewShotExamples = getFewShotExamples(
+      stateGuidance.heatLevel,
+      {
+        dynamic: context.persona.dynamic,
+        when_complimented: context.persona.when_complimented,
+        emoji_usage: context.persona.emoji_usage,
+      }
+    );
+
+    // 8. Build persona prompt section
+    const personaPrompt = buildPersonalityPrompt(context.persona);
+
+    // 9. Build dynamic context
+    const dynamicContext = buildDynamicContext({
+      conversationState: {
+        guidance: stateGuidance.guidance,
+        heatLevel: stateGuidance.heatLevel,
+        messageCount: stateGuidance.messageCount,
+      },
+      memoryContext,
+      userPreferences: {
+        hints: prefHints.hints,
+      },
+      fewShotExamples: fewShotExamples + '\n' + LENGTH_GUIDE,
+    });
+
+    // 10. Assemble complete system prompt
+    const systemPrompt = [
+      MASTER_SYSTEM_PROMPT_V2,
+      personaPrompt,
+      dynamicContext,
+      ANTI_PATTERN_EXAMPLES,
+    ].join('\n\n');
+
+    // 11. Log analytics
+    const analyticsId = await this.analyticsService.logMessage({
+      messageId: crypto.randomUUID(),
+      conversationId: context.conversationId,
+      userId: context.userId,
+      personaId: context.personaId,
+      isUserMessage: true,
+      messageLength: context.currentMessage.length,
+      heatLevel: stateGuidance.heatLevel,
+      endedWithQuestion: endsWithQuestion(context.currentMessage),
+      emojiCount: countEmojis(context.currentMessage),
+      startedWith: getFirstWord(context.currentMessage),
+      sessionMessageNumber: state.messagesThisSession,
+      priorHeatLevel: state.currentHeatLevel,
+      abTestVariant: context.abTestVariant,
+    });
+
+    // 12. Update engagement on previous bot message if exists
+    if (context.previousBotMessageId) {
+      const responseTime = (Date.now() - startTime) / 1000;
+      await this.analyticsService.updateEngagement(context.previousBotMessageId, {
+        userReplied: true,
+        replyDelaySeconds: responseTime,
+        replyLength: context.currentMessage.length,
+        sessionContinued: true,
+      });
+    }
+
+    // 13. Update user preferences with this message
+    await this.prefsService.updateWithMessage(
+      context.userId,
+      context.personaId,
+      {
+        messageLength: context.currentMessage.length,
+        responseTimeSeconds: (Date.now() - startTime) / 1000,
+        heatLevel: stateGuidance.heatLevel,
+        userUsedEmoji: countEmojis(context.currentMessage) > 0,
+        userAskedQuestion: endsWithQuestion(context.currentMessage),
+        sessionMessageNumber: state.messagesThisSession,
+      }
+    );
+
+    // 14. Extract and save any new memories from message
+    const extractedMemories = this.memoryService.extractMemoriesFromMessage(
+      context.currentMessage
+    );
+
+    for (const memory of extractedMemories) {
+      await this.memoryService.saveMemory(
+        context.userId,
+        context.personaId,
+        memory.category,
+        memory.fact,
+        'user_stated'
+      );
+    }
+
+    return {
+      systemPrompt,
+      analyticsId,
+    };
+  }
+
+  // ===========================================
+  // POST-RESPONSE PROCESSING
+  // ===========================================
+
+  async processResponse(
+    conversationId: string,
+    botResponse: string,
+    analyticsId: string,
+    userId: string,
+    personaId: string
+  ): Promise<void> {
+    // Update conversation state with bot message
+    await this.stateService.updateWithBotMessage(conversationId, botResponse);
+
+    // Get current state for heat level
+    const state = await this.stateService.getState(conversationId, userId, personaId);
+
+    // Log bot message analytics
+    await this.analyticsService.logMessage({
+      messageId: analyticsId,
+      conversationId,
+      userId,
+      personaId,
+      isUserMessage: false,
+      messageLength: botResponse.length,
+      heatLevel: state.currentHeatLevel,
+      endedWithQuestion: endsWithQuestion(botResponse),
+      emojiCount: countEmojis(botResponse),
+      startedWith: getFirstWord(botResponse),
+      sessionMessageNumber: state.messagesThisSession,
+      priorHeatLevel: state.currentHeatLevel,
+    });
+  }
+}

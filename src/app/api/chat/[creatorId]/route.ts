@@ -1,12 +1,16 @@
 // ===========================================
 // API ROUTE: /api/chat/[creatorId]/route.ts
 // Main chat endpoint with LYRA compliance
+// Supports v1 (legacy) and v2 (enhanced) via feature flag
 // ===========================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { generateChatResponse } from '@/lib/ai/chat-service';
 import { checkChatAccess, decrementMessage, isLowMessages } from '@/lib/chat';
+import { useEnhancedChatV2 } from '@/lib/feature-flags';
+import { PromptBuilderService, ChatContext } from '@/lib/ai/enhanced-chat/prompt-builder';
+import { FORBIDDEN_PATTERNS_V2 } from '@/lib/ai/enhanced-chat/master-prompt-v2';
 
 export async function POST(
   request: NextRequest,
@@ -108,17 +112,39 @@ export async function POST(
       );
     }
 
-    // Generate response
-    const result = await generateChatResponse(
-      supabase as any,
-      {
-        subscriberId: user.id,
-        creatorId: creatorId,
+    // Check if enhanced chat v2 is enabled for this user
+    const useV2 = await useEnhancedChatV2(supabase, user.id);
+
+    let result: {
+      response: string;
+      conversationId: string;
+      passed_compliance: boolean;
+      compliance_issues?: string[];
+    };
+
+    if (useV2) {
+      // Use enhanced v2 chat system
+      result = await generateV2Response(
+        supabase,
+        user.id,
+        creatorId,
         message,
         conversationId,
-      },
-      personality
-    );
+        personality
+      );
+    } else {
+      // Use legacy v1 chat system
+      result = await generateChatResponse(
+        supabase as any,
+        {
+          subscriberId: user.id,
+          creatorId: creatorId,
+          message,
+          conversationId,
+        },
+        personality
+      );
+    }
 
     // Log compliance issues if any
     if (result.compliance_issues && result.compliance_issues.length > 0) {
@@ -235,4 +261,263 @@ export async function GET(
     console.error('Get chat error:', error);
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
+}
+
+// ===========================================
+// V2 ENHANCED CHAT HANDLER
+// ===========================================
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+async function generateV2Response(
+  supabase: any,
+  userId: string,
+  creatorId: string,
+  message: string,
+  conversationId: string | undefined,
+  personality: any
+): Promise<{
+  response: string;
+  conversationId: string;
+  passed_compliance: boolean;
+  compliance_issues?: string[];
+}> {
+  // Get or create conversation
+  let convId = conversationId;
+  if (!convId) {
+    const { data: existingConv } = await supabase
+      .from('conversations')
+      .select('id')
+      .or(
+        `and(participant1_id.eq.${userId},participant2_id.eq.${creatorId}),` +
+        `and(participant1_id.eq.${creatorId},participant2_id.eq.${userId})`
+      )
+      .maybeSingle();
+
+    if (existingConv) {
+      convId = existingConv.id;
+    } else {
+      const { data: newConv } = await supabase
+        .from('conversations')
+        .insert({
+          participant1_id: userId,
+          participant2_id: creatorId,
+        })
+        .select('id')
+        .single();
+      convId = newConv?.id;
+    }
+  }
+
+  // Initialize the prompt builder service
+  const promptBuilder = new PromptBuilderService(supabase);
+
+  // Build the chat context
+  const chatContext: ChatContext = {
+    conversationId: convId!,
+    userId,
+    personaId: creatorId,
+    persona: personality,
+    currentMessage: message,
+  };
+
+  // Build the enhanced prompt
+  const { systemPrompt, analyticsId } = await promptBuilder.buildPrompt(chatContext);
+
+  // Get recent message history for context
+  const { data: recentMessages } = await supabase
+    .from('chat_messages')
+    .select('role, content')
+    .eq('conversation_id', convId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  const messages: ChatMessage[] = [
+    ...(recentMessages || []).reverse().map((m: any) => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    })),
+    { role: 'user' as const, content: message },
+  ];
+
+  // Save user message
+  await supabase.from('chat_messages').insert({
+    conversation_id: convId,
+    creator_id: creatorId,
+    subscriber_id: userId,
+    role: 'user',
+    content: message,
+  });
+
+  // Generate AI response
+  let aiResponse = await callAnthropicAPIV2(
+    systemPrompt,
+    messages,
+    personality.response_length || 'medium'
+  );
+
+  // Compliance check
+  const complianceResult = checkComplianceV2(aiResponse);
+
+  if (!complianceResult.passed) {
+    console.warn('V2 Compliance issues:', complianceResult.issues);
+    aiResponse = await regenerateCompliantV2(
+      systemPrompt,
+      messages,
+      personality.response_length || 'medium'
+    );
+  }
+
+  // Post-process: strip asterisks
+  aiResponse = stripAsteriskActions(aiResponse);
+
+  // Save AI response
+  await supabase.from('chat_messages').insert({
+    conversation_id: convId,
+    creator_id: creatorId,
+    subscriber_id: userId,
+    role: 'assistant',
+    content: aiResponse,
+  });
+
+  // Update conversation timestamp
+  await supabase
+    .from('conversations')
+    .update({ last_message_at: new Date().toISOString() })
+    .eq('id', convId);
+
+  // Process response for analytics (async, don't wait)
+  promptBuilder.processResponse(
+    convId!,
+    aiResponse,
+    analyticsId,
+    userId,
+    creatorId
+  ).catch((err: Error) => console.error('Failed to process response:', err));
+
+  return {
+    response: aiResponse,
+    conversationId: convId!,
+    passed_compliance: complianceResult.passed,
+    compliance_issues: complianceResult.issues,
+  };
+}
+
+// ===========================================
+// V2 HELPERS
+// ===========================================
+
+function getMaxTokensForLength(responseLength: 'short' | 'medium' | 'long' = 'medium'): number {
+  switch (responseLength) {
+    case 'short': return 100;
+    case 'medium': return 250;
+    case 'long': return 500;
+    default: return 250;
+  }
+}
+
+async function callAnthropicAPIV2(
+  systemPrompt: string,
+  messages: ChatMessage[],
+  responseLength: 'short' | 'medium' | 'long' = 'medium'
+): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!apiKey) {
+    return "Hey you 💕 What's on your mind?";
+  }
+
+  const maxTokens = getMaxTokensForLength(responseLength);
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: messages.map(m => ({
+          role: m.role,
+          content: m.content,
+        })),
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('API error:', await response.text());
+      return "Hey you 💕 What's on your mind?";
+    }
+
+    const data = await response.json();
+    return data.content[0].text;
+  } catch (error) {
+    console.error('API call error:', error);
+    return "Hey you 💕 What's on your mind?";
+  }
+}
+
+function checkComplianceV2(response: string): { passed: boolean; issues: string[] } {
+  const issues: string[] = [];
+
+  for (const pattern of FORBIDDEN_PATTERNS_V2) {
+    if (pattern.test(response)) {
+      issues.push(`Matched: ${pattern.source}`);
+    }
+  }
+
+  return {
+    passed: issues.length === 0,
+    issues,
+  };
+}
+
+async function regenerateCompliantV2(
+  systemPrompt: string,
+  messages: ChatMessage[],
+  responseLength: 'short' | 'medium' | 'long' = 'medium'
+): Promise<string> {
+  const stricterPrompt = systemPrompt + `
+
+⚠️ YOUR PREVIOUS RESPONSE WAS REJECTED. Try again.
+
+ABSOLUTELY FORBIDDEN - DO NOT USE:
+- Asterisk actions (*smiles*, *leans in*, etc)
+- "I'm afraid..."
+- "As much as I'd love to..."
+- "outside the boundaries"
+- "I can't engage"
+- "as an AI"
+- Any apologetic refusal language
+
+INSTEAD USE:
+✅ "Bold."
+✅ "Patience."
+✅ "Getting ahead of yourself... I like it"
+✅ "Mm, you're eager"
+✅ "Keep that energy"
+
+Generate a SHORT, flirty response. No explanations.`;
+
+  return await callAnthropicAPIV2(stricterPrompt, messages, responseLength);
+}
+
+function stripAsteriskActions(text: string): string {
+  let cleaned = text;
+  cleaned = cleaned.replace(/\*[^*]+\*/g, '');
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+  if (!cleaned || cleaned.length < 2) {
+    return "Hey you 😏";
+  }
+
+  cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  return cleaned;
 }
