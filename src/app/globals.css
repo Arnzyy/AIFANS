@@ -118,8 +118,15 @@
   }
 }
 
-/* Prevent visual viewport issues on iOS - Nuclear fix for sticky header */
-html, body {
+/* Chat page container - use this class for full-screen chat layouts */
+.chat-page-container {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* iOS-specific: Only apply fixed body when chat page is active */
+body:has(.chat-page-container) {
   overflow: hidden;
   overscroll-behavior: none;
   position: fixed;
@@ -127,7 +134,13 @@ html, body {
   height: 100%;
 }
 
-#__next, main {
-  height: 100%;
-  overflow: hidden;
+/* Fallback for browsers without :has() support - chat containers handle themselves */
+@supports not selector(:has(*)) {
+  .chat-page-container {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 }

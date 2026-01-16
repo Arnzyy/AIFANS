@@ -922,7 +922,7 @@ export default function AIChatPage() {
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 flex flex-col overflow-hidden bg-black"
+      className="chat-page-container flex flex-col bg-black"
     >
       {/* Quick Tip Success Toast */}
       {quickTipSuccess && (

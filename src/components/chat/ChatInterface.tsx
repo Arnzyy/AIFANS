@@ -143,7 +143,7 @@ export function ChatInterface({
   };
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden bg-black">
+    <div className="chat-page-container flex flex-col bg-black">
       {/* Chat Header - sticky + z-50 for iOS Safari */}
       <div className="flex-shrink-0 sticky top-0 z-50 flex items-center justify-between px-4 py-3 border-b border-white/10 bg-zinc-950 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center gap-3">
