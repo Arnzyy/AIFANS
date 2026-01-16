@@ -198,8 +198,8 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'At least one personality trait is required' }, { status: 400 });
   }
 
-  // Update personality
-  const { data: personality, error } = await adminSupabase
+  // Update personality - build query with filters
+  let updateQuery = adminSupabase
     .from('ai_personalities')
     .update({
       model_id: body.model_id || null,
@@ -244,13 +244,24 @@ export async function PUT(request: NextRequest) {
       is_active: body.is_active,
       updated_at: new Date().toISOString(),
     })
-    .eq('creator_id', user.id)
-    .select()
-    .single();
+    .eq('creator_id', user.id);
+
+  // Also filter by model_id to get the specific personality
+  if (body.model_id) {
+    updateQuery = updateQuery.eq('model_id', body.model_id);
+  } else {
+    updateQuery = updateQuery.is('model_id', null);
+  }
+
+  const { data: personality, error } = await updateQuery.select().single();
 
   if (error) {
     console.error('Error updating personality:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({
+      error: error.message,
+      details: error.details,
+      code: error.code
+    }, { status: 500 });
   }
 
   return NextResponse.json(personality);
