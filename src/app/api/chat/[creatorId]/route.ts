@@ -437,6 +437,15 @@ async function callAnthropicAPIV2(
 
   const maxTokens = getMaxTokensForLength(responseLength);
 
+  // DEBUG: Log V2 API call params
+  console.log('=== V2 API CALL DEBUG ===');
+  console.log('Model:', 'claude-3-haiku-20240307');
+  console.log('System prompt length:', systemPrompt.length);
+  console.log('Messages count:', messages.length);
+  console.log('Last user message:', messages[messages.length - 1]?.content?.slice(0, 100));
+  console.log('Max tokens:', maxTokens);
+  console.log('Contains EXPLICIT INPUT HANDLING:', systemPrompt.includes('EXPLICIT INPUT HANDLING'));
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -462,6 +471,8 @@ async function callAnthropicAPIV2(
     }
 
     const data = await response.json();
+    console.log('=== V2 API RESPONSE ===');
+    console.log('Response:', data.content[0].text.slice(0, 200));
     return data.content[0].text;
   } catch (error) {
     console.error('API call error:', error);
@@ -472,9 +483,38 @@ async function callAnthropicAPIV2(
 function checkComplianceV2(response: string): { passed: boolean; issues: string[] } {
   const issues: string[] = [];
 
+  // DEBUG: Log V2 compliance check
+  console.log('=== V2 COMPLIANCE CHECK DEBUG ===');
+  console.log('Response preview:', response.slice(0, 150));
+  console.log('Checking against', FORBIDDEN_PATTERNS_V2.length, 'patterns');
+
   for (const pattern of FORBIDDEN_PATTERNS_V2) {
     if (pattern.test(response)) {
       issues.push(`Matched: ${pattern.source}`);
+    }
+  }
+
+  // DEBUG: Log match results
+  if (issues.length > 0) {
+    console.log('V2 FORBIDDEN PATTERNS MATCHED:', issues);
+  } else {
+    console.log('No V2 forbidden patterns detected');
+
+    // DEBUG: Manual check for known bad phrases
+    const manualCheck = [
+      'boundaries',
+      'I apologize',
+      "I'm afraid",
+      "can't engage",
+      'maintain certain',
+      'venture into',
+      'I need to',
+    ];
+    const manualMatches = manualCheck.filter(phrase =>
+      response.toLowerCase().includes(phrase.toLowerCase())
+    );
+    if (manualMatches.length > 0) {
+      console.log('V2 WARNING: These phrases should have matched:', manualMatches);
     }
   }
 

@@ -217,6 +217,13 @@ depending on whether the persona is set to "gets_shy" vs "owns_it" vs "flirts_ba
     prompt += '\n' + contentContext;
   }
 
+  // DEBUG: Log prompt stats
+  console.log('=== SYSTEM PROMPT DEBUG ===');
+  console.log('Total length:', prompt.length);
+  console.log('Contains HARD RULES:', prompt.includes('HARD RULES'));
+  console.log('Contains EXPLICIT INPUT HANDLING:', prompt.includes('EXPLICIT INPUT HANDLING'));
+  console.log('First 200 chars:', prompt.slice(0, 200));
+
   return prompt;
 }
 
@@ -248,6 +255,14 @@ async function callAnthropicAPI(
   }
 
   const maxTokens = getMaxTokensForLength(responseLength);
+
+  // DEBUG: Log API call params
+  console.log('=== API CALL DEBUG ===');
+  console.log('Model:', 'claude-3-haiku-20240307');
+  console.log('System prompt length:', systemPrompt.length);
+  console.log('Messages count:', messages.length);
+  console.log('Last user message:', messages[messages.length - 1]?.content?.slice(0, 100));
+  console.log('Max tokens:', maxTokens);
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -293,9 +308,38 @@ interface ComplianceResult {
 function checkCompliance(response: string): ComplianceResult {
   const issues: string[] = [];
 
+  // DEBUG: Log compliance check input
+  console.log('=== COMPLIANCE CHECK DEBUG ===');
+  console.log('Response preview:', response.slice(0, 150));
+  console.log('Checking against', FORBIDDEN_PATTERNS.length, 'patterns');
+
   for (const pattern of FORBIDDEN_PATTERNS) {
     if (pattern.test(response)) {
       issues.push(`Matched: ${pattern.source}`);
+    }
+  }
+
+  // DEBUG: Log match results
+  if (issues.length > 0) {
+    console.log('FORBIDDEN PATTERNS MATCHED:', issues);
+  } else {
+    console.log('No forbidden patterns detected');
+
+    // DEBUG: Manual check for known bad phrases
+    const manualCheck = [
+      'boundaries',
+      'I apologize',
+      "I'm afraid",
+      "can't engage",
+      'maintain certain',
+      'venture into',
+      'I need to',
+    ];
+    const manualMatches = manualCheck.filter(phrase =>
+      response.toLowerCase().includes(phrase.toLowerCase())
+    );
+    if (manualMatches.length > 0) {
+      console.log('WARNING: These phrases should have matched:', manualMatches);
     }
   }
 
