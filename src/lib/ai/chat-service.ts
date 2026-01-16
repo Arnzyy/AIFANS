@@ -258,7 +258,7 @@ async function callAnthropicAPI(
 
   // DEBUG: Log API call params
   console.log('=== API CALL DEBUG ===');
-  console.log('Model:', 'claude-3-haiku-20240307');
+  console.log('Model:', 'claude-sonnet-4-20250514');
   console.log('System prompt length:', systemPrompt.length);
   console.log('Messages count:', messages.length);
   console.log('Last user message:', messages[messages.length - 1]?.content?.slice(0, 100));
@@ -273,7 +273,7 @@ async function callAnthropicAPI(
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: maxTokens,
         system: systemPrompt,
         messages: messages.map(m => ({
