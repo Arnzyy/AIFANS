@@ -81,10 +81,26 @@ export async function POST(request: NextRequest) {
       updates.description = description;
     }
 
+    // Use upsert to handle both create and update, working around RLS
+    const { data: existing } = await supabase
+      .from('feature_flags')
+      .select('*')
+      .eq('flag_name', flag_name)
+      .single();
+
+    const upsertData = {
+      flag_name,
+      is_enabled: typeof is_enabled === 'boolean' ? is_enabled : existing?.is_enabled ?? false,
+      rollout_percentage: typeof rollout_percentage === 'number'
+        ? Math.max(0, Math.min(100, rollout_percentage))
+        : existing?.rollout_percentage ?? 0,
+      description: typeof description === 'string' ? description : existing?.description ?? '',
+      updated_at: new Date().toISOString(),
+    };
+
     const { data: flag, error } = await supabase
       .from('feature_flags')
-      .update(updates)
-      .eq('flag_name', flag_name)
+      .upsert(upsertData, { onConflict: 'flag_name' })
       .select()
       .single();
 
