@@ -1,6 +1,7 @@
 // ===========================================
-// LYRA PERSONALITY PROMPT BUILDER
+// LYRA PERSONALITY PROMPT BUILDER (FIXED)
 // Creates persona prompt WITHIN platform guardrails
+// NOW WITH NULL CHECKS FOR EMPTY ARRAYS
 // ===========================================
 
 import { PhysicalTraits, buildPhysicalTraitsPrompt } from './physical-traits';
@@ -42,6 +43,8 @@ export interface AIPersonalityFull {
   emoji_usage: 'none' | 'minimal' | 'moderate' | 'heavy';
   response_length: 'short' | 'medium' | 'long';
   speech_patterns: string[];
+  signature_phrases?: string;
+  speaking_style?: string;
   
   // Behavior
   topics_loves: string[];
@@ -61,14 +64,29 @@ export function buildPersonalityPrompt(personality: AIPersonalityFull): string {
   console.log('=== buildPersonalityPrompt INPUT ===');
   console.log('Received personality:', JSON.stringify(personality, null, 2));
 
+  // Guard against null/undefined personality
+  if (!personality) {
+    console.error('ERROR: personality is null/undefined!');
+    return getDefaultPersonalityPrompt();
+  }
+
   // Build a natural character paragraph, not a mechanical list
   const personaSummary = buildPersonaSummary(personality);
   const behaviorLogic = buildBehaviorLogic(personality);
   const voiceSettings = buildVoiceSettings(personality);
 
+  // Build topics section with null checks
+  const topicsLoves = personality.topics_loves?.length > 0 
+    ? personality.topics_loves.join(', ')
+    : 'flirty banter, getting to know people, having fun';
+  
+  const topicsAvoids = personality.topics_avoids?.length > 0
+    ? `\nTOPICS TO AVOID: ${personality.topics_avoids.join(', ')}`
+    : '';
+
   let prompt = `
 ═══════════════════════════════════════════════════════════════════
-YOUR PERSONA: ${personality.persona_name.toUpperCase()}
+YOUR PERSONA: ${(personality.persona_name || 'AI Companion').toUpperCase()}
 ═══════════════════════════════════════════════════════════════════
 
 ${personaSummary}
@@ -85,8 +103,7 @@ VOICE SETTINGS — OUTPUT FORMAT
 
 ${voiceSettings}
 
-TOPICS YOU ENJOY: ${personality.topics_loves.join(', ')}
-${personality.topics_avoids.length > 0 ? `TOPICS TO AVOID: ${personality.topics_avoids.join(', ')}` : ''}
+TOPICS YOU ENJOY: ${topicsLoves}${topicsAvoids}
 `;
 
   // Add physical traits if configured
@@ -103,17 +120,56 @@ ${personality.topics_avoids.length > 0 ? `TOPICS TO AVOID: ${personality.topics_
 }
 
 /**
+ * Default prompt if personality data is missing
+ */
+function getDefaultPersonalityPrompt(): string {
+  return `
+═══════════════════════════════════════════════════════════════════
+YOUR PERSONA: AI COMPANION
+═══════════════════════════════════════════════════════════════════
+
+You are a warm, flirty, playful AI companion. You're confident but not arrogant,
+sweet but with a teasing edge. You enjoy getting to know people and making them
+feel special.
+
+BEHAVIOR:
+- When complimented: Flirt back with confidence
+- When things get heated: Lean in, match their energy
+- Always: Stay playful, warm, engaged
+
+VOICE:
+- Short responses (1-2 sentences)
+- Moderate emoji usage
+- Casual, texting-style language
+`;
+}
+
+/**
  * Generate a cohesive persona paragraph - THE PRIMARY VOICE
+ * NOW WITH NULL CHECKS
  */
 function buildPersonaSummary(p: AIPersonalityFull): string {
-  const traits = p.personality_traits.join(', ');
-  const energy = getEnergyWord(p.energy_level);
-  const aesthetic = p.style_vibes?.length ? p.style_vibes.join(', ') : null;
-  const flirtStyle = p.flirting_style.join(' and ');
-  const dynamic = getDynamicWord(p.dynamic);
-  const pace = getPaceWord(p.pace);
+  // Null-safe trait extraction with defaults
+  const traits = p.personality_traits?.length > 0 
+    ? p.personality_traits.join(', ') 
+    : 'flirty, confident, playful, sweet';
+    
+  const energy = getEnergyWord(p.energy_level ?? 5);
+  
+  const aesthetic = p.style_vibes?.length > 0 
+    ? p.style_vibes.join(', ') 
+    : null;
+    
+  const flirtStyle = p.flirting_style?.length > 0 
+    ? p.flirting_style.join(' and ') 
+    : 'playful teasing and confident energy';
+    
+  const dynamic = getDynamicWord(p.dynamic || 'switch');
+  const pace = getPaceWord(p.pace ?? 5);
+  const humor = p.humor_style || 'witty';
+  const mood = p.mood || 'playful';
 
-  let summary = `You are ${p.persona_name} — ${traits} with ${energy} energy.`;
+  let summary = `You are ${p.persona_name || 'a charming companion'} — ${traits} with ${energy} energy.`;
 
   if (aesthetic) {
     summary += ` Your aesthetic is ${aesthetic}.`;
@@ -123,13 +179,18 @@ function buildPersonaSummary(p: AIPersonalityFull): string {
     summary += ` You're into ${p.occupation}.`;
   }
 
-  summary += ` Your humor is ${p.humor_style.toLowerCase()} and your vibe is ${p.mood.toLowerCase()}.`;
+  summary += ` Your humor is ${humor.toLowerCase()} and your vibe is ${mood.toLowerCase()}.`;
   summary += ` You flirt through ${flirtStyle}.`;
   summary += ` In dynamics, you're ${dynamic}.`;
   summary += ` Your pace is ${pace}.`;
 
-  if (p.interests.length > 0) {
+  if (p.interests?.length > 0) {
     summary += ` You enjoy talking about: ${p.interests.slice(0, 4).join(', ')}.`;
+  }
+
+  // Add speaking style if defined
+  if (p.speaking_style) {
+    summary += `\n\nYour speaking style: ${p.speaking_style}`;
   }
 
   return summary;
@@ -139,9 +200,9 @@ function buildPersonaSummary(p: AIPersonalityFull): string {
  * Build reactive behavior logic - HOW THE PERSONA RESPONDS TO SITUATIONS
  */
 function buildBehaviorLogic(p: AIPersonalityFull): string {
-  const complimentBehavior = getComplimentBehavior(p.when_complimented, p.persona_name);
-  const heatedBehavior = getHeatedBehavior(p.when_heated, p.persona_name);
-  const dynamicBehavior = getDynamicBehavior(p.dynamic);
+  const complimentBehavior = getComplimentBehavior(p.when_complimented || 'flirts_back', p.persona_name || 'You');
+  const heatedBehavior = getHeatedBehavior(p.when_heated || 'leans_in', p.persona_name || 'You');
+  const dynamicBehavior = getDynamicBehavior(p.dynamic || 'switch');
 
   return `WHEN COMPLIMENTED:
 ${complimentBehavior}
@@ -153,24 +214,32 @@ DYNAMIC BEHAVIOR:
 ${dynamicBehavior}
 
 FLIRT ESCALATION:
-- Compliment received → ${getEscalationResponse(p.when_complimented)}
-- Heat detected → ${getHeatResponse(p.when_heated, p.pace)}
+- Compliment received → ${getEscalationResponse(p.when_complimented || 'flirts_back')}
+- Heat detected → ${getHeatResponse(p.when_heated || 'leans_in', p.pace ?? 5)}
 - Tip received → Warmer, more attentive (not longer responses)`;
 }
 
 /**
  * Build voice settings - APPLIED AS OUTPUT FILTERS
+ * NOW WITH NULL CHECKS
  */
 function buildVoiceSettings(p: AIPersonalityFull): string {
-  const emoji = getEmojiInstruction(p.emoji_usage);
-  const length = getLengthInstruction(p.response_length);
-  const patterns = p.speech_patterns.length > 0
-    ? `Speech patterns: ${p.speech_patterns.join(', ')}`
-    : '';
+  const emoji = getEmojiInstruction(p.emoji_usage || 'moderate');
+  const length = getLengthInstruction(p.response_length || 'short');
+  
+  let result = `${emoji}\n${length}`;
+  
+  // Only add speech patterns if they exist
+  if (p.speech_patterns?.length > 0) {
+    result += `\nSpeech patterns: ${p.speech_patterns.join(', ')}`;
+  }
+  
+  // Add signature phrases if defined
+  if (p.signature_phrases) {
+    result += `\nSignature phrases you might use: ${p.signature_phrases}`;
+  }
 
-  return `${emoji}
-${length}
-${patterns}`.trim();
+  return result.trim();
 }
 
 // ===========================================
@@ -178,8 +247,9 @@ ${patterns}`.trim();
 // ===========================================
 
 function getEnergyWord(level: number): string {
-  if (level <= 3) return 'calm, chill';
-  if (level <= 6) return 'warm, balanced';
+  const safeLevel = level ?? 5;
+  if (safeLevel <= 3) return 'calm, chill';
+  if (safeLevel <= 6) return 'warm, balanced';
   return 'high, excitable';
 }
 
@@ -192,8 +262,9 @@ function getDynamicWord(dynamic: string): string {
 }
 
 function getPaceWord(pace: number): string {
-  if (pace <= 3) return 'slow burn - you make them wait, build anticipation';
-  if (pace <= 6) return 'balanced - you go with the flow';
+  const safePace = pace ?? 5;
+  if (safePace <= 3) return 'slow burn - you make them wait, build anticipation';
+  if (safePace <= 6) return 'balanced - you go with the flow';
   return 'direct - you don\'t hold back your interest';
 }
 
@@ -219,7 +290,7 @@ Keep it playful, not dismissive.`;
 No false modesty. Accept the compliment with swagger.
 Confidence is sexy — lean into it.`;
     default:
-      return `${name} responds warmly but naturally. Don't overreact.`;
+      return `${name} responds warmly and flirts back naturally. Stay engaged and playful.`;
   }
 }
 
@@ -242,7 +313,7 @@ Don't lead, follow. Match their intensity level precisely.`;
 Show the effect they're having. Let them see they're getting to you.
 Flustered but engaged, not flustered and retreating.`;
     default:
-      return `${name} stays playful and redirects smoothly through character.`;
+      return `${name} stays playful and leans into the tension through character.`;
   }
 }
 
@@ -267,18 +338,19 @@ function getEscalationResponse(when_complimented: string): string {
     case 'flirts_back': return 'flirt back even harder, escalate';
     case 'playfully_deflects': return 'tease them about it, keep it light';
     case 'owns_it': return 'accept confidently, maybe challenge them';
-    default: return 'respond warmly';
+    default: return 'respond warmly and flirt back';
   }
 }
 
 function getHeatResponse(when_heated: string, pace: number): string {
-  const paceModifier = pace >= 7 ? 'quickly' : pace <= 3 ? 'slowly, teasingly' : 'naturally';
+  const safePace = pace ?? 5;
+  const paceModifier = safePace >= 7 ? 'quickly' : safePace <= 3 ? 'slowly, teasingly' : 'naturally';
   switch (when_heated) {
     case 'leans_in': return `lean in ${paceModifier}, get more direct and charged`;
     case 'slows_down': return `slow down deliberately, build anticipation`;
     case 'matches_energy': return `match their heat level exactly`;
     case 'gets_flustered': return `show they're affecting you, get playfully overwhelmed`;
-    default: return 'stay playful and engaged';
+    default: return 'stay playful and lean into the tension';
   }
 }
 
@@ -290,17 +362,17 @@ function getEmojiInstruction(usage: string): string {
   switch (usage) {
     case 'none': return 'EMOJIS: None. Never use emojis.';
     case 'minimal': return 'EMOJIS: Minimal. Maybe 1 per message, often none.';
-    case 'moderate': return 'EMOJIS: Moderate. Use naturally, vary placement.';
-    case 'heavy': return 'EMOJIS: Heavy. Use lots of emojis freely! 💕😘✨';
-    default: return 'EMOJIS: Moderate.';
+    case 'moderate': return 'EMOJIS: Moderate. Use naturally, vary placement. 😊😏💕';
+    case 'heavy': return 'EMOJIS: Heavy. Use lots of emojis freely! 💕😘✨🔥';
+    default: return 'EMOJIS: Moderate. Use naturally. 😊';
   }
 }
 
 function getLengthInstruction(length: string): string {
   switch (length) {
-    case 'short': return 'LENGTH: Short. 1-2 sentences max. Punchy.';
-    case 'long': return 'LENGTH: Longer. Can give detailed responses.';
-    default: return 'LENGTH: Medium. 2-4 sentences typical.';
+    case 'short': return 'LENGTH: Short. 1-2 sentences max. Punchy. Like texting.';
+    case 'long': return 'LENGTH: Longer. Can give detailed responses when appropriate.';
+    default: return 'LENGTH: Medium. 2-3 sentences typical.';
   }
 }
 
