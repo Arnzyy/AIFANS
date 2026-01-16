@@ -156,7 +156,7 @@ function buildPersonaSummary(p: AIPersonalityFull): string {
     
   const energy = getEnergyWord(p.energy_level ?? 5);
   
-  const aesthetic = p.style_vibes?.length > 0 
+  const aesthetic = (p.style_vibes?.length ?? 0) > 0 
     ? p.style_vibes.join(', ') 
     : null;
     
