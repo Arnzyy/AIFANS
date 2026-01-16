@@ -287,6 +287,13 @@ async function generateV2Response(
   passed_compliance: boolean;
   compliance_issues?: string[];
 }> {
+  // DEBUG: Log V2 personality data
+  console.log('=== V2 PERSONALITY DATA LOADED ===');
+  console.log('Personality ID:', personality?.id);
+  console.log('Personality keys:', personality ? Object.keys(personality) : 'NULL');
+  console.log('Persona name:', personality?.persona_name);
+  console.log('Full personality:', JSON.stringify(personality, null, 2));
+
   // Get or create conversation
   let convId = conversationId;
   if (!convId) {
@@ -339,6 +346,12 @@ async function generateV2Response(
     .eq('conversation_id', convId)
     .order('created_at', { ascending: false })
     .limit(20);
+
+  // DEBUG: Log V2 conversation history
+  console.log('=== V2 CONVERSATION HISTORY ===');
+  console.log('Conversation ID:', convId);
+  console.log('Messages loaded from DB:', recentMessages?.length || 0);
+  console.log('Last 3 messages:', JSON.stringify(recentMessages?.slice(0, 3), null, 2));
 
   const messages: ChatMessage[] = [
     ...(recentMessages || []).reverse().map((m: any) => ({

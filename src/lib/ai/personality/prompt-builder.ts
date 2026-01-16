@@ -57,6 +57,10 @@ export interface AIPersonalityFull {
  * This is the PRIMARY source of voice/tone - master prompt is just mechanics
  */
 export function buildPersonalityPrompt(personality: AIPersonalityFull): string {
+  // DEBUG: Log input
+  console.log('=== buildPersonalityPrompt INPUT ===');
+  console.log('Received personality:', JSON.stringify(personality, null, 2));
+
   // Build a natural character paragraph, not a mechanical list
   const personaSummary = buildPersonaSummary(personality);
   const behaviorLogic = buildBehaviorLogic(personality);
@@ -89,6 +93,11 @@ ${personality.topics_avoids.length > 0 ? `TOPICS TO AVOID: ${personality.topics_
   if (personality.physical_traits && Object.keys(personality.physical_traits).length > 0) {
     prompt += buildPhysicalTraitsPrompt(personality.physical_traits);
   }
+
+  // DEBUG: Log output
+  console.log('=== buildPersonalityPrompt OUTPUT ===');
+  console.log('Built prompt length:', prompt.length);
+  console.log('Built prompt preview (first 500 chars):', prompt.slice(0, 500));
 
   return prompt;
 }

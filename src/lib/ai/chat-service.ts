@@ -53,8 +53,22 @@ export async function generateChatResponse(
 ): Promise<ChatResponse> {
   const { subscriberId, creatorId, message } = request;
 
+  // DEBUG: Log personality data being loaded
+  console.log('=== PERSONALITY DATA LOADED ===');
+  console.log('Personality ID:', personality?.id);
+  console.log('Personality keys:', personality ? Object.keys(personality) : 'NULL');
+  console.log('Persona name:', personality?.persona_name);
+  console.log('Full personality:', JSON.stringify(personality, null, 2));
+
   // 1. Build memory context
   const memoryContext = await buildChatContext(supabase, subscriberId, creatorId);
+
+  // DEBUG: Log conversation history
+  console.log('=== CONVERSATION HISTORY ===');
+  console.log('Memory exists:', !!memoryContext.memory);
+  console.log('Summary exists:', !!memoryContext.summary);
+  console.log('Recent messages loaded:', memoryContext.recent_messages?.length || 0);
+  console.log('Last 3 messages:', JSON.stringify(memoryContext.recent_messages?.slice(-3), null, 2));
   
   // 2. Check if user is referencing content
   let contentContext = '';
