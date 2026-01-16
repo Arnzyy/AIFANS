@@ -351,7 +351,9 @@ export class MessageAnalyticsService {
 // ===========================================
 
 export function countEmojis(text: string): number {
-  const emojiRegex = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]/gu;
+  // Simple emoji detection without unicode flag for ES5 compatibility
+  // Matches common emoji patterns using surrogate pairs
+  const emojiRegex = /(?:[\u2600-\u27BF]|(?:\uD83C[\uDF00-\uDFFF])|(?:\uD83D[\uDC00-\uDE4F\uDE80-\uDEFF])|(?:\uD83E[\uDD00-\uDDFF]))/g;
   const matches = text.match(emojiRegex);
   return matches ? matches.length : 0;
 }

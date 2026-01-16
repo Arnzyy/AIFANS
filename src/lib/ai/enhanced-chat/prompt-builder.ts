@@ -110,11 +110,17 @@ export class PromptBuilderService {
     const memoryContext = this.memoryService.formatMemoriesForPrompt(memories);
 
     // 7. Get few-shot examples for current heat level
+    // Cast when_complimented to expected type (may be free-form string in DB)
+    const validComplimentResponses = ['gets_shy', 'flirts_back', 'playfully_deflects', 'owns_it'] as const;
+    const whenComplimented = validComplimentResponses.includes(context.persona.when_complimented as any)
+      ? context.persona.when_complimented as typeof validComplimentResponses[number]
+      : undefined;
+
     const fewShotExamples = getFewShotExamples(
       stateGuidance.heatLevel,
       {
         dynamic: context.persona.dynamic,
-        when_complimented: context.persona.when_complimented,
+        when_complimented: whenComplimented,
         emoji_usage: context.persona.emoji_usage,
       }
     );
