@@ -520,7 +520,7 @@ but keep it neutral until persona settings are defined.`;
       { role: 'user', content: message }
     ];
 
-    const responseLength = personality?.response_length || 'medium';
+    const responseLength = (personality?.response_length as 'short' | 'medium' | 'long') || 'medium';
     const response = await callAnthropicAPI(systemPrompt, messages, responseLength);
     return stripAsteriskActions(response);
   } catch (error) {
