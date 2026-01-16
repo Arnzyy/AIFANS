@@ -415,10 +415,10 @@ async function generateV2Response(
 
 function getMaxTokensForLength(responseLength: 'short' | 'medium' | 'long' = 'medium'): number {
   switch (responseLength) {
-    case 'short': return 100;
-    case 'medium': return 250;
-    case 'long': return 500;
-    default: return 250;
+    case 'short': return 50;   // ~35 words - punchy one-liners
+    case 'medium': return 120; // ~90 words - conversational
+    case 'long': return 250;   // ~180 words - detailed
+    default: return 120;
   }
 }
 
