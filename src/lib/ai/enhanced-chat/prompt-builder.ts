@@ -122,12 +122,18 @@ export class PromptBuilderService {
       ? context.persona.dynamic as typeof validDynamics[number]
       : undefined;
 
+    // Cast emoji_usage to expected type (may be free-form string in DB)
+    const validEmojiUsage = ['none', 'minimal', 'moderate', 'heavy'] as const;
+    const emojiUsage = validEmojiUsage.includes(context.persona.emoji_usage as any)
+      ? context.persona.emoji_usage as typeof validEmojiUsage[number]
+      : undefined;
+
     const fewShotExamples = getFewShotExamples(
       stateGuidance.heatLevel,
       {
         dynamic,
         when_complimented: whenComplimented,
-        emoji_usage: context.persona.emoji_usage,
+        emoji_usage: emojiUsage,
       }
     );
 
