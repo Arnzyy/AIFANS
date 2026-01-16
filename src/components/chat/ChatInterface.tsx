@@ -144,8 +144,8 @@ export function ChatInterface({
 
   return (
     <div className="flex flex-col h-full bg-black">
-      {/* Chat Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-zinc-950">
+      {/* Chat Header - Sticky like WhatsApp */}
+      <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 border-b border-white/10 bg-zinc-950">
         <div className="flex items-center gap-3">
           <div className="relative">
             <img

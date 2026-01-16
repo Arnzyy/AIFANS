@@ -977,8 +977,8 @@ export default function AIChatPage() {
         </div>
       )}
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
+      {/* Header - Fixed for iOS compatibility */}
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-black/95 backdrop-blur-xl">
         <div className="flex items-center gap-3 px-3 md:px-4 h-14 md:h-16">
           <Link
             href={isModelChat ? `/model/${creator?.id}` : `/${creator?.username}`}
@@ -1067,17 +1067,17 @@ export default function AIChatPage() {
         </div>
       </header>
 
-      {/* AI Disclosure Banner */}
+      {/* AI Disclosure Banner - Fixed below header */}
       {showDisclosure && (
-        <div className="px-3 md:px-4 py-2 md:py-3 bg-purple-500/10 border-b border-purple-500/20">
+        <div className="fixed top-14 md:top-16 left-0 right-0 z-40 px-3 md:px-4 py-2 md:py-3 bg-purple-500/10 border-b border-purple-500/20">
           <p className="text-xs md:text-sm text-center text-purple-200">
             {AI_CHAT_DISCLOSURE.medium}
           </p>
         </div>
       )}
 
-      {/* Messages - pb-48 accounts for fixed input area + tip bar */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 pb-48">
+      {/* Messages - pt accounts for fixed header + disclosure, pb-48 for fixed input area + tip bar */}
+      <div className={`flex-1 min-h-0 overflow-y-auto px-4 pb-48 ${showDisclosure ? 'pt-28 md:pt-32' : 'pt-16 md:pt-20'}`}>
         <div className="max-w-2xl mx-auto space-y-4">
           {messages.length === 0 && !openingMessage ? (
             <div className="text-center py-6 md:py-12">
