@@ -922,7 +922,7 @@ export default function AIChatPage() {
   return (
     <div
       ref={containerRef}
-      className="flex flex-col h-dvh max-h-dvh overflow-hidden bg-black"
+      className="fixed inset-0 flex flex-col overflow-hidden bg-black"
     >
       {/* Quick Tip Success Toast */}
       {quickTipSuccess && (
@@ -943,8 +943,8 @@ export default function AIChatPage() {
         </div>
       )}
 
-      {/* Header - flex-shrink-0 keeps it fixed without position:fixed */}
-      <header className="flex-shrink-0 border-b border-white/10 bg-black z-10">
+      {/* Header - sticky + z-50 for iOS Safari */}
+      <header className="flex-shrink-0 sticky top-0 z-50 border-b border-white/10 bg-black pt-[env(safe-area-inset-top)]">
         <div className="flex items-center gap-3 px-3 md:px-4 h-14 md:h-16">
           <Link
             href={isModelChat ? `/model/${creator?.id}` : `/${creator?.username}`}
@@ -1042,8 +1042,8 @@ export default function AIChatPage() {
         </div>
       )}
 
-      {/* Messages - WhatsApp style: flex-1 overflow-y-auto, inner justify-end anchors to bottom */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
+      {/* Messages - WhatsApp style with overscroll-contain for iOS */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className="flex-1 flex flex-col justify-end min-h-full px-4 py-4 gap-3 max-w-2xl mx-auto w-full">
           {messages.length === 0 && !openingMessage ? (
             <div className="text-center py-6 md:py-12">
@@ -1152,8 +1152,8 @@ export default function AIChatPage() {
         </div>
       </div>
 
-      {/* Input Area with Tip Bar - flex-shrink-0 for WhatsApp style layout */}
-      <div className="flex-shrink-0 border-t border-white/10 bg-black pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      {/* Input Area with Tip Bar - sticky + z-50 for iOS Safari */}
+      <div className="flex-shrink-0 sticky bottom-0 z-50 border-t border-white/10 bg-black pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {/* Quick Tip Bar - Mobile Optimized */}
         {creator && creator.id.includes('-') && creator.id.length >= 30 && (
           <div className="px-2 md:px-4 py-1.5 md:py-2 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border-b border-white/5">
