@@ -11,6 +11,7 @@ import {
   ToggleLeft,
   ToggleRight,
 } from 'lucide-react';
+import FeatureFlagsSettings from '@/components/admin/FeatureFlagsSettings';
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState({
@@ -98,6 +99,9 @@ export default function AdminSettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Feature Flags */}
+      <FeatureFlagsSettings />
 
       {/* Moderation Settings */}
       <div className="bg-zinc-900 rounded-xl p-6">

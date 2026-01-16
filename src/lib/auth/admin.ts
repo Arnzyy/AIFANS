@@ -2,7 +2,7 @@
 // Add emails here that should have full access to all content
 
 const ADMIN_EMAILS: string[] = [
-  // Add admin emails here for full platform access
+  'admin@joinlyra.com',
 ];
 
 /**
