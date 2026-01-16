@@ -3,17 +3,31 @@
 // Assembles the complete prompt with all dynamic context
 // ===========================================
 
-import { SupabaseClient } from '@supabase/supabase-js';
 import {
   MASTER_SYSTEM_PROMPT_V2,
   buildDynamicContext,
   ConversationStateContext,
   UserPreferenceContext
 } from './master-prompt-v2';
-import { ConversationStateService } from './conversation-state';
-import { EnhancedMemoryService } from './memory-service';
-import { UserPreferencesService } from './user-preferences';
-import { MessageAnalyticsService, countEmojis, getFirstWord, endsWithQuestion } from './message-analytics';
+import {
+  ConversationStateService,
+  getConversationStateService,
+  endsWithQuestion,
+  getFirstWord
+} from './conversation-state';
+import {
+  MemoryService,
+  getMemoryService
+} from './memory-service';
+import {
+  UserPreferencesService,
+  getUserPreferencesService
+} from './user-preferences';
+import {
+  MessageAnalyticsService,
+  getMessageAnalyticsService,
+  countEmojis
+} from './message-analytics';
 import { getFewShotExamples, ANTI_PATTERN_EXAMPLES, LENGTH_GUIDE } from './few-shot-examples';
 import { buildPersonalityPrompt } from '../personality/prompt-builder';
 import { AIPersonalityFull } from '../personality/prompt-builder';
@@ -43,15 +57,15 @@ export interface BuiltPrompt {
 
 export class PromptBuilderService {
   private stateService: ConversationStateService;
-  private memoryService: EnhancedMemoryService;
+  private memoryService: MemoryService;
   private prefsService: UserPreferencesService;
   private analyticsService: MessageAnalyticsService;
 
-  constructor(private supabase: SupabaseClient) {
-    this.stateService = new ConversationStateService(supabase);
-    this.memoryService = new EnhancedMemoryService(supabase);
-    this.prefsService = new UserPreferencesService(supabase);
-    this.analyticsService = new MessageAnalyticsService(supabase);
+  constructor(supabaseUrl: string, supabaseKey: string) {
+    this.stateService = getConversationStateService(supabaseUrl, supabaseKey);
+    this.memoryService = getMemoryService(supabaseUrl, supabaseKey);
+    this.prefsService = getUserPreferencesService(supabaseUrl, supabaseKey);
+    this.analyticsService = getMessageAnalyticsService(supabaseUrl, supabaseKey);
   }
 
   // ===========================================
@@ -226,4 +240,23 @@ export class PromptBuilderService {
       priorHeatLevel: state.currentHeatLevel,
     });
   }
+}
+
+// ===========================================
+// SINGLETON EXPORT
+// ===========================================
+
+let promptBuilder: PromptBuilderService | null = null;
+
+export function getPromptBuilder(
+  supabaseUrl?: string,
+  supabaseKey?: string
+): PromptBuilderService {
+  if (!promptBuilder) {
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase credentials required for first initialization');
+    }
+    promptBuilder = new PromptBuilderService(supabaseUrl, supabaseKey);
+  }
+  return promptBuilder;
 }

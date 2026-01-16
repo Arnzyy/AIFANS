@@ -3,7 +3,7 @@
 // Tracks conversation patterns to prevent repetition
 // ===========================================
 
-import { SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // ===========================================
 // TYPE DEFINITIONS
@@ -122,9 +122,12 @@ export function endsWithQuestion(content: string): boolean {
 // ===========================================
 
 export class ConversationStateService {
+  private supabase: SupabaseClient;
   private stateCache: Map<string, ConversationState> = new Map();
 
-  constructor(private supabase: SupabaseClient) {}
+  constructor(supabaseUrl: string, supabaseKey: string) {
+    this.supabase = createClient(supabaseUrl, supabaseKey);
+  }
 
   // ===========================================
   // GET OR CREATE STATE
@@ -222,12 +225,12 @@ export class ConversationStateService {
       throw new Error(`State not found for conversation ${conversationId}`);
     }
 
-    const endedWithQuestionFlag = endsWithQuestion(message);
+    const endedWithQuestion = endsWithQuestion(message);
     const length = classifyLength(message);
     const startedWith = getFirstWord(message);
 
     // Update tracking
-    state.lastResponseEndedWithQuestion = endedWithQuestionFlag;
+    state.lastResponseEndedWithQuestion = endedWithQuestion;
     state.lastResponseLength = length;
     state.lastResponseStartedWith = startedWith;
 
@@ -235,13 +238,13 @@ export class ConversationStateService {
     state.questionsInLast5Messages = state.recentBotMessages
       .slice(-4)
       .filter(m => m.endedWithQuestion)
-      .length + (endedWithQuestionFlag ? 1 : 0);
+      .length + (endedWithQuestion ? 1 : 0);
 
     // Add to recent messages (keep last 5)
     state.recentBotMessages.push({
       content: message,
       length: message.length,
-      endedWithQuestion: endedWithQuestionFlag,
+      endedWithQuestion,
       startedWith,
       heatLevel: state.currentHeatLevel,
       timestamp: new Date(),
@@ -270,16 +273,16 @@ export class ConversationStateService {
 
     // Question frequency check
     if (state.questionsInLast5Messages >= 2) {
-      guidance.push('DO NOT end with a question this time - use a statement or reaction instead.');
+      guidance.push('DO NOT end with a question this time — use a statement or reaction instead.');
     }
 
     // Length variation check
     const recentLengths = state.recentBotMessages.slice(-3).map(m => classifyLength(m.content));
     if (recentLengths.length >= 3 && recentLengths.every(l => l === recentLengths[0])) {
       if (recentLengths[0] === 'short') {
-        guidance.push('Your last 3 messages were short - you can go slightly longer this time.');
+        guidance.push('Your last 3 messages were short — you can go slightly longer this time.');
       } else if (recentLengths[0] === 'long') {
-        guidance.push('Your last 3 messages were long - make this one punchy and short.');
+        guidance.push('Your last 3 messages were long — make this one punchy and short.');
       }
     }
 
@@ -287,7 +290,7 @@ export class ConversationStateService {
     if (state.lastResponseStartedWith && state.recentBotMessages.length >= 2) {
       const lastTwo = state.recentBotMessages.slice(-2).map(m => m.startedWith);
       if (lastTwo[0] === lastTwo[1]) {
-        guidance.push(`Don't start with "${state.lastResponseStartedWith}" again - vary your opener.`);
+        guidance.push(`Don't start with "${state.lastResponseStartedWith}" again — vary your opener.`);
       }
     }
 
@@ -295,31 +298,31 @@ export class ConversationStateService {
     const commonOpeners = ['mm', 'oh', 'well', 'i'];
     const lastOpener = state.lastResponseStartedWith.toLowerCase();
     if (commonOpeners.includes(lastOpener)) {
-      guidance.push(`Last message started with "${lastOpener}" - use a different opener.`);
+      guidance.push(`Last message started with "${lastOpener}" — use a different opener.`);
     }
 
     // Heat-based guidance
     if (state.currentHeatLevel >= 7) {
-      guidance.push('Heat is HIGH - keep responses SHORT and CONFIDENT. One-liners are perfect.');
+      guidance.push('Heat is HIGH — keep responses SHORT and CONFIDENT. One-liners are perfect.');
     } else if (state.currentHeatLevel >= 4) {
-      guidance.push('Heat is MEDIUM - stay flirty but don\'t over-explain. Keep it playful.');
+      guidance.push('Heat is MEDIUM — stay flirty but don\'t over-explain. Keep it playful.');
     }
 
     // Session length guidance
     if (state.messagesThisSession > 15 && state.currentHeatLevel < 4) {
-      guidance.push('Long session, low heat - add some playful tension or tease to keep it interesting.');
+      guidance.push('Long session, low heat — add some playful tension or tease to keep it interesting.');
     }
 
     // Pattern breaking
     if (state.messagesThisSession > 5) {
       const structures = state.recentBotMessages.slice(-3).map(m => {
         const hasQuestion = m.endedWithQuestion;
-        const lengthCat = classifyLength(m.content);
-        return `${lengthCat}-${hasQuestion ? 'q' : 's'}`;
+        const length = classifyLength(m.content);
+        return `${length}-${hasQuestion ? 'q' : 's'}`;
       });
 
       if (structures.length >= 3 && structures.every(s => s === structures[0])) {
-        guidance.push('Your responses are getting predictable - break the pattern with a different structure.');
+        guidance.push('Your responses are getting predictable — break the pattern with a different structure.');
       }
     }
 
@@ -328,7 +331,7 @@ export class ConversationStateService {
     if (lastUserMessage) {
       const userLength = classifyLength(lastUserMessage.content);
       if (userLength === 'short') {
-        guidance.push('User sent a SHORT message - match their energy with a brief response.');
+        guidance.push('User sent a SHORT message — match their energy with a brief response.');
       }
     }
 
@@ -399,4 +402,23 @@ export class ConversationStateService {
       this.stateCache.set(conversationId, state);
     }
   }
+}
+
+// ===========================================
+// SINGLETON EXPORT
+// ===========================================
+
+let stateService: ConversationStateService | null = null;
+
+export function getConversationStateService(
+  supabaseUrl?: string,
+  supabaseKey?: string
+): ConversationStateService {
+  if (!stateService) {
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase credentials required for first initialization');
+    }
+    stateService = new ConversationStateService(supabaseUrl, supabaseKey);
+  }
+  return stateService;
 }

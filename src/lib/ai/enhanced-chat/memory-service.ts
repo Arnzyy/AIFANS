@@ -3,7 +3,7 @@
 // Contextual memory injection based on conversation
 // ===========================================
 
-import { SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // ===========================================
 // TYPE DEFINITIONS
@@ -66,8 +66,12 @@ const CATEGORY_KEYWORDS: Record<MemoryCategory, string[]> = {
 // MEMORY SERVICE
 // ===========================================
 
-export class EnhancedMemoryService {
-  constructor(private supabase: SupabaseClient) {}
+export class MemoryService {
+  private supabase: SupabaseClient;
+
+  constructor(supabaseUrl: string, supabaseKey: string) {
+    this.supabase = createClient(supabaseUrl, supabaseKey);
+  }
 
   // ===========================================
   // GET ALL MEMORIES FOR USER/PERSONA
@@ -75,7 +79,7 @@ export class EnhancedMemoryService {
 
   async getAllMemories(userId: string, personaId: string): Promise<UserMemory[]> {
     const { data, error } = await this.supabase
-      .from('user_memories_v2')
+      .from('user_memories')
       .select('*')
       .eq('user_id', userId)
       .eq('persona_id', personaId)
@@ -168,9 +172,9 @@ export class EnhancedMemoryService {
 
     for (const [category, facts] of Object.entries(grouped)) {
       if (facts.length === 1) {
-        lines.push(`- ${facts[0]}`);
+        lines.push(`• ${facts[0]}`);
       } else {
-        lines.push(`- ${category}: ${facts.join(', ')}`);
+        lines.push(`• ${category}: ${facts.join(', ')}`);
       }
     }
 
@@ -214,7 +218,7 @@ export class EnhancedMemoryService {
 
     // Check for existing memory in same category
     const { data: existing } = await this.supabase
-      .from('user_memories_v2')
+      .from('user_memories')
       .select('*')
       .eq('user_id', userId)
       .eq('persona_id', personaId)
@@ -224,7 +228,7 @@ export class EnhancedMemoryService {
     if (existing) {
       // Update existing memory
       const { data, error } = await this.supabase
-        .from('user_memories_v2')
+        .from('user_memories')
         .update({
           fact,
           source,
@@ -248,7 +252,7 @@ export class EnhancedMemoryService {
 
     // Create new memory
     const { data, error } = await this.supabase
-      .from('user_memories_v2')
+      .from('user_memories')
       .insert({
         user_id: userId,
         persona_id: personaId,
@@ -274,6 +278,34 @@ export class EnhancedMemoryService {
   }
 
   // ===========================================
+  // UPDATE MEMORY RECENCY
+  // ===========================================
+
+  async updateRecency(userId: string, personaId: string): Promise<void> {
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Update to 'established' if last mentioned more than a week ago
+    await this.supabase
+      .from('user_memories')
+      .update({ recency: 'established' })
+      .eq('user_id', userId)
+      .eq('persona_id', personaId)
+      .eq('recency', 'recent')
+      .lt('last_mentioned', oneWeekAgo.toISOString());
+
+    // Update to 'old' if last mentioned more than a month ago
+    await this.supabase
+      .from('user_memories')
+      .update({ recency: 'old' })
+      .eq('user_id', userId)
+      .eq('persona_id', personaId)
+      .eq('recency', 'established')
+      .lt('last_mentioned', oneMonthAgo.toISOString());
+  }
+
+  // ===========================================
   // MEMORY EXTRACTION FROM MESSAGE
   // ===========================================
 
@@ -291,7 +323,7 @@ export class EnhancedMemoryService {
 
     for (const pattern of namePatterns) {
       const match = message.match(pattern);
-      if (match && match[1] && match[1].length > 1 && match[1].length < 20) {
+      if (match && match[1]) {
         extracted.push({ category: 'name', fact: `Name is ${match[1]}` });
         break;
       }
@@ -378,4 +410,23 @@ export class EnhancedMemoryService {
       updatedAt: new Date(data.updated_at),
     };
   }
+}
+
+// ===========================================
+// SINGLETON EXPORT
+// ===========================================
+
+let memoryService: MemoryService | null = null;
+
+export function getMemoryService(
+  supabaseUrl?: string,
+  supabaseKey?: string
+): MemoryService {
+  if (!memoryService) {
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase credentials required for first initialization');
+    }
+    memoryService = new MemoryService(supabaseUrl, supabaseKey);
+  }
+  return memoryService;
 }

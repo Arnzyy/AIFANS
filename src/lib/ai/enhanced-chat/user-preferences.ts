@@ -3,7 +3,7 @@
 // Tracks and learns user behavior patterns
 // ===========================================
 
-import { SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // ===========================================
 // TYPE DEFINITIONS
@@ -59,9 +59,12 @@ export interface PreferenceHints {
 // ===========================================
 
 export class UserPreferencesService {
+  private supabase: SupabaseClient;
   private prefsCache: Map<string, UserPreferences> = new Map();
 
-  constructor(private supabase: SupabaseClient) {}
+  constructor(supabaseUrl: string, supabaseKey: string) {
+    this.supabase = createClient(supabaseUrl, supabaseKey);
+  }
 
   // ===========================================
   // GET OR CREATE PREFERENCES
@@ -78,7 +81,7 @@ export class UserPreferencesService {
 
     // Try to load from database
     const { data, error } = await this.supabase
-      .from('user_preferences_v2')
+      .from('user_preferences')
       .select('*')
       .eq('user_id', userId)
       .eq('persona_id', personaId)
@@ -212,6 +215,46 @@ export class UserPreferencesService {
   }
 
   // ===========================================
+  // UPDATE SESSION END
+  // ===========================================
+
+  async updateSessionEnd(
+    userId: string,
+    personaId: string,
+    sessionData: {
+      durationMinutes: number;
+      messageCount: number;
+    }
+  ): Promise<void> {
+    const prefs = await this.getPreferences(userId, personaId);
+
+    const totalSessions = prefs.totalSessions + 1;
+
+    prefs.avgSessionDurationMinutes = this.runningAverage(
+      prefs.avgSessionDurationMinutes,
+      sessionData.durationMinutes,
+      totalSessions
+    );
+
+    prefs.avgMessagesPerSession = this.runningAverage(
+      prefs.avgMessagesPerSession,
+      sessionData.messageCount,
+      totalSessions
+    );
+
+    prefs.totalSessions = totalSessions;
+    prefs.updatedAt = new Date();
+
+    // Update cache and persist
+    const cacheKey = `${userId}-${personaId}`;
+    this.prefsCache.set(cacheKey, prefs);
+
+    this.persistPreferences(prefs).catch(err => {
+      console.error('Failed to persist session preferences:', err);
+    });
+  }
+
+  // ===========================================
   // GENERATE PREFERENCE HINTS
   // ===========================================
 
@@ -305,7 +348,7 @@ export class UserPreferencesService {
     };
 
     await this.supabase
-      .from('user_preferences_v2')
+      .from('user_preferences')
       .upsert(serialized, {
         onConflict: 'user_id,persona_id',
       });
@@ -337,4 +380,23 @@ export class UserPreferencesService {
       updatedAt: new Date(data.updated_at),
     };
   }
+}
+
+// ===========================================
+// SINGLETON EXPORT
+// ===========================================
+
+let prefsService: UserPreferencesService | null = null;
+
+export function getUserPreferencesService(
+  supabaseUrl?: string,
+  supabaseKey?: string
+): UserPreferencesService {
+  if (!prefsService) {
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase credentials required for first initialization');
+    }
+    prefsService = new UserPreferencesService(supabaseUrl, supabaseKey);
+  }
+  return prefsService;
 }

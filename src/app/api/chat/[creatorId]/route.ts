@@ -9,7 +9,7 @@ import { createServerClient } from '@/lib/supabase/server';
 import { generateChatResponse } from '@/lib/ai/chat-service';
 import { checkChatAccess, decrementMessage, isLowMessages } from '@/lib/chat';
 import { useEnhancedChatV2 } from '@/lib/feature-flags';
-import { PromptBuilderService, ChatContext } from '@/lib/ai/enhanced-chat/prompt-builder';
+import { getPromptBuilder, ChatContext } from '@/lib/ai/enhanced-chat/prompt-builder';
 import { FORBIDDEN_PATTERNS_V2 } from '@/lib/ai/enhanced-chat/master-prompt-v2';
 
 export async function POST(
@@ -313,7 +313,10 @@ async function generateV2Response(
   }
 
   // Initialize the prompt builder service
-  const promptBuilder = new PromptBuilderService(supabase);
+  const promptBuilder = getPromptBuilder(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
   // Build the chat context
   const chatContext: ChatContext = {
