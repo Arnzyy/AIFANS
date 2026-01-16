@@ -205,6 +205,23 @@ export function Step5Voice({ personality, onChange }: Step5Props) {
         </p>
       </div>
 
+      {/* Speaking Style - NEW */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Speaking Style (optional)
+        </label>
+        <textarea
+          value={personality.speaking_style || ''}
+          onChange={(e) => onChange({ speaking_style: e.target.value })}
+          rows={2}
+          placeholder='e.g., "Warm and flirty, like texting someone you\'re really into. Playful but not over the top."'
+          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 resize-none"
+        />
+        <p className="text-xs text-gray-500 mt-2">
+          Describe her overall vibe when she talks
+        </p>
+      </div>
+
       {/* Live Preview */}
       <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-4">
         <div className="text-sm text-gray-400 mb-3">Live Preview - how she might say hi:</div>
