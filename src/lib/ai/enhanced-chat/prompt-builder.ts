@@ -116,10 +116,16 @@ export class PromptBuilderService {
       ? context.persona.when_complimented as typeof validComplimentResponses[number]
       : undefined;
 
+    // Cast dynamic to expected type (may be free-form string in DB)
+    const validDynamics = ['submissive', 'switch', 'dominant'] as const;
+    const dynamic = validDynamics.includes(context.persona.dynamic as any)
+      ? context.persona.dynamic as typeof validDynamics[number]
+      : undefined;
+
     const fewShotExamples = getFewShotExamples(
       stateGuidance.heatLevel,
       {
-        dynamic: context.persona.dynamic,
+        dynamic,
         when_complimented: whenComplimented,
         emoji_usage: context.persona.emoji_usage,
       }
