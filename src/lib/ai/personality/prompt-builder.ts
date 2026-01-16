@@ -156,13 +156,13 @@ function buildPersonaSummary(p: AIPersonalityFull): string {
     
   const energy = getEnergyWord(p.energy_level ?? 5);
   
-  const aesthetic = (p.style_vibes?.length ?? 0) > 0 
-    ? p.style_vibes.join(', ') 
-    : null;
+  const aesthetic = p.style_vibes && p.style_vibes.length > 0
+  ? p.style_vibes.join(', ')
+  : null;
     
-  const flirtStyle = p.flirting_style?.length > 0 
-    ? p.flirting_style.join(' and ') 
-    : 'playful teasing and confident energy';
+  const flirtStyle = p.flirting_style && p.flirting_style.length > 0
+  ? p.flirting_style.join(' and ')
+  : 'playful teasing and confident energy';
     
   const dynamic = getDynamicWord(p.dynamic || 'switch');
   const pace = getPaceWord(p.pace ?? 5);
