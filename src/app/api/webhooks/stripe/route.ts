@@ -171,6 +171,26 @@ async function createSubscription(session: any) {
 
   const fees = calculateFees(Math.round(pricePaid * 100));
 
+  // Check if subscription already exists (idempotency)
+  const { data: existingSub } = await supabase
+    .from('subscriptions')
+    .select('id')
+    .eq('external_subscription_id', stripeSubscription.id)
+    .maybeSingle();
+
+  if (existingSub) {
+    console.log('Subscription already exists for Stripe sub:', stripeSubscription.id);
+    return;
+  }
+
+  console.log('Inserting subscription:', {
+    subscriber_id: user_id,
+    creator_id: creator_id,
+    tier_id: actualTierId,
+    subscription_type: subscription_type,
+    external_subscription_id: stripeSubscription.id,
+  });
+
   // Create subscription record
   const { data: subscription, error } = await supabase
     .from('subscriptions')
@@ -192,7 +212,8 @@ async function createSubscription(session: any) {
 
   if (error) {
     console.error('Failed to create subscription:', error);
-    return;
+    console.error('Insert data was:', { user_id, creator_id, tier_id: actualTierId, subscription_type });
+    throw new Error(`Subscription insert failed: ${error.message}`);
   }
 
   // Subscription type labels for display

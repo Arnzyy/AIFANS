@@ -106,7 +106,7 @@ export async function GET(
           }
         }
 
-        // Check subscription using creator's profile ID
+        // Check subscription using creator's profile ID (for any type)
         if (creatorProfileId) {
           const { data: subscription } = await supabase
             .from('subscriptions')
@@ -114,22 +114,29 @@ export async function GET(
             .eq('subscriber_id', user.id)
             .eq('creator_id', creatorProfileId)
             .eq('status', 'active')
-            .in('subscription_type', ['chat', 'bundle'])
             .maybeSingle();
 
+          if (subscription) {
+            console.log('[API /api/models/[id]] Found subscription via creatorProfileId:', subscription.id, subscription.subscription_type);
+          }
           isSubscribed = !!subscription;
         }
 
-        // Also check with model.id as fallback (legacy support)
+        // Also check with model.id directly (model subscriptions store model ID as creator_id)
         if (!isSubscribed) {
           const { data: modelSub } = await supabase
             .from('subscriptions')
-            .select('id')
+            .select('id, subscription_type, status')
             .eq('subscriber_id', user.id)
             .eq('creator_id', model.id)
             .eq('status', 'active')
             .maybeSingle();
 
+          if (modelSub) {
+            console.log('[API /api/models/[id]] Found subscription via model.id:', modelSub.id, modelSub.subscription_type);
+          } else {
+            console.log('[API /api/models/[id]] No subscription found for user:', user.id, 'model:', model.id);
+          }
           isSubscribed = !!modelSub;
         }
       }
