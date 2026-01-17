@@ -20,7 +20,8 @@
       "Bash(wc:*)",
       "Bash(git ls-files:*)",
       "Bash(dir:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(git check-ignore:*)"
     ]
   }
 }
