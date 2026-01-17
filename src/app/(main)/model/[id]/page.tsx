@@ -883,6 +883,8 @@ export default function ModelProfilePage() {
             setShowSubscribeModal(false);
             setIsSubscribed(true);
           }}
+          isGuest={!currentUser}
+          redirectPath={`/model/${model.id}`}
         />
       )}
     </div>
