@@ -200,7 +200,6 @@ async function createSubscription(session: any) {
       tier_id: actualTierId,
       status: 'active',
       price_paid: pricePaid,
-      billing_period: billing_period || 'monthly',
       subscription_type: subscription_type,
       started_at: new Date().toISOString(),
       current_period_start: currentPeriodStart.toISOString(),
