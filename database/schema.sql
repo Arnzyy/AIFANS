@@ -617,15 +617,34 @@ CREATE TRIGGER update_posts_updated_at BEFORE UPDATE ON posts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- Auto-create profile on signup
+-- Handles username conflicts by appending numbers until unique
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+    base_username TEXT;
+    final_username TEXT;
+    counter INT := 0;
 BEGIN
-    INSERT INTO profiles (id, username, email)
-    VALUES (
-        NEW.id,
-        COALESCE(NEW.raw_user_meta_data->>'username', 'user_' || substr(NEW.id::text, 1, 8)),
-        NEW.email
-    );
+    -- Get base username from metadata or generate from user id
+    base_username := LOWER(COALESCE(NEW.raw_user_meta_data->>'username', 'user_' || substr(NEW.id::text, 1, 8)));
+    final_username := base_username;
+
+    -- Try to insert, handling username conflicts by appending numbers
+    LOOP
+        BEGIN
+            INSERT INTO profiles (id, username, email)
+            VALUES (NEW.id, final_username, NEW.email);
+            EXIT; -- Success, exit loop
+        EXCEPTION WHEN unique_violation THEN
+            -- If it's an id conflict, the user already has a profile - just exit
+            IF counter > 100 THEN
+                -- After 100 attempts, something is very wrong
+                RAISE EXCEPTION 'Could not create unique username after 100 attempts for %', NEW.email;
+            END IF;
+            counter := counter + 1;
+            final_username := base_username || counter;
+        END;
+    END LOOP;
 
     -- Token wallet is created on-demand by the app (src/lib/tokens/token-service.ts)
     -- when the user first needs to check their balance or make a transaction

@@ -136,20 +136,27 @@ async function createSubscription(session: any) {
   const isModelSubscription = tier_id && tier_id.startsWith('model-');
   const actualTierId = isModelSubscription ? null : tier_id;
 
+  // For model subscriptions, we need to resolve the actual creator profile ID
+  // because subscriptions.creator_id has a foreign key to profiles
+  let actualCreatorId = creator_id;
+
   // Get price info
   let pricePaid = 0;
 
   if (isModelSubscription) {
-    // For model subscriptions, get price from the model
+    // For model subscriptions, get price AND the actual creator_id from the model
     const modelId = tier_id.replace('model-', '');
     const { data: model } = await supabase
       .from('creator_models')
-      .select('subscription_price')
+      .select('subscription_price, creator_id')
       .eq('id', modelId)
       .single();
 
     if (model) {
       pricePaid = (model.subscription_price || 999) / 100; // Convert pence to pounds
+      // Use the model's creator_id (which is a profile ID) for the subscription
+      actualCreatorId = model.creator_id;
+      console.log('Model subscription: resolved creator_id from', creator_id, 'to', actualCreatorId);
     }
   } else if (tier_id) {
     // For regular tier subscriptions
@@ -185,18 +192,19 @@ async function createSubscription(session: any) {
 
   console.log('Inserting subscription:', {
     subscriber_id: user_id,
-    creator_id: creator_id,
+    creator_id: actualCreatorId,
     tier_id: actualTierId,
     subscription_type: subscription_type,
     external_subscription_id: stripeSubscription.id,
   });
 
   // Create subscription record (minimal columns for compatibility)
+  // Note: creator_id must be a profile ID (foreign key constraint)
   const { data: subscription, error } = await supabase
     .from('subscriptions')
     .insert({
       subscriber_id: user_id,
-      creator_id: creator_id,
+      creator_id: actualCreatorId,
       tier_id: actualTierId,
       status: 'active',
       subscription_type: subscription_type,
@@ -223,7 +231,7 @@ async function createSubscription(session: any) {
   // Create transaction record
   await supabase.from('transactions').insert({
     user_id: user_id,
-    creator_id: creator_id,
+    creator_id: actualCreatorId,
     transaction_type: 'subscription',
     status: 'completed',
     gross_amount: fromCents(fees.grossAmount),
@@ -237,7 +245,7 @@ async function createSubscription(session: any) {
 
   // Increment subscriber count (only for content or bundle, as they access content)
   if (subscription_type === 'content' || subscription_type === 'bundle') {
-    await supabase.rpc('increment_subscriber_count', { p_creator_id: creator_id });
+    await supabase.rpc('increment_subscriber_count', { p_creator_id: actualCreatorId });
   }
 
   // Create notification for creator
@@ -249,7 +257,7 @@ async function createSubscription(session: any) {
       : 'Someone subscribed to your content!';
 
     await supabase.from('notifications').insert({
-      user_id: creator_id,
+      user_id: actualCreatorId,
       type: 'new_subscriber',
       title: 'New Subscriber!',
       body: notificationBody,
