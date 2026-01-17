@@ -1,6 +1,7 @@
 import { createServerClient, createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { AIPersonalityFull } from '@/lib/ai/personality/types';
+import { encryptField, decryptField } from '@/lib/encryption';
 
 // GET /api/creator/ai-personality - Get creator's AI personalities
 export async function GET() {
@@ -24,7 +25,38 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ personalities: personalities || [] });
+  // Decrypt sensitive fields if they were encrypted
+  const decryptedPersonalities = (personalities || []).map((p: any) => {
+    const decrypted = { ...p };
+
+    if (p.flirting_style_encrypted && p.flirting_style) {
+      try {
+        decrypted.flirting_style = decryptField(p.flirting_style);
+      } catch (e) {
+        console.error('Failed to decrypt flirting_style:', e);
+      }
+    }
+
+    if (p.turn_ons_encrypted && p.turn_ons) {
+      try {
+        decrypted.turn_ons = decryptField(p.turn_ons);
+      } catch (e) {
+        console.error('Failed to decrypt turn_ons:', e);
+      }
+    }
+
+    if (p.speech_patterns_encrypted && p.speech_patterns) {
+      try {
+        decrypted.speech_patterns = decryptField(p.speech_patterns);
+      } catch (e) {
+        console.error('Failed to decrypt speech_patterns:', e);
+      }
+    }
+
+    return decrypted;
+  });
+
+  return NextResponse.json({ personalities: decryptedPersonalities });
 }
 
 // POST /api/creator/ai-personality - Create or update AI personality (upsert)
@@ -67,6 +99,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'At least one personality trait is required' }, { status: 400 });
   }
 
+  // Encrypt sensitive fields
+  const encryptedFlirtingStyle = body.flirting_style ? encryptField(body.flirting_style) : null;
+  const encryptedTurnOns = body.turn_ons ? encryptField(body.turn_ons) : null;
+  const encryptedSpeechPatterns = body.speech_patterns ? encryptField(body.speech_patterns) : null;
+
   const personalityData = {
     creator_id: user.id,
     model_id: body.model_id || null,
@@ -90,17 +127,20 @@ export async function POST(request: NextRequest) {
     interests: body.interests,
     music_taste: body.music_taste,
     guilty_pleasures: body.guilty_pleasures,
-    flirting_style: body.flirting_style,
+    flirting_style: encryptedFlirtingStyle,
+    flirting_style_encrypted: !!encryptedFlirtingStyle,
     dynamic: body.dynamic,
     attracted_to: body.attracted_to,
     love_language: body.love_language,
     pace: body.pace,
     vibe_creates: body.vibe_creates,
-    turn_ons: body.turn_ons,
+    turn_ons: encryptedTurnOns,
+    turn_ons_encrypted: !!encryptedTurnOns,
     vocabulary_level: body.vocabulary_level,
     emoji_usage: body.emoji_usage,
     response_length: body.response_length,
-    speech_patterns: body.speech_patterns,
+    speech_patterns: encryptedSpeechPatterns,
+    speech_patterns_encrypted: !!encryptedSpeechPatterns,
     accent_flavor: body.accent_flavor,
     signature_phrases: body.signature_phrases,
     topics_loves: body.topics_loves,
@@ -198,6 +238,11 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'At least one personality trait is required' }, { status: 400 });
   }
 
+  // Encrypt sensitive fields for update
+  const encryptedFlirtingStylePut = body.flirting_style ? encryptField(body.flirting_style) : null;
+  const encryptedTurnOnsPut = body.turn_ons ? encryptField(body.turn_ons) : null;
+  const encryptedSpeechPatternsPut = body.speech_patterns ? encryptField(body.speech_patterns) : null;
+
   // Update personality - build query with filters
   let updateQuery = adminSupabase
     .from('ai_personalities')
@@ -223,17 +268,20 @@ export async function PUT(request: NextRequest) {
       interests: body.interests,
       music_taste: body.music_taste,
       guilty_pleasures: body.guilty_pleasures,
-      flirting_style: body.flirting_style,
+      flirting_style: encryptedFlirtingStylePut,
+      flirting_style_encrypted: !!encryptedFlirtingStylePut,
       dynamic: body.dynamic,
       attracted_to: body.attracted_to,
       love_language: body.love_language,
       pace: body.pace,
       vibe_creates: body.vibe_creates,
-      turn_ons: body.turn_ons,
+      turn_ons: encryptedTurnOnsPut,
+      turn_ons_encrypted: !!encryptedTurnOnsPut,
       vocabulary_level: body.vocabulary_level,
       emoji_usage: body.emoji_usage,
       response_length: body.response_length,
-      speech_patterns: body.speech_patterns,
+      speech_patterns: encryptedSpeechPatternsPut,
+      speech_patterns_encrypted: !!encryptedSpeechPatternsPut,
       accent_flavor: body.accent_flavor,
       signature_phrases: body.signature_phrases,
       topics_loves: body.topics_loves,
