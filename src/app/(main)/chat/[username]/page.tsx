@@ -37,13 +37,11 @@ interface Creator {
   } | null;
 }
 
-// Helper to check if a string is a UUID
 function isUUID(str: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
 }
 
-// Helper to get/set chat cleared timestamp (persists visual clear across reloads)
 function getChatClearedAt(conversationId: string): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem(`chat_cleared_${conversationId}`);
@@ -54,7 +52,6 @@ function setChatClearedAt(conversationId: string): void {
   localStorage.setItem(`chat_cleared_${conversationId}`, new Date().toISOString());
 }
 
-// Random fallback opening messages (used when API fails)
 function getRandomFallbackOpener(name: string): string {
   const hour = new Date().getHours();
   const isNight = hour >= 21 || hour < 6;
@@ -92,7 +89,7 @@ export default function AIChatPage() {
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [creator, setCreator] = useState<Creator | null>(null);
-  const [isModelChat, setIsModelChat] = useState(false); // True if chatting with a database model
+  const [isModelChat, setIsModelChat] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -101,7 +98,6 @@ export default function AIChatPage() {
   const [typing, setTyping] = useState(false);
   const [showDisclosure, setShowDisclosure] = useState(true);
 
-  // Chat access state
   const [chatAccess, setChatAccess] = useState<ChatAccess | null>(null);
   const [tokenBalance, setTokenBalance] = useState(0);
   const [openingMessage, setOpeningMessage] = useState<string | null>(null);
@@ -111,15 +107,9 @@ export default function AIChatPage() {
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [accessLoading, setAccessLoading] = useState(false);
 
-  // Quick tip state
   const [quickTipSending, setQuickTipSending] = useState<number | null>(null);
   const [quickTipSuccess, setQuickTipSuccess] = useState<number | null>(null);
-
-  // Content browser state
   const [showContentBrowser, setShowContentBrowser] = useState(false);
-
-  // Container ref for scroll management
-  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadChat();
@@ -132,13 +122,8 @@ export default function AIChatPage() {
   const loadChat = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-
-      // Allow viewing even without login (for opening message)
-      // Only redirect if trying to send messages
       setCurrentUser(user);
 
-      // Set default guest access immediately for non-logged-in users
-      // This ensures the access gate shows while API loads
       if (!user) {
         setChatAccess({
           hasAccess: false,
@@ -157,9 +142,7 @@ export default function AIChatPage() {
 
       let creatorId: string;
 
-      // Check if the username is actually a model ID (UUID)
       if (isUUID(username)) {
-        // This is a model ID, fetch the model directly
         console.log('[AIChatPage] Detected UUID, fetching model:', username);
         try {
           const modelRes = await fetch(`/api/models/${username}`);
@@ -168,18 +151,14 @@ export default function AIChatPage() {
             const model = modelData.model;
 
             if (model) {
-              // Check if AI chat is actually configured for this model
               if (!model.hasAiChat) {
-                // No AI chat configured, redirect to model profile
                 router.push(`/model/${username}`);
                 return;
               }
 
               const modelName = model.displayName || model.name;
-              // Create a clean username from model name (lowercase, no spaces)
               const modelUsername = modelName.toLowerCase().replace(/\s+/g, '_');
 
-              // Use model data as the "creator" for chat purposes
               setCreator({
                 id: model.id,
                 username: modelUsername,
@@ -190,14 +169,12 @@ export default function AIChatPage() {
                   bio: model.bio,
                 },
               } as Creator);
-              setIsModelChat(true); // This is a database model chat
+              setIsModelChat(true);
 
-              // Check subscription status - admin email gets full access
               const isAdmin = isAdminUser(user?.email);
               const isSubscribedToModel = modelData.isSubscribed || isAdmin;
 
               if (user && isSubscribedToModel) {
-                // User is subscribed or admin - grant access
                 setChatAccess({
                   hasAccess: true,
                   accessType: 'subscription',
@@ -208,7 +185,6 @@ export default function AIChatPage() {
                   isLowMessages: false,
                 });
 
-                // Fetch token balance for header display
                 try {
                   const walletRes = await fetch('/api/wallet');
                   if (walletRes.ok) {
@@ -219,10 +195,8 @@ export default function AIChatPage() {
                   console.error('[AIChatPage] Error fetching wallet:', walletErr);
                 }
 
-                // Get or create conversation for this model chat
                 let hasExistingMessages = false;
                 try {
-                  // First check if conversation exists
                   const { data: existingConv } = await supabase
                     .from('conversations')
                     .select('id')
@@ -234,7 +208,6 @@ export default function AIChatPage() {
 
                   let conv = existingConv;
                   if (!conv) {
-                    // Create new conversation
                     const { data: newConv } = await supabase
                       .from('conversations')
                       .insert({
@@ -249,7 +222,6 @@ export default function AIChatPage() {
                   if (conv?.id) {
                     setConversationId(conv.id);
 
-                    // Load existing messages (limit to last 50 for performance)
                     const { data: existingMessages } = await supabase
                       .from('chat_messages')
                       .select('*')
@@ -257,19 +229,15 @@ export default function AIChatPage() {
                       .order('created_at', { ascending: false })
                       .limit(50);
 
-                    // Reverse to show in chronological order (oldest first)
                     if (existingMessages) existingMessages.reverse();
 
-                    // Check if user has ANY message history (before filtering)
-                    // This determines if they're a returning user (don't show opening message)
                     const hasAnyHistory = existingMessages && existingMessages.length > 0;
                     if (hasAnyHistory) {
                       hasExistingMessages = true;
-                      setShowDisclosure(false); // Already chatted before
-                      setOpeningMessage(''); // Don't show opening message for returning users
+                      setShowDisclosure(false);
+                      setOpeningMessage('');
                     }
 
-                    // Filter out messages before the "cleared at" timestamp (visual clear persistence)
                     const clearedAt = getChatClearedAt(conv.id);
                     let filteredMessages = existingMessages || [];
                     if (clearedAt && filteredMessages.length > 0) {
@@ -279,9 +247,7 @@ export default function AIChatPage() {
                       );
                     }
 
-                    // Only show filtered messages in UI
                     if (filteredMessages.length > 0) {
-                      // Transform to Message format
                       const msgs = filteredMessages.map((m: any) => ({
                         id: m.id,
                         content: m.content,
@@ -291,17 +257,14 @@ export default function AIChatPage() {
                         is_ai_generated: m.role === 'assistant',
                       }));
                       setMessages(msgs);
-                      setShowDisclosure(false); // Already chatted before
-                      setOpeningMessage(''); // Clear opening message for returning users
+                      setShowDisclosure(false);
+                      setOpeningMessage('');
 
-                      // Check if we should generate a welcome back message
-                      // Only if the last message was more than 1 hour ago
                       const lastMsg = filteredMessages[filteredMessages.length - 1];
                       const lastMsgTime = new Date(lastMsg.created_at).getTime();
                       const oneHourAgo = Date.now() - (60 * 60 * 1000);
 
                       if (lastMsgTime < oneHourAgo) {
-                        // Generate welcome back message
                         try {
                           const welcomeRes = await fetch(`/api/chat/${model.id}/welcome-back`, {
                             method: 'POST',
@@ -315,7 +278,6 @@ export default function AIChatPage() {
                           if (welcomeRes.ok) {
                             const { welcomeMessage } = await welcomeRes.json();
                             if (welcomeMessage) {
-                              // Add welcome back message to the conversation
                               const welcomeMsg: Message = {
                                 id: `welcome-${Date.now()}`,
                                 content: welcomeMessage,
@@ -337,7 +299,6 @@ export default function AIChatPage() {
                   console.error('[AIChatPage] Error loading conversation:', convErr);
                 }
 
-                // Only fetch opening message for NEW conversations (no history)
                 if (!hasExistingMessages) {
                   try {
                     const openingRes = await fetch(`/api/models/${username}/opening-message`);
@@ -345,7 +306,6 @@ export default function AIChatPage() {
                       const { openingMessage: aiMessage } = await openingRes.json();
                       setOpeningMessage(aiMessage);
                     } else {
-                      // Fallback if API fails - still varied by time of day
                       setOpeningMessage(getRandomFallbackOpener(modelName));
                     }
                   } catch {
@@ -353,7 +313,6 @@ export default function AIChatPage() {
                   }
                 }
               } else if (user) {
-                // User is logged in but NOT subscribed - show subscription paywall
                 setChatAccess({
                   hasAccess: false,
                   accessType: 'none',
@@ -366,7 +325,6 @@ export default function AIChatPage() {
                   isLowMessages: false,
                 });
 
-                // Fetch token balance for display in paywall
                 try {
                   const walletRes = await fetch('/api/wallet');
                   if (walletRes.ok) {
@@ -377,7 +335,6 @@ export default function AIChatPage() {
                   console.error('[AIChatPage] Error fetching wallet:', walletErr);
                 }
 
-                // Show AI-generated opening message as preview
                 try {
                   const openingRes = await fetch(`/api/models/${username}/opening-message`);
                   if (openingRes.ok) {
@@ -390,7 +347,6 @@ export default function AIChatPage() {
                   setOpeningMessage(getRandomFallbackOpener(modelName));
                 }
               } else {
-                // Guest user (not logged in) - show AI-generated opening as teaser
                 try {
                   const openingRes = await fetch(`/api/models/${username}/opening-message`);
                   if (openingRes.ok) {
@@ -403,16 +359,13 @@ export default function AIChatPage() {
                   setOpeningMessage(getRandomFallbackOpener(modelName));
                 }
               }
-              // For model chats, we're done loading
               setLoading(false);
               return;
             } else {
-              // Model not found
               router.push('/explore');
               return;
             }
           } else {
-            // API error, redirect to explore
             router.push('/explore');
             return;
           }
@@ -422,7 +375,6 @@ export default function AIChatPage() {
           return;
         }
       } else {
-        // Try to fetch the creator from database first
         const { data: creatorData } = await supabase
           .from('profiles')
           .select(`
@@ -433,32 +385,27 @@ export default function AIChatPage() {
           .eq('role', 'creator')
           .single();
 
-        // Handle creator_profiles which may be array or object from Supabase
         const creatorProfiles = Array.isArray(creatorData?.creator_profiles)
           ? creatorData.creator_profiles[0]
           : creatorData?.creator_profiles;
 
         if (creatorData && creatorProfiles?.ai_chat_enabled) {
-          // Real creator from database
           setCreator({
             ...creatorData,
             creator_profiles: creatorProfiles,
           } as Creator);
           creatorId = creatorData.id;
 
-          // Set a default opening message for guests while API loads
           const creatorName = creatorData.display_name || creatorData.username;
           if (!user) {
             setOpeningMessage(`Hey there... I'm ${creatorName} 💋\n\nI've been waiting for someone like you to show up. There's so much I want to share with you - my thoughts, my day, maybe some things I don't tell just anyone...\n\nSubscribe to unlock our private conversations and get to know the real me 💕`);
           }
         } else {
-          // Try mock creators
           const mockCreator = getCreatorByUsername(username.toLowerCase());
           if (!mockCreator || !mockCreator.hasAiChat) {
             router.push(`/${username}`);
             return;
           }
-          // Use mock creator data
           setCreator({
             id: mockCreator.id,
             username: mockCreator.username,
@@ -470,9 +417,7 @@ export default function AIChatPage() {
             },
           } as Creator);
 
-          // For mock creators: logged-in users get free access, guests see paywall demo
           if (user) {
-            // Logged-in users can chat freely with mock creators
             setChatAccess({
               hasAccess: true,
               accessType: 'subscription',
@@ -483,16 +428,13 @@ export default function AIChatPage() {
               isLowMessages: false,
             });
           } else {
-            // Guests see the access gate (demo the paywall experience)
             setOpeningMessage(`Hey there... I'm ${mockCreator.displayName} 💋\n\nI've been waiting for someone like you to show up. There's so much I want to share with you - my thoughts, my day, maybe some things I don't tell just anyone...\n\nSubscribe to unlock our private conversations and get to know the real me 💕`);
-            // Guest access already set above, don't overwrite
           }
           setLoading(false);
-          return; // Skip conversation creation for mock creators
+          return;
         }
       }
 
-      // Call start chat endpoint to get opening message and access status
       try {
         const startResponse = await fetch(`/api/chat/${creatorId}/start`);
         const startData = await startResponse.json();
@@ -503,7 +445,6 @@ export default function AIChatPage() {
         if (startData.access) {
           setChatAccess(startData.access);
         } else if (!user) {
-          // Fallback guest access if endpoint doesn't return access
           setChatAccess({
             hasAccess: false,
             accessType: 'guest',
@@ -525,7 +466,6 @@ export default function AIChatPage() {
           setConversationId(startData.conversationId);
         }
 
-        // If user is logged in, fetch existing messages
         if (user && startData.conversationId) {
           const { data: messagesData } = await supabase
             .from('messages')
@@ -535,12 +475,11 @@ export default function AIChatPage() {
 
           setMessages(messagesData || []);
           if (messagesData && messagesData.length > 0) {
-            setShowDisclosure(false); // Already chatted before
+            setShowDisclosure(false);
           }
         }
       } catch (startError) {
         console.error('Error calling start endpoint:', startError);
-        // Set fallback access for guests
         if (!user) {
           setChatAccess({
             hasAccess: false,
@@ -565,7 +504,6 @@ export default function AIChatPage() {
     }
   };
 
-  // Purchase session handler
   const handlePurchaseSession = useCallback(async (pack: MessagePack) => {
     if (!creator) return;
     setAccessLoading(true);
@@ -584,7 +522,6 @@ export default function AIChatPage() {
         throw new Error(data.error || 'Failed to purchase session');
       }
 
-      // Update state with new access and balance
       if (data.access) {
         setChatAccess(data.access);
       }
@@ -600,7 +537,6 @@ export default function AIChatPage() {
     }
   }, [creator]);
 
-  // Extend messages handler
   const handleExtendMessages = useCallback(async (option: UnlockOption) => {
     if (!creator || !option.messages) return;
     setAccessLoading(true);
@@ -631,7 +567,6 @@ export default function AIChatPage() {
     }
   }, [creator]);
 
-  // Subscribe handler - show modal with FAN/CHAT/BUNDLE options
   const handleSubscribe = useCallback(async () => {
     if (!creator) return;
 
@@ -639,18 +574,16 @@ export default function AIChatPage() {
       id: 'default',
       name: 'Fan Access',
       description: 'Access to all posts and content',
-      price: 999, // £9.99 in cents
+      price: 999,
       duration_months: 1,
       is_featured: true,
     };
 
-    // Fetch subscription tiers for this creator
     try {
       const tiersRes = await fetch(`/api/creators/${creator.id}/tiers`);
       if (tiersRes.ok) {
         const tiersData = await tiersRes.json();
         const fetchedTiers = tiersData.tiers || [];
-        // Use default tier if none found
         setSubscriptionTiers(fetchedTiers.length > 0 ? fetchedTiers : [defaultTier]);
       } else {
         setSubscriptionTiers([defaultTier]);
@@ -666,13 +599,11 @@ export default function AIChatPage() {
     e.preventDefault();
     if (!newMessage.trim() || !creator || sending) return;
 
-    // Check if user is logged in
     if (!currentUser) {
       router.push('/login?redirect=/chat/' + username);
       return;
     }
 
-    // Check access
     if (chatAccess && !chatAccess.canSendMessage) {
       setShowPurchaseModal(true);
       return;
@@ -685,7 +616,6 @@ export default function AIChatPage() {
     const messageContent = newMessage.trim();
     setNewMessage('');
 
-    // Optimistically add user message
     const tempUserMsg: Message = {
       id: `temp-${Date.now()}`,
       content: messageContent,
@@ -697,11 +627,9 @@ export default function AIChatPage() {
     setMessages(prev => [...prev, tempUserMsg]);
 
     try {
-      // Check if this is a mock creator (ID doesn't look like UUID)
       const isMockCreator = !creator.id.includes('-') || creator.id.length < 30;
 
       if (isMockCreator) {
-        // For mock creators only, call the mock AI endpoint (no memory)
         const response = await fetch('/api/ai-chat/mock', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -723,7 +651,6 @@ export default function AIChatPage() {
           throw new Error(data.error || 'Failed to send message');
         }
 
-        // Add AI response
         const aiMsg: Message = {
           id: `ai-${Date.now()}`,
           content: data.response,
@@ -734,7 +661,6 @@ export default function AIChatPage() {
         };
         setMessages(prev => [...prev, aiMsg]);
       } else {
-        // Call real AI chat API for database creators (with access control)
         const response = await fetch(`/api/chat/${creator.id}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -747,7 +673,6 @@ export default function AIChatPage() {
         const data = await response.json();
 
         if (!response.ok) {
-          // Handle access denied
           if (response.status === 403 && data.access) {
             setChatAccess(data.access);
             setShowPurchaseModal(true);
@@ -756,12 +681,10 @@ export default function AIChatPage() {
           throw new Error(data.error || 'Failed to send message');
         }
 
-        // Update conversation ID if new
         if (data.conversationId && !conversationId) {
           setConversationId(data.conversationId);
         }
 
-        // Update access state from response
         if (data.access) {
           setChatAccess(prevAccess => prevAccess ? {
             ...prevAccess,
@@ -772,7 +695,6 @@ export default function AIChatPage() {
           } : null);
         }
 
-        // Add AI response
         const aiMsg: Message = {
           id: `ai-${Date.now()}`,
           content: data.response,
@@ -786,12 +708,10 @@ export default function AIChatPage() {
 
     } catch (error: any) {
       console.error('Error sending message:', error);
-      // Remove optimistic message on error
       setMessages(prev => prev.filter(m => m.id !== tempUserMsg.id));
       setNewMessage(messageContent);
 
       if (error.message.includes('Insufficient balance')) {
-        // Show wallet prompt
         router.push('/wallet?add=true&return=/chat/' + username);
       }
     } finally {
@@ -800,18 +720,13 @@ export default function AIChatPage() {
     }
   };
 
-  // Handle tip sent - generate AI acknowledgement based on tip amount and personality
   const handleTipSent = async (amount: number, newBalance: number) => {
     if (!creator) return;
 
-    // Update header balance immediately
     setTokenBalance(newBalance);
-
-    // Show typing indicator while generating acknowledgement
     setTyping(true);
 
     try {
-      // Call API to generate AI acknowledgement based on tip amount + personality
       const response = await fetch(`/api/chat/${creator.id}/tip-ack`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -836,7 +751,6 @@ export default function AIChatPage() {
           setMessages(prev => [...prev, tipAckMsg]);
         }
       } else {
-        // Fallback if API fails - simple thank you
         const fallbackMsg: Message = {
           id: `tip-ack-${Date.now()}`,
           content: `Thank you so much for the ${amount} tokens! You're amazing 💕`,
@@ -849,7 +763,6 @@ export default function AIChatPage() {
       }
     } catch (error) {
       console.error('Failed to generate tip acknowledgement:', error);
-      // Fallback message
       const fallbackMsg: Message = {
         id: `tip-ack-${Date.now()}`,
         content: `Thank you for the ${amount} tokens! 💖`,
@@ -864,11 +777,9 @@ export default function AIChatPage() {
     }
   };
 
-  // Send quick tip directly without modal
   const sendQuickTip = async (amount: number) => {
     if (!creator || quickTipSending) return;
 
-    // Check balance first
     if (amount > tokenBalance) {
       router.push('/wallet?add=true&return=/chat/' + username);
       return;
@@ -897,11 +808,8 @@ export default function AIChatPage() {
         return;
       }
 
-      // Show success briefly
       setQuickTipSuccess(amount);
       setTimeout(() => setQuickTipSuccess(null), 2000);
-
-      // Trigger AI acknowledgement
       handleTipSent(amount, data.new_balance);
 
     } catch (error) {
@@ -919,11 +827,15 @@ export default function AIChatPage() {
     );
   }
 
+  // =====================================================
+  // iOS SAFARI FIX: 
+  // - Container: fixed inset-0 (locks to viewport)
+  // - Messages: min-h-0 (CRITICAL - allows flex child to shrink)
+  // - No sticky positioning (flex handles everything)
+  // =====================================================
+
   return (
-    <div
-      ref={containerRef}
-      className="chat-page-container flex flex-col bg-black"
-    >
+    <div className="fixed inset-0 flex flex-col bg-black">
       {/* Quick Tip Success Toast */}
       {quickTipSuccess && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
@@ -943,8 +855,11 @@ export default function AIChatPage() {
         </div>
       )}
 
-      {/* Header - sticky + z-50 for iOS Safari */}
-      <header className="flex-shrink-0 sticky top-0 z-50 border-b border-white/10 bg-black pt-[env(safe-area-inset-top)]">
+      {/* HEADER - flex-shrink-0 keeps it fixed height */}
+      <header 
+        className="flex-shrink-0 border-b border-white/10 bg-black z-10"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      >
         <div className="flex items-center gap-3 px-3 md:px-4 h-14 md:h-16">
           <Link
             href={isModelChat ? `/model/${creator?.id}` : `/${creator?.username}`}
@@ -958,11 +873,7 @@ export default function AIChatPage() {
               <div className="relative flex-shrink-0">
                 <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/10 overflow-hidden">
                   {creator.avatar_url ? (
-                    <img
-                      src={creator.avatar_url}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={creator.avatar_url} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-base md:text-lg">
                       {(creator.display_name || creator.username).charAt(0).toUpperCase()}
@@ -985,12 +896,10 @@ export default function AIChatPage() {
             </Link>
           )}
 
-          {/* Token balance (only for logged in users with real creators) */}
           {currentUser && creator && creator.id.includes('-') && creator.id.length >= 30 && (
             <InlineTokenBalance balance={tokenBalance} />
           )}
 
-          {/* Tip Button - only for real creators */}
           {creator && creator.id.includes('-') && creator.id.length >= 30 && (
             <TipButton
               creatorId={creator.id}
@@ -1002,7 +911,6 @@ export default function AIChatPage() {
             />
           )}
 
-          {/* Gallery Button - view creator's content */}
           {creator && creator.id.includes('-') && creator.id.length >= 30 && (
             <button
               onClick={() => setShowContentBrowser(true)}
@@ -1013,11 +921,9 @@ export default function AIChatPage() {
             </button>
           )}
 
-          {/* Clear chat button (visual only - keeps history & memories) */}
           {messages.length > 0 && (
             <button
               onClick={() => {
-                // Save clear timestamp so it persists across page reloads
                 if (conversationId) {
                   setChatClearedAt(conversationId);
                 }
@@ -1033,7 +939,7 @@ export default function AIChatPage() {
         </div>
       </header>
 
-      {/* AI Disclosure Banner - flex-shrink-0 keeps it in place */}
+      {/* AI Disclosure Banner */}
       {showDisclosure && (
         <div className="flex-shrink-0 px-3 md:px-4 py-2 md:py-3 bg-purple-500/10 border-b border-purple-500/20">
           <p className="text-xs md:text-sm text-center text-purple-200">
@@ -1042,18 +948,18 @@ export default function AIChatPage() {
         </div>
       )}
 
-      {/* Messages - WhatsApp style with overscroll-contain for iOS */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <div className="flex-1 flex flex-col justify-end min-h-full px-4 py-4 gap-3 max-w-2xl mx-auto w-full">
+      {/* MESSAGES - This is the scrollable area */}
+      {/* min-h-0 is CRITICAL for iOS Safari flex scroll */}
+      <div 
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        <div className="flex flex-col justify-end min-h-full px-4 py-4 gap-3 max-w-2xl mx-auto w-full">
           {messages.length === 0 && !openingMessage ? (
             <div className="text-center py-6 md:py-12">
               <div className="mb-3 md:mb-4">
                 {creator?.avatar_url ? (
-                  <img
-                    src={creator.avatar_url}
-                    alt=""
-                    className="w-16 h-16 md:w-20 md:h-20 rounded-full mx-auto object-cover"
-                  />
+                  <img src={creator.avatar_url} alt="" className="w-16 h-16 md:w-20 md:h-20 rounded-full mx-auto object-cover" />
                 ) : (
                   <div className="w-16 h-16 md:w-20 md:h-20 rounded-full mx-auto bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-2xl md:text-3xl">
                     {(creator?.display_name || creator?.username || '?').charAt(0).toUpperCase()}
@@ -1068,16 +974,11 @@ export default function AIChatPage() {
               </p>
             </div>
           ) : messages.length === 0 && openingMessage ? (
-            /* Opening message for new conversations */
             <div className="flex justify-start">
               {creator && (
                 <div className="w-8 h-8 rounded-full mr-2 flex-shrink-0 overflow-hidden">
                   {creator.avatar_url ? (
-                    <img
-                      src={creator.avatar_url}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={creator.avatar_url} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-sm">
                       {(creator.display_name || creator.username).charAt(0).toUpperCase()}
@@ -1094,18 +995,11 @@ export default function AIChatPage() {
             messages.map((message) => {
               const isOwn = message.sender_id === currentUser?.id;
               return (
-                <div
-                  key={message.id}
-                  className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-                >
+                <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
                   {!isOwn && creator && (
                     <div className="w-8 h-8 rounded-full mr-2 flex-shrink-0 overflow-hidden">
                       {creator.avatar_url ? (
-                        <img
-                          src={creator.avatar_url}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={creator.avatar_url} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-sm">
                           {(creator.display_name || creator.username).charAt(0).toUpperCase()}
@@ -1113,13 +1007,7 @@ export default function AIChatPage() {
                       )}
                     </div>
                   )}
-                  <div
-                    className={`max-w-[75%] px-4 py-2.5 rounded-2xl ${
-                      isOwn
-                        ? 'bg-purple-500 text-white rounded-br-md'
-                        : 'bg-white/10 rounded-bl-md'
-                    }`}
-                  >
+                  <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl ${isOwn ? 'bg-purple-500 text-white rounded-br-md' : 'bg-white/10 rounded-bl-md'}`}>
                     <p className="whitespace-pre-wrap break-words">{message.content}</p>
                     <p className={`text-xs mt-1 ${isOwn ? 'text-purple-200' : 'text-gray-500'}`}>
                       {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
@@ -1130,7 +1018,6 @@ export default function AIChatPage() {
             })
           )}
 
-          {/* Typing indicator */}
           {typing && (
             <div className="flex justify-start">
               <div className="w-8 h-8 rounded-full mr-2 flex-shrink-0 overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500">
@@ -1152,9 +1039,12 @@ export default function AIChatPage() {
         </div>
       </div>
 
-      {/* Input Area with Tip Bar - sticky + z-50 for iOS Safari */}
-      <div className="flex-shrink-0 sticky bottom-0 z-50 border-t border-white/10 bg-black pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        {/* Quick Tip Bar - Mobile Optimized */}
+      {/* INPUT AREA - flex-shrink-0 keeps it fixed at bottom */}
+      <div 
+        className="flex-shrink-0 border-t border-white/10 bg-black z-10"
+        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))' }}
+      >
+        {/* Quick Tip Bar */}
         {creator && creator.id.includes('-') && creator.id.length >= 30 && (
           <div className="px-2 md:px-4 py-1.5 md:py-2 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border-b border-white/5">
             <div className="max-w-2xl mx-auto flex items-center gap-1 md:gap-2">
@@ -1190,7 +1080,7 @@ export default function AIChatPage() {
           </div>
         )}
 
-        {/* Message Input with Access Gate */}
+        {/* Message Input */}
         <div className="p-2 md:p-4">
           <div className="max-w-2xl mx-auto">
             {chatAccess ? (
@@ -1229,7 +1119,6 @@ export default function AIChatPage() {
                 </form>
               </ChatAccessGate>
             ) : !currentUser ? (
-              // Guest fallback - show login CTA
               <div className="space-y-4">
                 <div className="relative">
                   <div className="opacity-50 pointer-events-none">
@@ -1240,10 +1129,7 @@ export default function AIChatPage() {
                         className="flex-1 px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-white/5 border border-white/10 outline-none text-base"
                         disabled
                       />
-                      <button
-                        disabled
-                        className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 font-medium opacity-50 text-sm md:text-base"
-                      >
+                      <button disabled className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 font-medium opacity-50 text-sm md:text-base">
                         Send
                       </button>
                     </div>
@@ -1280,17 +1166,13 @@ export default function AIChatPage() {
                   </div>
                   <div className="text-center text-sm text-gray-500">
                     <span>Don&apos;t have an account? </span>
-                    <Link
-                      href={`/register?redirect=/chat/${username}`}
-                      className="text-purple-400 hover:text-purple-300 font-medium"
-                    >
+                    <Link href={`/register?redirect=/chat/${username}`} className="text-purple-400 hover:text-purple-300 font-medium">
                       Sign up free
                     </Link>
                   </div>
                 </div>
               </div>
             ) : (
-              // Logged in but access not yet loaded
               <form onSubmit={sendMessage} className="flex gap-2 md:gap-3">
                 <input
                   type="text"
@@ -1316,7 +1198,7 @@ export default function AIChatPage() {
         </div>
       </div>
 
-      {/* Purchase Session Modal */}
+      {/* Modals */}
       <PurchaseSessionModal
         isOpen={showPurchaseModal}
         onClose={() => {
@@ -1330,7 +1212,6 @@ export default function AIChatPage() {
         error={purchaseError}
       />
 
-      {/* Subscribe Modal with FAN/CHAT/BUNDLE options */}
       {showSubscribeModal && creator && (
         <SubscribeModal
           creator={{
@@ -1340,11 +1221,10 @@ export default function AIChatPage() {
             avatar_url: creator.avatar_url || undefined,
           }}
           tiers={subscriptionTiers}
-          chatPrice={999} // £9.99 for chat
+          chatPrice={999}
           onClose={() => setShowSubscribeModal(false)}
           onSuccess={() => {
             setShowSubscribeModal(false);
-            // Reload to refresh access
             loadChat();
           }}
           defaultType="chat"
@@ -1353,7 +1233,6 @@ export default function AIChatPage() {
         />
       )}
 
-      {/* In-Chat Content Browser */}
       {creator && (
         <InChatContentBrowser
           creatorId={creator.id}
