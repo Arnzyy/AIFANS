@@ -118,9 +118,27 @@ async function createSubscription(session: any) {
   const currentPeriodStart = new Date(stripeSubscription.current_period_start * 1000);
   const currentPeriodEnd = new Date(stripeSubscription.current_period_end * 1000);
 
-  // Get tier info for price
+  // Check if this is a model subscription (tier_id starts with "model-")
+  const isModelSubscription = tier_id && tier_id.startsWith('model-');
+  const actualTierId = isModelSubscription ? null : tier_id;
+
+  // Get price info
   let pricePaid = 0;
-  if (tier_id) {
+
+  if (isModelSubscription) {
+    // For model subscriptions, get price from the model
+    const modelId = tier_id.replace('model-', '');
+    const { data: model } = await supabase
+      .from('creator_models')
+      .select('subscription_price')
+      .eq('id', modelId)
+      .single();
+
+    if (model) {
+      pricePaid = (model.subscription_price || 999) / 100; // Convert pence to pounds
+    }
+  } else if (tier_id) {
+    // For regular tier subscriptions
     const { data: tier } = await supabase
       .from('subscription_tiers')
       .select('*')
@@ -133,7 +151,7 @@ async function createSubscription(session: any) {
         : billing_period === '3_month'
         ? 'price_3_month'
         : 'price_monthly';
-      pricePaid = tier[priceField] || tier.price_monthly || 0;
+      pricePaid = (tier[priceField] || tier.price_monthly || 0) / 100; // Convert pence to pounds
     }
   }
 
@@ -145,7 +163,7 @@ async function createSubscription(session: any) {
     .insert({
       subscriber_id: user_id,
       creator_id: creator_id,
-      tier_id: tier_id || null,
+      tier_id: actualTierId,
       status: 'active',
       price_paid: pricePaid,
       billing_period: billing_period || 'monthly',
