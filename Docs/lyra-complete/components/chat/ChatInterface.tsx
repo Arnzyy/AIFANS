@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Send, Image, MoreVertical, Phone, Video, Smile, Paperclip } from 'lucide-react';
+import { Send, Image, MoreVertical } from 'lucide-react';
 import { InChatContentBrowser } from './InChatContentBrowser';
 
 // ===========================================
@@ -104,12 +104,9 @@ export function ChatInterface({ creator, initialMessages = [] }: ChatInterfacePr
           setMessagesRemaining(data.messages_remaining);
         }
       } else {
-        // Handle errors
         if (res.status === 429) {
-          // Message limit reached
           alert('Daily message limit reached. Buy more messages to continue chatting!');
         } else if (res.status === 402) {
-          // Chat add-on required
           alert('Chat add-on required. Upgrade to unlock private chat!');
         } else {
           throw new Error(data.error || 'Failed to send message');
@@ -117,7 +114,6 @@ export function ChatInterface({ creator, initialMessages = [] }: ChatInterfacePr
       }
     } catch (error) {
       console.error('Send message error:', error);
-      // Remove the user message on error
       setMessages(prev => prev.filter(m => m.id !== userMessage.id));
       setInput(userMessage.content);
     } finally {
@@ -133,9 +129,9 @@ export function ChatInterface({ creator, initialMessages = [] }: ChatInterfacePr
   };
 
   return (
-    <div className="flex flex-col h-full bg-black">
-      {/* Chat Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-zinc-950">
+    <div className="chat-page-container">
+      {/* ============ HEADER - Never scrolls ============ */}
+      <div className="chat-header flex items-center justify-between px-4 py-3 border-b border-white/10 bg-zinc-950">
         <div className="flex items-center gap-3">
           <div className="relative">
             <img
@@ -154,7 +150,6 @@ export function ChatInterface({ creator, initialMessages = [] }: ChatInterfacePr
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Content Browser Button */}
           <button
             onClick={() => setShowContentBrowser(true)}
             className="p-2 hover:bg-white/10 rounded-full transition"
@@ -170,7 +165,7 @@ export function ChatInterface({ creator, initialMessages = [] }: ChatInterfacePr
 
       {/* Messages Remaining Banner */}
       {messagesRemaining !== null && messagesRemaining <= 5 && (
-        <div className="px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-b border-purple-500/30">
+        <div className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-b border-purple-500/30">
           <p className="text-sm text-center">
             <span className="text-purple-400 font-semibold">{messagesRemaining}</span> messages remaining today
             {messagesRemaining <= 2 && (
@@ -182,46 +177,47 @@ export function ChatInterface({ creator, initialMessages = [] }: ChatInterfacePr
         </div>
       )}
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
-          <div className="text-center py-12">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-              <span className="text-3xl">💕</span>
+      {/* ============ MESSAGES - This scrolls ============ */}
+      <div className="chat-messages">
+        <div className="chat-messages-inner p-4 space-y-4">
+          {messages.length === 0 && (
+            <div className="text-center py-12">
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <span className="text-3xl">💕</span>
+              </div>
+              <h3 className="font-semibold mb-2">Start chatting with {creator.persona_name}</h3>
+              <p className="text-gray-500 text-sm">Say hi and see where the conversation goes...</p>
             </div>
-            <h3 className="font-semibold mb-2">Start chatting with {creator.persona_name}</h3>
-            <p className="text-gray-500 text-sm">Say hi and see where the conversation goes...</p>
-          </div>
-        )}
+          )}
 
-        {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} creatorAvatar={creator.avatar_url} />
-        ))}
+          {messages.map((message) => (
+            <MessageBubble key={message.id} message={message} creatorAvatar={creator.avatar_url} />
+          ))}
 
-        {isLoading && (
-          <div className="flex items-start gap-3">
-            <img
-              src={creator.avatar_url}
-              alt=""
-              className="w-8 h-8 rounded-full"
-            />
-            <div className="bg-white/10 rounded-2xl px-4 py-2">
-              <div className="flex gap-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          {isLoading && (
+            <div className="flex items-start gap-3">
+              <img
+                src={creator.avatar_url}
+                alt=""
+                className="w-8 h-8 rounded-full"
+              />
+              <div className="bg-white/10 rounded-2xl px-4 py-2">
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
-      {/* Input Area */}
-      <div className="p-4 border-t border-white/10 bg-zinc-950">
+      {/* ============ INPUT - Never scrolls ============ */}
+      <div className="chat-input p-4 border-t border-white/10 bg-zinc-950">
         <div className="flex items-center gap-2">
-          {/* Content button */}
           <button
             onClick={() => setShowContentBrowser(true)}
             className="p-2 hover:bg-white/10 rounded-full transition"
@@ -229,7 +225,6 @@ export function ChatInterface({ creator, initialMessages = [] }: ChatInterfacePr
             <Image className="w-5 h-5 text-gray-400" />
           </button>
 
-          {/* Input */}
           <div className="flex-1 relative">
             <input
               ref={inputRef}
@@ -243,7 +238,6 @@ export function ChatInterface({ creator, initialMessages = [] }: ChatInterfacePr
             />
           </div>
 
-          {/* Send button */}
           <button
             onClick={sendMessage}
             disabled={!input.trim() || isLoading}
@@ -253,7 +247,6 @@ export function ChatInterface({ creator, initialMessages = [] }: ChatInterfacePr
           </button>
         </div>
 
-        {/* Tip text */}
         <p className="text-xs text-gray-500 text-center mt-2">
           Tap the 📷 to browse and reference {creator.persona_name}'s content
         </p>
@@ -301,7 +294,6 @@ function MessageBubble({
             : 'bg-white/10 text-white'
         }`}
       >
-        {/* Content reference if any */}
         {message.content_reference && (
           <div className="mb-2 rounded-lg overflow-hidden">
             <img

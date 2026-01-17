@@ -110,22 +110,62 @@
   mask-composite: exclude;
 }
 
-/* iOS keyboard fix - prevents black gap between keyboard and input */
-@supports (-webkit-touch-callout: none) {
-  .h-dvh, [class*="h-dvh"] {
-    height: -webkit-fill-available;
-    min-height: -webkit-fill-available;
-  }
-}
+/* ============================================
+   CHAT PAGE LAYOUT - WhatsApp Style
+   ============================================ */
 
-/* Chat page container - use this class for full-screen chat layouts */
+/* Main container - locks the viewport */
 .chat-page-container {
   position: fixed;
   inset: 0;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
+  background: black;
 }
 
-/* iOS-specific: Only apply fixed body when chat page is active */
+/* Header - never scrolls */
+.chat-header {
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+/* Messages area - THIS is what scrolls */
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Messages inner wrapper - anchors messages to bottom */
+.chat-messages-inner {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 100%;
+}
+
+/* Input area - never scrolls */
+.chat-input {
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+/* iOS keyboard fix */
+@supports (-webkit-touch-callout: none) {
+  .chat-page-container {
+    height: -webkit-fill-available;
+    min-height: -webkit-fill-available;
+  }
+  
+  .chat-messages {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Lock body scroll ONLY when chat page is active */
 body:has(.chat-page-container) {
   overflow: hidden;
   overscroll-behavior: none;
@@ -134,7 +174,7 @@ body:has(.chat-page-container) {
   height: 100%;
 }
 
-/* Fallback for browsers without :has() support - chat containers handle themselves */
+/* Fallback for browsers without :has() support */
 @supports not selector(:has(*)) {
   .chat-page-container {
     position: fixed;
@@ -143,4 +183,13 @@ body:has(.chat-page-container) {
     flex-direction: column;
     overflow: hidden;
   }
+}
+
+/* Safe area padding for iPhone notch/home bar */
+.chat-input {
+  padding-bottom: env(safe-area-inset-bottom, 12px);
+}
+
+.chat-header {
+  padding-top: env(safe-area-inset-top, 0);
 }
