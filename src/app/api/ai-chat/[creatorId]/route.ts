@@ -47,7 +47,8 @@ export async function GET(
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('Session creation error:', error);
+      return NextResponse.json({ error: 'Failed to create chat session' }, { status: 500 });
     }
     session = newSession;
   }
