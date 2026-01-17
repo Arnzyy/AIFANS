@@ -191,7 +191,7 @@ async function createSubscription(session: any) {
     external_subscription_id: stripeSubscription.id,
   });
 
-  // Create subscription record
+  // Create subscription record (minimal columns for compatibility)
   const { data: subscription, error } = await supabase
     .from('subscriptions')
     .insert({
@@ -199,10 +199,7 @@ async function createSubscription(session: any) {
       creator_id: creator_id,
       tier_id: actualTierId,
       status: 'active',
-      price_paid: pricePaid,
       subscription_type: subscription_type,
-      started_at: new Date().toISOString(),
-      current_period_start: currentPeriodStart.toISOString(),
       current_period_end: currentPeriodEnd.toISOString(),
       external_subscription_id: stripeSubscription.id,
     })
