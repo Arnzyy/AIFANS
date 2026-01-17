@@ -8,8 +8,14 @@ export async function POST() {
     return NextResponse.json({ error: 'Not available in production' }, { status: 403 });
   }
 
-  const ADMIN_EMAIL = 'admin@joinlyra.com';
-  const ADMIN_PASSWORD = 'Password123!';
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@joinlyra.com';
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+  if (!ADMIN_PASSWORD) {
+    return NextResponse.json({
+      error: 'ADMIN_PASSWORD environment variable not set'
+    }, { status: 500 });
+  }
 
   try {
     const supabase = createAdminClient();

@@ -8,8 +8,8 @@ const BLOCKED_COUNTRIES: string[] = [
   // Add countries here if needed in the future
 ];
 
-// Bypass token for demos
-const BYPASS_TOKEN = 'investor2025';
+// Bypass token for demos - set via environment variable
+const BYPASS_TOKEN = process.env.DEMO_BYPASS_TOKEN || '';
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
