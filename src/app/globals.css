@@ -111,60 +111,85 @@
 }
 
 /* ============================================
-   CHAT PAGE - iOS Safari Fixed Layout
-   ============================================ 
-   
-   The trick: Container is fixed to viewport.
-   Body is NOT position:fixed (breaks iOS scroll).
-   Only messages area scrolls.
-*/
+   CHAT PAGE LAYOUT - WhatsApp Style
+   ============================================ */
 
-/* Main chat container - fills viewport */
+/* Main container - locks the viewport */
 .chat-page-container {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: black;
-  /* iOS safe areas */
-  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
-/* Lock html/body scroll when chat is open - NO position:fixed on body! */
-html:has(.chat-page-container),
+/* Header - never scrolls */
+.chat-header {
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+/* Messages area - THIS is what scrolls */
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Messages inner wrapper - anchors messages to bottom */
+.chat-messages-inner {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 100%;
+}
+
+/* Input area - never scrolls */
+.chat-input {
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+/* iOS keyboard fix */
+@supports (-webkit-touch-callout: none) {
+  .chat-page-container {
+    height: -webkit-fill-available;
+    min-height: -webkit-fill-available;
+  }
+  
+  .chat-messages {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Lock body scroll ONLY when chat page is active */
 body:has(.chat-page-container) {
   overflow: hidden;
   overscroll-behavior: none;
-  /* DO NOT add position:fixed here - it breaks iOS internal scrolling */
-  height: 100%;
+  position: fixed;      /* ← DELETE THIS LINE */
   width: 100%;
+  height: 100%;
 }
 
-/* Fallback for browsers without :has() */
+/* Fallback for browsers without :has() support */
 @supports not selector(:has(*)) {
   .chat-page-container {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 }
 
-/* iOS Safari specific fixes */
-@supports (-webkit-touch-callout: none) {
-  .chat-page-container {
-    /* Use dvh for dynamic viewport height on iOS */
-    height: 100dvh;
-    height: -webkit-fill-available;
-  }
-  
-  /* Ensure smooth momentum scrolling on iOS */
-  .chat-page-container > div[class*="overflow-y-auto"] {
-    -webkit-overflow-scrolling: touch;
-  }
+/* Safe area padding for iPhone notch/home bar */
+.chat-input {
+  padding-bottom: env(safe-area-inset-bottom, 12px);
+}
+
+.chat-header {
+  padding-top: env(safe-area-inset-top, 0);
 }
