@@ -322,19 +322,21 @@ export async function POST(request: NextRequest) {
       ],
       metadata: {
         user_id: user.id,
-        creator_id: creatorId,
+        creator_id: actualCreatorId, // Use resolved profile ID, not model ID
         tier_id: tier?.id || '',
         billing_period: billingPeriod,
         type: 'subscription',
         subscription_type: subscriptionType,
+        model_id: modelId || '', // Track which model this subscription is for
       },
       subscription_data: {
         metadata: {
           user_id: user.id,
-          creator_id: creatorId,
+          creator_id: actualCreatorId, // Use resolved profile ID, not model ID
           tier_id: tier?.id || '',
           billing_period: billingPeriod,
           subscription_type: subscriptionType,
+          model_id: modelId || '', // Track which model this subscription is for
         },
       },
       success_url: `${getAppUrl()}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
