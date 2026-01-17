@@ -38,7 +38,7 @@ export default async function FeedPage() {
       .in('creator_id', subscribedCreatorIds)
       .eq('is_published', true)
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(200);
     
     posts = data || [];
   }

@@ -77,13 +77,13 @@ export async function POST(
       }
     }
 
-    // 4. Get conversation history (from sfw_chat_messages - SEPARATE)
+    // 4. Get conversation history (from sfw_chat_messages - SEPARATE, 200 messages for better memory)
     const { data: history } = await supabase
       .from('sfw_chat_messages')
       .select('role, content')
       .eq('thread_id', currentThreadId)
       .order('created_at', { ascending: true })
-      .limit(20);
+      .limit(200);
 
     // 5. Calculate cost (using SFW pricing - SEPARATE from NSFW)
     const isSubscriber = await checkSubscription(supabase, user.id, creatorId);

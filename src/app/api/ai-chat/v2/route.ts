@@ -102,13 +102,13 @@ export async function POST(request: NextRequest) {
     // Build the enhanced prompt
     const { systemPrompt, analyticsId } = await promptBuilder.buildPrompt(chatContext);
 
-    // Get recent message history for context
+    // Get recent message history for context (200 messages for better memory)
     const { data: recentMessages } = await supabase
       .from('chat_messages')
       .select('role, content')
       .eq('conversation_id', convId)
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(200);
 
     const messages: ChatMessage[] = [
       ...(recentMessages || []).reverse().map(m => ({

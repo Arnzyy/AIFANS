@@ -144,13 +144,13 @@ export async function POST(
     content: message,
   });
 
-  // Get recent messages for context
+  // Get recent messages for context (200 messages for better memory)
   const { data: recentMessages } = await supabase
     .from('ai_chat_messages')
     .select('role, content')
     .eq('session_id', session.id)
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(200);
 
   // Build conversation history
   const conversationHistory = (recentMessages || []).reverse().map(m => ({

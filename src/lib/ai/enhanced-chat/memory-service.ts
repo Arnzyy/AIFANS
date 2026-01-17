@@ -79,7 +79,7 @@ export class MemoryService {
 
   async getAllMemories(userId: string, personaId: string): Promise<UserMemory[]> {
     const { data, error } = await this.supabase
-      .from('user_memories')
+      .from('user_memories_v2')
       .select('*')
       .eq('user_id', userId)
       .eq('persona_id', personaId)
@@ -218,7 +218,7 @@ export class MemoryService {
 
     // Check for existing memory in same category
     const { data: existing } = await this.supabase
-      .from('user_memories')
+      .from('user_memories_v2')
       .select('*')
       .eq('user_id', userId)
       .eq('persona_id', personaId)
@@ -228,7 +228,7 @@ export class MemoryService {
     if (existing) {
       // Update existing memory
       const { data, error } = await this.supabase
-        .from('user_memories')
+        .from('user_memories_v2')
         .update({
           fact,
           source,
@@ -252,7 +252,7 @@ export class MemoryService {
 
     // Create new memory
     const { data, error } = await this.supabase
-      .from('user_memories')
+      .from('user_memories_v2')
       .insert({
         user_id: userId,
         persona_id: personaId,
@@ -288,7 +288,7 @@ export class MemoryService {
 
     // Update to 'established' if last mentioned more than a week ago
     await this.supabase
-      .from('user_memories')
+      .from('user_memories_v2')
       .update({ recency: 'established' })
       .eq('user_id', userId)
       .eq('persona_id', personaId)
@@ -297,7 +297,7 @@ export class MemoryService {
 
     // Update to 'old' if last mentioned more than a month ago
     await this.supabase
-      .from('user_memories')
+      .from('user_memories_v2')
       .update({ recency: 'old' })
       .eq('user_id', userId)
       .eq('persona_id', personaId)

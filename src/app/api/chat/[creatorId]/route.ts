@@ -11,6 +11,7 @@ import { checkChatAccess, decrementMessage, isLowMessages } from '@/lib/chat';
 import { useEnhancedChatV2 } from '@/lib/feature-flags';
 import { getPromptBuilder, ChatContext } from '@/lib/ai/enhanced-chat/prompt-builder';
 import { FORBIDDEN_PATTERNS_V2 } from '@/lib/ai/enhanced-chat/master-prompt-v2';
+import { getMemoryService } from '@/lib/ai/enhanced-chat/memory-service';
 
 export async function POST(
   request: NextRequest,
@@ -339,13 +340,13 @@ async function generateV2Response(
   // Build the enhanced prompt
   const { systemPrompt, analyticsId } = await promptBuilder.buildPrompt(chatContext);
 
-  // Get recent message history for context
+  // Get recent message history for context (200 messages for better memory)
   const { data: recentMessages } = await supabase
     .from('chat_messages')
     .select('role, content')
     .eq('conversation_id', convId)
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(200);
 
   // DEBUG: Log V2 conversation history
   console.log('=== V2 CONVERSATION HISTORY ===');
@@ -400,6 +401,11 @@ async function generateV2Response(
     role: 'assistant',
     content: aiResponse,
   });
+
+  // Extract and save long-term memories from user message (async, don't wait)
+  extractAndSaveMemories(userId, creatorId, message).catch(err =>
+    console.error('Failed to extract memories:', err)
+  );
 
   // Update conversation timestamp
   await supabase
@@ -591,4 +597,54 @@ function stripAsteriskActions(text: string): string {
 
   cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
   return cleaned;
+}
+
+// ===========================================
+// LONG-TERM MEMORY EXTRACTION
+// ===========================================
+
+async function extractAndSaveMemories(
+  userId: string,
+  creatorId: string,
+  userMessage: string
+) {
+  try {
+    const memoryService = getMemoryService(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    // Use the memory service's built-in extraction
+    const extractedMemories = memoryService.extractMemoriesFromMessage(userMessage);
+
+    // Save each extracted memory
+    for (const { category, fact } of extractedMemories) {
+      await memoryService.saveMemory(userId, creatorId, category, fact, 'user_stated');
+      console.log(`[Memory] Saved: ${category} = ${fact}`);
+    }
+
+    // Additional pattern matching for facts the service might miss
+    const additionalPatterns = [
+      { regex: /i live in (.+?)(?:\.|,|$)/i, category: 'location' as const, format: (m: string) => `Lives in ${m}` },
+      { regex: /i(?:'m| am) from (.+?)(?:\.|,|$)/i, category: 'location' as const, format: (m: string) => `From ${m}` },
+      { regex: /i love (.+?)(?:\.|,|$)/i, category: 'interests' as const, format: (m: string) => `Loves ${m}` },
+      { regex: /i(?:'m| am) into (.+?)(?:\.|,|$)/i, category: 'interests' as const, format: (m: string) => `Into ${m}` },
+      { regex: /i(?:'m| am) married/i, category: 'relationship' as const, format: () => 'Is married' },
+      { regex: /i(?:'m| am) single/i, category: 'relationship' as const, format: () => 'Is single' },
+      { regex: /i(?:'m| am) dating/i, category: 'relationship' as const, format: () => 'Is dating someone' },
+    ];
+
+    for (const { regex, category, format } of additionalPatterns) {
+      const match = userMessage.match(regex);
+      if (match) {
+        const fact = format(match[1]?.trim() || '');
+        if (fact && fact.length > 3 && fact.length < 200) {
+          await memoryService.saveMemory(userId, creatorId, category, fact, 'user_stated');
+          console.log(`[Memory] Saved additional: ${category} = ${fact}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Memory] Extraction error:', err);
+  }
 }
