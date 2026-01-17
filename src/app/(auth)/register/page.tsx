@@ -41,6 +41,17 @@ function RegisterForm() {
       return;
     }
 
+    // Validate password strength
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    if (!hasUppercase || !hasNumber || !hasSpecial) {
+      setError('Password must contain at least 1 uppercase letter, 1 number, and 1 special character');
+      setLoading(false);
+      return;
+    }
+
     // Check if username is taken
     const { data: existingUser } = await supabase
       .from('profiles')
@@ -198,7 +209,7 @@ function RegisterForm() {
             placeholder="••••••••"
           />
           <p className="text-xs text-gray-500 mt-1">
-            Minimum 8 characters
+            Min 8 characters, 1 uppercase, 1 number, 1 special character
           </p>
         </div>
 

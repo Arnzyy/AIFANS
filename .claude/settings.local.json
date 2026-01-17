@@ -21,7 +21,8 @@
       "Bash(git ls-files:*)",
       "Bash(dir:*)",
       "Bash(findstr:*)",
-      "Bash(git check-ignore:*)"
+      "Bash(git check-ignore:*)",
+      "Bash(npm install:*)"
     ]
   }
 }
