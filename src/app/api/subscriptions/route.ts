@@ -115,11 +115,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if already subscribed based on type
+    // Use actualCreatorId (profile ID) since that's what we store in subscriptions
     const { data: existingSubs } = await supabase
       .from('subscriptions')
       .select('id, subscription_type')
       .eq('subscriber_id', user.id)
-      .eq('creator_id', creatorId) // Use original creatorId (model ID) for subscription lookup
+      .eq('creator_id', actualCreatorId)
       .eq('status', 'active');
 
     const existingTypes = (existingSubs || []).map(s => s.subscription_type || 'content');

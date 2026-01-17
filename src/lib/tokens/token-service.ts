@@ -184,6 +184,7 @@ export async function createTokenCheckout(
       },
     ],
     metadata: {
+      type: 'token_purchase',
       purchase_id: purchase.id,
       user_id: userId,
       pack_sku: packSku,

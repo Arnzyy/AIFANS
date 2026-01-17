@@ -98,6 +98,9 @@ async function handleCheckoutCompleted(session: any) {
     case 'ppv':
       await createPPVPurchase(session);
       break;
+    case 'token_purchase':
+      await handleTokenPurchase(session);
+      break;
   }
 }
 
@@ -352,6 +355,89 @@ async function createPPVPurchase(session: any) {
   });
 
   console.log('PPV purchase created for post:', post_id);
+}
+
+async function handleTokenPurchase(session: any) {
+  const { purchase_id, user_id, tokens } = session.metadata || {};
+
+  if (!purchase_id || !user_id || !tokens) {
+    console.error('Missing metadata for token purchase');
+    return;
+  }
+
+  const tokenAmount = parseInt(tokens, 10);
+  console.log('Processing token purchase:', purchase_id, 'for user:', user_id, 'tokens:', tokenAmount);
+
+  // Update purchase status to COMPLETED
+  const { error: purchaseError } = await supabase
+    .from('token_pack_purchases')
+    .update({
+      status: 'COMPLETED',
+      stripe_payment_intent_id: session.payment_intent,
+    })
+    .eq('id', purchase_id)
+    .eq('status', 'PENDING'); // Only update if still pending (idempotency)
+
+  if (purchaseError) {
+    console.error('Failed to update token purchase:', purchaseError);
+    // Don't throw - might already be processed
+  }
+
+  // Credit tokens to user's wallet
+  // First, ensure wallet exists
+  const { data: wallet } = await supabase
+    .from('token_wallets')
+    .select('id, balance_tokens, lifetime_purchased')
+    .eq('user_id', user_id)
+    .maybeSingle();
+
+  if (wallet) {
+    // Update existing wallet
+    const { error: updateError } = await supabase
+      .from('token_wallets')
+      .update({
+        balance_tokens: wallet.balance_tokens + tokenAmount,
+        lifetime_purchased: (wallet.lifetime_purchased || 0) + tokenAmount,
+      })
+      .eq('user_id', user_id);
+
+    if (updateError) {
+      console.error('Failed to update wallet:', updateError);
+      throw new Error('Failed to credit tokens to wallet');
+    }
+  } else {
+    // Create new wallet with tokens
+    const { error: insertError } = await supabase
+      .from('token_wallets')
+      .insert({
+        user_id: user_id,
+        balance_tokens: tokenAmount,
+        lifetime_purchased: tokenAmount,
+      });
+
+    if (insertError) {
+      console.error('Failed to create wallet:', insertError);
+      throw new Error('Failed to create wallet');
+    }
+  }
+
+  // Add ledger entry
+  try {
+    await supabase.from('token_ledger').insert({
+      user_id: user_id,
+      entry_type: 'PURCHASE',
+      amount_tokens: tokenAmount,
+      balance_after: (wallet?.balance_tokens || 0) + tokenAmount,
+      reference_type: 'token_pack_purchase',
+      reference_id: purchase_id,
+      description: `Purchased ${tokenAmount} tokens`,
+    });
+  } catch (e) {
+    // Ledger might not exist
+    console.warn('Could not create ledger entry:', e);
+  }
+
+  console.log('Token purchase completed:', purchase_id, 'credited', tokenAmount, 'tokens to user', user_id);
 }
 
 async function handleInvoicePaid(invoice: any) {
