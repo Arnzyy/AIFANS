@@ -3,6 +3,23 @@ import { createServerClient } from '@/lib/supabase/server';
 import { stripe, calculateFees, toCents } from '@/lib/stripe';
 import { getCurrency, convertCurrency, type Currency } from '@/lib/stripe/currency';
 
+// Helper to get app URL with fallback
+function getAppUrl(): string {
+  const url = process.env.NEXT_PUBLIC_APP_URL;
+  if (url) {
+    // Ensure it has a scheme
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    return `https://${url}`;
+  }
+  // Fallback for Vercel deployments
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return 'https://www.joinlyra.com';
+}
+
 // Get user's subscriptions
 export async function GET(request: NextRequest) {
   try {
@@ -191,7 +208,8 @@ export async function POST(request: NextRequest) {
     let intervalCount = 1;
     let monthlyPriceGBP = 0;
 
-    const contentMonthlyPrice = tier?.price_monthly || 0;
+    // Convert from pence to pounds (price_monthly is stored in pence)
+    const contentMonthlyPrice = (tier?.price_monthly || 0) / 100;
 
     switch (subscriptionType) {
       case 'content':
@@ -318,8 +336,8 @@ export async function POST(request: NextRequest) {
           subscription_type: subscriptionType,
         },
       },
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/cancel`,
+      success_url: `${getAppUrl()}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${getAppUrl()}/checkout/cancel`,
     });
 
     return NextResponse.json({
