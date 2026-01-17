@@ -88,6 +88,52 @@ export async function getPresignedUploadUrl(
 }
 
 // ===========================================
+// SIGNED URL FOR DOWNLOADS (Protected Content)
+// ===========================================
+
+/**
+ * Generate a signed URL for downloading protected content
+ * Use this for PPV content, subscriber-only content, etc.
+ * @param key - The R2 object key (path)
+ * @param expiresIn - Expiry in seconds (default 1 hour)
+ */
+export async function getSignedDownloadUrl(
+  key: string,
+  expiresIn: number = 3600
+): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+  });
+
+  return await getSignedUrl(s3Client, command, { expiresIn });
+}
+
+/**
+ * Get the appropriate URL for content based on whether it's protected
+ * @param key - The R2 object key
+ * @param isProtected - If true, returns signed URL; if false, returns public URL
+ */
+export async function getContentUrl(
+  key: string,
+  isProtected: boolean = false,
+  expiresIn: number = 3600
+): Promise<string> {
+  if (isProtected) {
+    return await getSignedDownloadUrl(key, expiresIn);
+  }
+  return `${PUBLIC_URL}/${key}`;
+}
+
+/**
+ * Extract the R2 key from a public URL
+ */
+export function getKeyFromUrl(url: string): string | null {
+  if (!url.startsWith(PUBLIC_URL)) return null;
+  return url.replace(`${PUBLIC_URL}/`, '');
+}
+
+// ===========================================
 // DELETE FUNCTIONS
 // ===========================================
 

@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { isAdminUser } from '@/lib/auth/admin';
+import { getSignedDownloadUrl, getKeyFromUrl } from '@/lib/storage/r2';
 
 export async function GET(
   request: NextRequest,
@@ -202,19 +203,34 @@ export async function GET(
     });
 
     // Transform content items to expected format
-    const contentFromItems = (items || []).map((item) => {
+    // SECURITY: Only return content_url for UNLOCKED content
+    const contentFromItems = await Promise.all((items || []).map(async (item) => {
       const isPpv = item.visibility === 'ppv';
       // Subscribers see all content as unlocked (they paid for subscription)
       // PPV content packs are only for non-subscribers to purchase
       const isUnlocked = isAdmin || hasContentSubscription || !isPpv || unlockedContentIds.has(item.id);
       const price = contentPriceMap.get(item.id);
 
+      // SECURITY FIX: Only provide content_url if unlocked
+      // Locked content only gets thumbnail for blur/preview
+      let contentUrl: string | null = null;
+      if (isUnlocked && item.url) {
+        // For unlocked paid content, use signed URL for extra security
+        const key = getKeyFromUrl(item.url);
+        if (key && isPpv) {
+          // Signed URL expires in 1 hour - prevents URL sharing
+          contentUrl = await getSignedDownloadUrl(key, 3600);
+        } else {
+          contentUrl = item.url;
+        }
+      }
+
       return {
         id: item.id,
         creator_id: item.creator_id,
         type: item.type as 'image' | 'video',
         thumbnail_url: item.thumbnail_url || item.url,
-        content_url: item.url,
+        content_url: contentUrl,
         is_ppv: isPpv,
         price: price,
         title: item.title,
@@ -224,7 +240,7 @@ export async function GET(
         // Include moderation status for admins
         ...(isAdmin && { moderation_status: item.moderation_status }),
       };
-    });
+    }));
 
     // Also fetch posts from this creator that have media
     // IMPORTANT: Posts are ONLY for subscribers - non-subscribers should not see any posts
@@ -257,24 +273,42 @@ export async function GET(
       postPurchasesResult.data?.forEach((p: any) => unlockedPostIds.add(p.post_id));
 
       // Transform posts to content format
+      // SECURITY: Only return content_url for UNLOCKED content
       const postsWithMedia = postsResult.data || [];
-      contentFromPosts = postsWithMedia
+      contentFromPosts = await Promise.all(postsWithMedia
         .filter((post: any) => post.media_urls && post.media_urls.length > 0)
-        .map((post: any) => ({
-          id: `post-${post.id}`,
-          post_id: post.id,
-          creator_id: post.creator_id,
-          type: 'image' as const,
-          thumbnail_url: post.media_urls[0],
-          content_url: post.media_urls[0],
-          is_ppv: post.is_ppv || false,
-          price: post.ppv_price ? post.ppv_price / 100 : undefined,
-          title: post.text_content?.substring(0, 50),
+        .map(async (post: any) => {
+          const isPpvPost = post.is_ppv || false;
           // For PPV posts: locked unless purchased OR admin
           // For non-PPV posts: unlocked for subscribers (they already have access)
-          is_unlocked: isAdmin || (!post.is_ppv) || unlockedPostIds.has(post.id),
-          created_at: post.created_at,
-          source: 'post' as const,
+          const isUnlocked = isAdmin || (!isPpvPost) || unlockedPostIds.has(post.id);
+
+          // SECURITY FIX: Only provide content_url if unlocked
+          let contentUrl: string | null = null;
+          if (isUnlocked && post.media_urls[0]) {
+            // For unlocked PPV posts, use signed URL for extra security
+            const key = getKeyFromUrl(post.media_urls[0]);
+            if (key && isPpvPost) {
+              contentUrl = await getSignedDownloadUrl(key, 3600);
+            } else {
+              contentUrl = post.media_urls[0];
+            }
+          }
+
+          return {
+            id: `post-${post.id}`,
+            post_id: post.id,
+            creator_id: post.creator_id,
+            type: 'image' as const,
+            thumbnail_url: post.media_urls[0],
+            content_url: contentUrl,
+            is_ppv: isPpvPost,
+            price: post.ppv_price ? post.ppv_price / 100 : undefined,
+            title: post.text_content?.substring(0, 50),
+            is_unlocked: isUnlocked,
+            created_at: post.created_at,
+            source: 'post' as const,
+          };
         }));
     }
 
