@@ -78,12 +78,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if creatorId is actually a model ID (not a profile ID)
+    // Models have a creator_id field pointing to the actual creator's profile
+    let modelId: string | null = null;
+    let actualCreatorId = creatorId;
+    let modelData: any = null;
+
+    const { data: model } = await supabase
+      .from('creator_models')
+      .select('id, creator_id, name, subscription_price')
+      .eq('id', creatorId)
+      .single();
+
+    if (model) {
+      // It's a model subscription
+      modelId = model.id;
+      actualCreatorId = model.creator_id;
+      modelData = model;
+    }
+
     // Check if already subscribed based on type
     const { data: existingSubs } = await supabase
       .from('subscriptions')
       .select('id, subscription_type')
       .eq('subscriber_id', user.id)
-      .eq('creator_id', creatorId)
+      .eq('creator_id', creatorId) // Use original creatorId (model ID) for subscription lookup
       .eq('status', 'active');
 
     const existingTypes = (existingSubs || []).map(s => s.subscription_type || 'content');
@@ -120,7 +139,7 @@ export async function POST(request: NextRequest) {
     const { data: creatorProfile } = await supabase
       .from('creator_profiles')
       .select('ai_chat_price_per_message')
-      .eq('user_id', creatorId)
+      .eq('user_id', actualCreatorId)
       .single();
 
     // Chat monthly price (default £9.99 if not set)
@@ -128,12 +147,21 @@ export async function POST(request: NextRequest) {
 
     // Fetch tier details (for content subscriptions)
     let tier = null;
-    if (subscriptionType !== 'chat' && tierId) {
+
+    // If this is a model subscription, use the model's subscription_price directly
+    if (modelData && subscriptionType !== 'chat') {
+      // Create a virtual tier from the model's price
+      tier = {
+        id: `model-${modelData.id}`,
+        price_monthly: modelData.subscription_price || 999, // Default to £9.99
+        name: 'Fan',
+      };
+    } else if (subscriptionType !== 'chat' && tierId) {
       const { data } = await supabase
         .from('subscription_tiers')
         .select('*')
         .eq('id', tierId)
-        .eq('creator_id', creatorId)
+        .eq('creator_id', actualCreatorId)
         .eq('is_active', true)
         .single();
       tier = data;
@@ -142,7 +170,7 @@ export async function POST(request: NextRequest) {
       const { data } = await supabase
         .from('subscription_tiers')
         .select('*')
-        .eq('creator_id', creatorId)
+        .eq('creator_id', actualCreatorId)
         .eq('is_active', true)
         .order('price_monthly', { ascending: true })
         .limit(1)
@@ -150,7 +178,7 @@ export async function POST(request: NextRequest) {
       tier = data;
     }
 
-    // For content/bundle, we need a tier
+    // For content/bundle, we need a tier (or model price)
     if ((subscriptionType === 'content' || subscriptionType === 'bundle') && !tier) {
       return NextResponse.json(
         { error: 'No subscription tier available for this creator' },
@@ -201,22 +229,28 @@ export async function POST(request: NextRequest) {
     const priceInCents = toCents(priceGBP);
     const convertedPriceInCents = convertCurrency(priceInCents, 'gbp', currency);
 
-    // Get creator info for product name
-    const { data: creator } = await supabase
-      .from('profiles')
-      .select('username, display_name')
-      .eq('id', creatorId)
-      .single();
+    // Get display name for product - use model name if model subscription
+    let displayName = '';
+    if (modelData) {
+      displayName = modelData.name;
+    } else {
+      const { data: creator } = await supabase
+        .from('profiles')
+        .select('username, display_name')
+        .eq('id', creatorId)
+        .single();
+      displayName = creator?.display_name || creator?.username || 'Creator';
+    }
 
     // Build product name based on subscription type
     const productNames: Record<string, string> = {
-      content: `${creator?.display_name || creator?.username} - Fan Access`,
-      chat: `${creator?.display_name || creator?.username} - AI Chat`,
-      bundle: `${creator?.display_name || creator?.username} - Fan + Chat Bundle`,
+      content: `${displayName} - Fan Access`,
+      chat: `${displayName} - AI Chat`,
+      bundle: `${displayName} - Fan + Chat Bundle`,
     };
     const productDescriptions: Record<string, string> = {
-      content: `Access to all posts and content from ${creator?.display_name || creator?.username}`,
-      chat: `AI chat with ${creator?.display_name || creator?.username}`,
+      content: `Access to all posts and content from ${displayName}`,
+      chat: `AI chat with ${displayName}`,
       bundle: `Full access: posts, content, and AI chat`,
     };
 

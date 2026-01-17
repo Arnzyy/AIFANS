@@ -92,16 +92,26 @@ export default async function FeedPage() {
     posts = data || [];
   }
 
-  // Get suggested creators (not subscribed)
-  const { data: suggestedCreators } = await supabase
-    .from('profiles')
+  // Get suggested models (not subscribed)
+  const { data: suggestedModels } = await supabase
+    .from('creator_models')
     .select(`
-      *,
-      creator_profiles!inner(*)
+      id,
+      name,
+      avatar_url,
+      tagline,
+      creator:profiles!creator_models_creator_id_fkey(
+        id,
+        username,
+        display_name
+      ),
+      subscription_tiers(
+        price_monthly
+      )
     `)
-    .eq('role', 'creator')
-    .not('id', 'in', `(${[user.id, ...subscribedIds].join(',')})`)
+    .eq('is_active', true)
+    .not('id', 'in', `(${subscribedIds.length > 0 ? subscribedIds.join(',') : 'null'})`)
     .limit(5);
 
-  return <FeedClient initialPosts={posts} suggestedCreators={suggestedCreators || []} />;
+  return <FeedClient initialPosts={posts} suggestedModels={suggestedModels || []} />;
 }
