@@ -109,14 +109,28 @@ async function createSubscription(session: any) {
     return;
   }
 
+  if (!session.subscription) {
+    console.error('No subscription ID in checkout session');
+    return;
+  }
+
+  console.log('Creating subscription for user:', user_id, 'creator:', creator_id, 'type:', subscription_type);
+
   // Get subscription from Stripe
   const stripeSubscription = await stripe.subscriptions.retrieve(
     session.subscription as string
   ) as any;
 
-  // Calculate period dates
-  const currentPeriodStart = new Date(stripeSubscription.current_period_start * 1000);
-  const currentPeriodEnd = new Date(stripeSubscription.current_period_end * 1000);
+  // Calculate period dates with fallbacks
+  const now = new Date();
+  const oneMonthFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  const currentPeriodStart = stripeSubscription.current_period_start
+    ? new Date(stripeSubscription.current_period_start * 1000)
+    : now;
+  const currentPeriodEnd = stripeSubscription.current_period_end
+    ? new Date(stripeSubscription.current_period_end * 1000)
+    : oneMonthFromNow;
 
   // Check if this is a model subscription (tier_id starts with "model-")
   const isModelSubscription = tier_id && tier_id.startsWith('model-');
