@@ -1,4 +1,5 @@
 import { createServerClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminUser } from '@/lib/auth/admin';
 
@@ -9,6 +10,7 @@ export async function GET(
 ) {
   try {
     const supabase = await createServerClient();
+    const adminClient = await createAdminClient();
     const { id } = await params;
 
     console.log('[API /api/models/[id]] Fetching model:', id);
@@ -79,17 +81,22 @@ export async function GET(
     if (user) {
       // Admin users have full access
       if (isAdminUser(user.email)) {
+        console.log('[API /api/models/[id]] Admin user has full access');
         isSubscribed = true;
       } else {
+        // Use admin client to bypass RLS and check subscription
         // model.creator_id IS the profile ID - subscriptions are stored with this ID
-        // Check for any active subscription (content, chat, or bundle)
-        const { data: subscription } = await supabase
+        const { data: subscription, error: subError } = await adminClient
           .from('subscriptions')
-          .select('id, subscription_type')
+          .select('id, subscription_type, status')
           .eq('subscriber_id', user.id)
           .eq('creator_id', model.creator_id)
           .eq('status', 'active')
           .maybeSingle();
+
+        if (subError) {
+          console.error('[API /api/models/[id]] Subscription query error:', subError.message);
+        }
 
         if (subscription) {
           console.log('[API /api/models/[id]] Found subscription:', subscription.id, 'type:', subscription.subscription_type);
@@ -98,6 +105,8 @@ export async function GET(
           console.log('[API /api/models/[id]] No subscription found for user:', user.id, 'creator:', model.creator_id);
         }
       }
+    } else {
+      console.log('[API /api/models/[id]] No authenticated user - content will be locked');
     }
 
     // Check if AI chat is actually configured (has persona data)
@@ -135,7 +144,7 @@ export async function GET(
       isSubscribed,
     });
   } catch (error) {
-    console.error('Error fetching model:', error);
+    console.error('[API /api/models/[id]] Error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch model' },
       { status: 500 }
