@@ -133,73 +133,41 @@ async function checkSubscriptionAccess(
   userId: string,
   creatorId: string
 ): Promise<ChatAccess> {
-  // The creatorId might be a model ID, creator ID, or profile ID
-  // We need to find the profile ID (user_id) that subscriptions reference
-  let profileIdToCheck: string | null = null;
+  // The creatorId might be a model ID or profile ID
+  // model.creator_id IS the profile ID, so we can use it directly
+  // Subscriptions are stored with creator_id = profile ID
 
   console.log('[checkSubscriptionAccess] Input creatorId:', creatorId, 'userId:', userId);
 
-  // First, check if creatorId is a model ID
+  // Build list of possible IDs to check (for backwards compatibility)
+  const possibleCreatorIds = new Set<string>();
+  possibleCreatorIds.add(creatorId); // Always include the input ID
+
+  // Check if creatorId is a model ID
   const { data: model, error: modelError } = await supabase
     .from('creator_models')
     .select('id, creator_id')
     .eq('id', creatorId)
     .single();
 
-  console.log('[checkSubscriptionAccess] Model lookup:', model ? `Found model, creator_id: ${model.creator_id}` : 'Not a model', modelError?.message || '');
-
   if (model) {
-    // It's a model - get the creator's profile ID
-    const { data: creator, error: creatorError } = await supabase
-      .from('creators')
-      .select('id, user_id')
-      .eq('id', model.creator_id)
-      .single();
-
-    console.log('[checkSubscriptionAccess] Creator lookup:', creator ? `Found creator, user_id: ${creator.user_id}` : 'Creator not found', creatorError?.message || '');
-    profileIdToCheck = creator?.user_id || null;
-  } else {
-    // Check if it's a creator ID
-    const { data: creator } = await supabase
-      .from('creators')
-      .select('id, user_id')
-      .eq('id', creatorId)
-      .single();
-
-    if (creator) {
-      profileIdToCheck = creator.user_id;
-      console.log('[checkSubscriptionAccess] Found creator directly, user_id:', creator.user_id);
-    } else {
-      // Maybe it's already a profile ID - check profiles table
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', creatorId)
-        .single();
-      if (profile) {
-        profileIdToCheck = profile.id;
-        console.log('[checkSubscriptionAccess] Found profile directly:', profile.id);
-      }
-    }
+    // For models, model.creator_id IS the profile ID - use it directly
+    console.log('[checkSubscriptionAccess] Found model, creator_id (profile ID):', model.creator_id);
+    possibleCreatorIds.add(model.creator_id);
   }
 
-  // If we couldn't resolve to a profile ID, try direct lookup as fallback
-  if (!profileIdToCheck) {
-    console.log('[checkSubscriptionAccess] Could not resolve profile ID, using creatorId as fallback');
-    profileIdToCheck = creatorId;
-  }
+  const idsToCheck = Array.from(possibleCreatorIds);
+  console.log('[checkSubscriptionAccess] Checking subscription for subscriber:', userId, 'creator IDs:', idsToCheck);
 
-  console.log('[checkSubscriptionAccess] Checking subscription for subscriber:', userId, 'creator:', profileIdToCheck);
-
-  // Simple subscription check - just see if an active subscription exists
-  // Only select columns that exist in the table
+  // Check subscription with all possible IDs
   const { data: subscription, error } = await supabase
     .from('subscriptions')
     .select('id, status, subscription_type')
     .eq('subscriber_id', userId)
-    .eq('creator_id', profileIdToCheck)
+    .in('creator_id', idsToCheck)
     .eq('status', 'active')
     .in('subscription_type', ['chat', 'bundle'])
+    .limit(1)
     .maybeSingle();
 
   console.log('[checkSubscriptionAccess] Subscription result:', subscription ? `Found: ${subscription.id}, type: ${subscription.subscription_type}` : 'Not found', error?.message || '');

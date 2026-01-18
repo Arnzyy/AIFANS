@@ -117,21 +117,32 @@ export async function GET(
     let hasContentSubscription = isAdmin; // Admins have full access
 
     if (!isAdmin && user) {
-      // Check subscription - run all possible ID checks IN PARALLEL for speed
-      const possibleCreatorIds = [actualCreatorId];
-      if (creatorUserId && creatorUserId !== actualCreatorId) {
-        possibleCreatorIds.push(creatorUserId);
-      }
-      if (modelId && modelId !== actualCreatorId && modelId !== creatorUserId) {
-        possibleCreatorIds.push(modelId);
+      // Check subscription - model.creator_id IS the profile ID where subscriptions are stored
+      // Build list of possible IDs to check (for backwards compatibility)
+      const possibleCreatorIds = new Set<string>();
+
+      // Always include actualCreatorId
+      possibleCreatorIds.add(actualCreatorId);
+
+      // For models, model.creator_id IS the profile ID - always include it
+      if (model) {
+        possibleCreatorIds.add(model.creator_id);
       }
 
-      // Single query with IN clause instead of multiple sequential queries
+      // Include creatorUserId if different
+      if (creatorUserId) {
+        possibleCreatorIds.add(creatorUserId);
+      }
+
+      const idsToCheck = Array.from(possibleCreatorIds);
+      debugInfo.checkedIds = idsToCheck;
+
+      // Single query with IN clause
       const { data: subscription } = await supabase
         .from('subscriptions')
         .select('id, subscription_type')
         .eq('subscriber_id', user.id)
-        .in('creator_id', possibleCreatorIds)
+        .in('creator_id', idsToCheck)
         .eq('status', 'active')
         .in('subscription_type', ['content', 'bundle'])
         .limit(1)
@@ -139,7 +150,9 @@ export async function GET(
 
       hasContentSubscription = !!subscription;
       debugInfo.subscriptionFound = !!subscription;
-      debugInfo.checkedIds = possibleCreatorIds;
+      if (subscription) {
+        debugInfo.subscriptionType = subscription.subscription_type;
+      }
     }
 
     // Build content items query
