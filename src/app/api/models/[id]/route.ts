@@ -81,63 +81,21 @@ export async function GET(
       if (isAdminUser(user.email)) {
         isSubscribed = true;
       } else {
-        // Get the creator's profile ID (user_id) for subscription lookup
-        // Subscriptions are stored with creator's profile_id due to foreign key constraint
-        let creatorProfileId: string | null = null;
+        // model.creator_id IS the profile ID - subscriptions are stored with this ID
+        // Check for any active subscription (content, chat, or bundle)
+        const { data: subscription } = await supabase
+          .from('subscriptions')
+          .select('id, subscription_type')
+          .eq('subscriber_id', user.id)
+          .eq('creator_id', model.creator_id)
+          .eq('status', 'active')
+          .maybeSingle();
 
-        // First try: model.creator_id points to creators table
-        const { data: creatorRecord } = await supabase
-          .from('creators')
-          .select('id, user_id')
-          .eq('id', model.creator_id)
-          .single();
-
-        if (creatorRecord) {
-          creatorProfileId = creatorRecord.user_id;
+        if (subscription) {
+          console.log('[API /api/models/[id]] Found subscription:', subscription.id, 'type:', subscription.subscription_type);
+          isSubscribed = true;
         } else {
-          // Fallback: model.creator_id might already be a user_id
-          const { data: creatorByUserId } = await supabase
-            .from('creators')
-            .select('id, user_id')
-            .eq('user_id', model.creator_id)
-            .single();
-          if (creatorByUserId) {
-            creatorProfileId = creatorByUserId.user_id;
-          }
-        }
-
-        // Check subscription using creator's profile ID (for any type)
-        if (creatorProfileId) {
-          const { data: subscription } = await supabase
-            .from('subscriptions')
-            .select('id, subscription_type')
-            .eq('subscriber_id', user.id)
-            .eq('creator_id', creatorProfileId)
-            .eq('status', 'active')
-            .maybeSingle();
-
-          if (subscription) {
-            console.log('[API /api/models/[id]] Found subscription via creatorProfileId:', subscription.id, subscription.subscription_type);
-          }
-          isSubscribed = !!subscription;
-        }
-
-        // Also check with model.id directly (model subscriptions store model ID as creator_id)
-        if (!isSubscribed) {
-          const { data: modelSub } = await supabase
-            .from('subscriptions')
-            .select('id, subscription_type, status')
-            .eq('subscriber_id', user.id)
-            .eq('creator_id', model.id)
-            .eq('status', 'active')
-            .maybeSingle();
-
-          if (modelSub) {
-            console.log('[API /api/models/[id]] Found subscription via model.id:', modelSub.id, modelSub.subscription_type);
-          } else {
-            console.log('[API /api/models/[id]] No subscription found for user:', user.id, 'model:', model.id);
-          }
-          isSubscribed = !!modelSub;
+          console.log('[API /api/models/[id]] No subscription found for user:', user.id, 'creator:', model.creator_id);
         }
       }
     }
