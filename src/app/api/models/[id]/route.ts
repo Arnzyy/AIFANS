@@ -1,5 +1,4 @@
 import { createServerClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminUser } from '@/lib/auth/admin';
 
@@ -10,7 +9,6 @@ export async function GET(
 ) {
   try {
     const supabase = await createServerClient();
-    const adminClient = await createAdminClient();
     const { id } = await params;
 
     console.log('[API /api/models/[id]] Fetching model:', id);
@@ -84,9 +82,8 @@ export async function GET(
         console.log('[API /api/models/[id]] Admin user has full access');
         isSubscribed = true;
       } else {
-        // Use admin client to bypass RLS and check subscription
-        // model.creator_id IS the profile ID - subscriptions are stored with this ID
-        const { data: subscription, error: subError } = await adminClient
+        // Check subscription - RLS policies allow authenticated users to read
+        const { data: subscription, error: subError } = await supabase
           .from('subscriptions')
           .select('id, subscription_type, status')
           .eq('subscriber_id', user.id)
