@@ -545,9 +545,6 @@ export default function ModelProfilePage() {
             )}
           </div>
 
-          {model.creatorUsername && (
-            <p className="text-gray-500">by @{model.creatorUsername}</p>
-          )}
 
           <p className="text-sm text-gray-400 mt-1">Age: {model.age}</p>
 
