@@ -66,7 +66,7 @@ function RegisterForm() {
     }
 
     // Create account
-    const { error: signUpError } = await supabase.auth.signUp({
+    const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -83,13 +83,61 @@ function RegisterForm() {
       return;
     }
 
-    // Redirect based on account type
-    if (isCreator) {
-      router.push('/onboarding/creator');
-    } else {
-      router.push('/explore');
+    if (!authData.user) {
+      setError('Failed to create account');
+      setLoading(false);
+      return;
     }
-    router.refresh();
+
+    const userId = authData.user.id;
+
+    try {
+      // 1. Create profile record (required for FK constraints)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          email: email,
+          username: username.toLowerCase(),
+        });
+
+      if (profileError) {
+        console.error('Profile creation error:', profileError);
+        setError('Failed to create profile');
+        setLoading(false);
+        return;
+      }
+
+      // 2. If creator, create creator record
+      if (isCreator) {
+        const { error: creatorError } = await supabase
+          .from('creators')
+          .insert({
+            id: userId,
+            email: email,
+            username: username.toLowerCase(),
+          });
+
+        if (creatorError) {
+          console.error('Creator creation error:', creatorError);
+          setError('Failed to create creator account');
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Redirect based on account type
+      if (isCreator) {
+        router.push('/onboarding/creator');
+      } else {
+        router.push('/explore');
+      }
+      router.refresh();
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError('Failed to complete registration');
+      setLoading(false);
+    }
   };
 
   // Age verification gate
