@@ -16,6 +16,7 @@ import {
   buildTimeContextPrompt,
   updateConversationState,
   extractUserFacts,
+  extractUserFactsAI,
   detectConversationTopics
 } from '@/lib/ai/conversation-state';
 
@@ -400,37 +401,41 @@ async function generateChatResponse(
   // ===========================================
   // UPDATE CONVERSATION STATE (async, non-blocking)
   // ===========================================
-  try {
-    const newFacts = extractUserFacts(message);
-    const newTopics = detectConversationTopics(message);
+  // Run in background - don't await
+  (async () => {
+    try {
+      // Use AI-powered extraction (Haiku) with regex fallback
+      const newFacts = await extractUserFactsAI(message);
+      const newTopics = detectConversationTopics(message);
 
-    console.log('=== STATE UPDATE ===');
-    console.log('New facts extracted:', newFacts);
-    console.log('New topics detected:', newTopics);
+      console.log('=== STATE UPDATE ===');
+      console.log('New facts extracted:', newFacts);
+      console.log('New topics detected:', newTopics);
 
-    // Update state - fire and forget
-    updateConversationState(supabase, userId, creatorId, {
-      incrementMessageCount: true,
-    }).catch(err => console.error('State update error:', err));
-
-    // Store any new facts
-    for (const fact of newFacts) {
+      // Update state - fire and forget
       updateConversationState(supabase, userId, creatorId, {
-        newFact: fact,
-        incrementMessageCount: false,
-      }).catch(err => console.error('Fact update error:', err));
-    }
+        incrementMessageCount: true,
+      }).catch(err => console.error('State update error:', err));
 
-    // Store any topics detected
-    for (const topic of newTopics) {
-      updateConversationState(supabase, userId, creatorId, {
-        newTopic: topic,
-        incrementMessageCount: false,
-      }).catch(err => console.error('Topic update error:', err));
+      // Store any new facts
+      for (const fact of newFacts) {
+        updateConversationState(supabase, userId, creatorId, {
+          newFact: fact,
+          incrementMessageCount: false,
+        }).catch(err => console.error('Fact update error:', err));
+      }
+
+      // Store any topics detected
+      for (const topic of newTopics) {
+        updateConversationState(supabase, userId, creatorId, {
+          newTopic: topic,
+          incrementMessageCount: false,
+        }).catch(err => console.error('Topic update error:', err));
+      }
+    } catch (err) {
+      console.error('State update error (non-fatal):', err);
     }
-  } catch (err) {
-    console.error('State update error (non-fatal):', err);
-  }
+  })();
 
   // Update conversation timestamp
   await supabase

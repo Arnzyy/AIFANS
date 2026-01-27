@@ -322,6 +322,76 @@ export async function updateConversationState(
 }
 
 /**
+ * Extract facts from a user message using AI (Haiku)
+ * Falls back to regex if AI fails
+ */
+export async function extractUserFactsAI(userMessage: string): Promise<string[]> {
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      console.warn('No API key, falling back to regex extraction');
+      return extractUserFacts(userMessage);
+    }
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-3-5-20241022',
+        max_tokens: 100,
+        messages: [{
+          role: 'user',
+          content: `Extract facts about the user from this message. Return ONLY a JSON array of strings, nothing else.
+
+Facts to extract:
+- Name (if mentioned)
+- Job/occupation
+- Location/city
+- Interests/hobbies
+- Relationship status
+- Any other personal facts
+
+Message: "${userMessage}"
+
+Return format: ["fact1", "fact2", "fact3"]
+If no facts, return: []`
+        }]
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn('Haiku API failed, falling back to regex');
+      return extractUserFacts(userMessage);
+    }
+
+    const data = await response.json();
+    const content = data.content[0].text.trim();
+
+    // Parse JSON response
+    try {
+      const facts = JSON.parse(content);
+      if (Array.isArray(facts) && facts.length > 0) {
+        console.log('[AI Extraction] Found:', facts);
+        return facts;
+      }
+    } catch (e) {
+      console.warn('Failed to parse AI response, falling back to regex');
+    }
+
+    // Fallback to regex
+    return extractUserFacts(userMessage);
+
+  } catch (error) {
+    console.error('AI extraction error:', error);
+    return extractUserFacts(userMessage);
+  }
+}
+
+/**
  * Extract facts from a user message
  * Simple pattern matching version - can be enhanced with AI
  */
