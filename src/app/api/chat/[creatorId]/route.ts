@@ -1,17 +1,23 @@
 // ===========================================
 // API ROUTE: /api/chat/[creatorId]/route.ts
 // Main chat endpoint with LYRA compliance
-// Supports v1 (legacy) and v2 (enhanced) via feature flag
 // ===========================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { generateChatResponse } from '@/lib/ai/chat-service';
-import { checkChatAccess, decrementMessage, isLowMessages } from '@/lib/chat';
-import { useEnhancedChatV2 } from '@/lib/feature-flags';
+import { checkChatAccessOptimized, decrementMessage } from '@/lib/chat';
 import { getPromptBuilder, ChatContext } from '@/lib/ai/enhanced-chat/prompt-builder';
 import { FORBIDDEN_PATTERNS_V2 } from '@/lib/ai/enhanced-chat/master-prompt-v2';
 import { getMemoryService } from '@/lib/ai/enhanced-chat/memory-service';
+import { getCreatorWithPersonality, getPersonality } from '@/lib/cache/creator-cache';
+import {
+  getConversationState,
+  calculateTimeContext,
+  buildTimeContextPrompt,
+  updateConversationState,
+  extractUserFacts,
+  detectConversationTopics
+} from '@/lib/ai/conversation-state';
 
 export async function POST(
   request: NextRequest,
@@ -29,8 +35,8 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check chat access (subscription OR paid session)
-    const access = await checkChatAccess(supabase, user.id, creatorId);
+    // Check chat access (OPTIMIZED: passes user to avoid duplicate auth call)
+    const access = await checkChatAccessOptimized(supabase, user, creatorId);
 
     if (!access.hasAccess || !access.canSendMessage) {
       return NextResponse.json(
@@ -50,59 +56,40 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid message' }, { status: 400 });
     }
 
-    // Get AI personality - check ai_personalities first, then creator_models
+    // Get AI personality (OPTIMIZED: uses cache with 5min TTL)
     let personality: any = null;
 
-    // First try ai_personalities table - check BOTH creator_id AND model_id
-    // For creator_models (like Lyra), the personality is linked via model_id
-    // For regular human creators, it's linked via creator_id
-    const { data: aiPersonality } = await supabase
-      .from('ai_personalities')
-      .select('*')
-      .or(`creator_id.eq.${creatorId},model_id.eq.${creatorId}`)
-      .eq('is_active', true)
-      .maybeSingle();
+    // First try cached personality (checks both creator_id and model_id)
+    const cachedPersonality = await getPersonality(supabase, creatorId);
 
-    if (aiPersonality) {
-      personality = aiPersonality;
+    if (cachedPersonality) {
+      personality = cachedPersonality.data;
     } else {
-      // Check if this is a creator model (like Lyra)
-      const { data: model } = await supabase
-        .from('creator_models')
-        .select('id, name, age, backstory, speaking_style, personality_traits, interests, turn_ons, turn_offs, emoji_usage, response_length, nsfw_enabled, sfw_enabled')
-        .eq('id', creatorId)
-        .eq('status', 'approved')
-        .single();
+      // Fallback: check creator_models for legacy models without ai_personality
+      const { creator } = await getCreatorWithPersonality(supabase, creatorId);
 
-      if (model) {
-        // Convert creator_model persona to AIPersonalityFull format
+      if (creator && creator.ai_chat_enabled) {
+        // Convert creator_model to personality format
         personality = {
-          id: model.id,
-          creator_id: model.id,
-          // Identity - CRITICAL: persona_name is required for prompt builder
-          persona_name: model.name,
-          age: model.age || 21,
-          // Personality
-          personality_traits: model.personality_traits || ['friendly', 'flirty'],
+          id: creator.id,
+          creator_id: creator.id,
+          persona_name: creator.name,
+          age: creator.age || 21,
+          personality_traits: creator.personality_traits || ['friendly', 'flirty'],
           energy_level: 7,
           humor_style: 'playful teasing',
           mood: 'flirty and engaged',
-          // Interests
-          interests: model.interests || ['chatting', 'getting to know you'],
-          // Chat style
+          interests: creator.interests || ['chatting', 'getting to know you'],
           flirting_style: ['playful', 'engaging'],
           dynamic: 'switch' as const,
           pace: 5,
-          // Voice
-          emoji_usage: model.emoji_usage || 'moderate',
-          response_length: model.response_length || 'medium',
-          speech_patterns: [model.speaking_style || 'playful and engaging'],
-          // Behavior
-          topics_loves: model.turn_ons || ['flirting', 'compliments'],
-          topics_avoids: model.turn_offs || [],
+          emoji_usage: creator.emoji_usage || 'moderate',
+          response_length: creator.response_length || 'medium',
+          speech_patterns: [creator.speaking_style || 'playful and engaging'],
+          topics_loves: ['flirting', 'compliments'],
+          topics_avoids: [],
           when_complimented: 'blushes and thanks them sweetly',
           when_heated: 'maintains playful energy',
-          // Status
           is_active: true,
         };
       }
@@ -115,39 +102,15 @@ export async function POST(
       );
     }
 
-    // Check if enhanced chat v2 is enabled for this user
-    const useV2 = await useEnhancedChatV2(supabase, user.id);
-
-    let result: {
-      response: string;
-      conversationId: string;
-      passed_compliance: boolean;
-      compliance_issues?: string[];
-    };
-
-    if (useV2) {
-      // Use enhanced v2 chat system
-      result = await generateV2Response(
-        supabase,
-        user.id,
-        creatorId,
-        message,
-        conversationId,
-        personality
-      );
-    } else {
-      // Use legacy v1 chat system
-      result = await generateChatResponse(
-        supabase as any,
-        {
-          subscriberId: user.id,
-          creatorId: creatorId,
-          message,
-          conversationId,
-        },
-        personality
-      );
-    }
+    // Generate chat response
+    const result = await generateChatResponse(
+      supabase,
+      user.id,
+      creatorId,
+      message,
+      conversationId,
+      personality
+    );
 
     // Log compliance issues if any
     if (result.compliance_issues && result.compliance_issues.length > 0) {
@@ -162,8 +125,8 @@ export async function POST(
       access.accessType
     );
 
-    // Get updated access state
-    const updatedAccess = await checkChatAccess(supabase, user.id, creatorId);
+    // Get updated access state (OPTIMIZED: passes user)
+    const updatedAccess = await checkChatAccessOptimized(supabase, user, creatorId);
 
     // Build response with access info
     const response: Record<string, unknown> = {
@@ -220,7 +183,7 @@ export async function GET(
         `and(participant1_id.eq.${user.id},participant2_id.eq.${creatorId}),` +
           `and(participant1_id.eq.${creatorId},participant2_id.eq.${user.id})`
       )
-      .single();
+      .maybeSingle();
 
     if (!conversation) {
       return NextResponse.json({ messages: [] });
@@ -267,7 +230,7 @@ export async function GET(
 }
 
 // ===========================================
-// V2 ENHANCED CHAT HANDLER
+// CHAT RESPONSE HANDLER
 // ===========================================
 
 interface ChatMessage {
@@ -275,7 +238,7 @@ interface ChatMessage {
   content: string;
 }
 
-async function generateV2Response(
+async function generateChatResponse(
   supabase: any,
   userId: string,
   creatorId: string,
@@ -289,7 +252,7 @@ async function generateV2Response(
   compliance_issues?: string[];
 }> {
   // DEBUG: Log V2 personality data
-  console.log('=== V2 PERSONALITY DATA LOADED ===');
+  console.log('===PERSONALITY DATA LOADED ===');
   console.log('Personality ID:', personality?.id);
   console.log('Personality keys:', personality ? Object.keys(personality) : 'NULL');
   console.log('Persona name:', personality?.persona_name);
@@ -328,6 +291,28 @@ async function generateV2Response(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
+  // ===========================================
+  // TIME-AWARE CONVERSATION STATE
+  // ===========================================
+  let timeContextPrompt = '';
+  try {
+    const conversationState = await getConversationState(supabase, userId, creatorId);
+    const timeContext = calculateTimeContext(conversationState?.last_message_at);
+    timeContextPrompt = buildTimeContextPrompt(
+      timeContext,
+      conversationState,
+      personality.persona_name || 'AI'
+    );
+
+    console.log('=== TIME AWARENESS ===');
+    console.log('Gap description:', timeContext.gapDescription);
+    console.log('Should acknowledge gap:', timeContext.shouldAcknowledgeGap);
+    console.log('Days since last message:', timeContext.daysSinceLastMessage);
+    console.log('User facts known:', conversationState?.user_facts?.length || 0);
+  } catch (err) {
+    console.error('Conversation state error (non-fatal):', err);
+  }
+
   // Build the chat context
   const chatContext: ChatContext = {
     conversationId: convId!,
@@ -340,6 +325,11 @@ async function generateV2Response(
   // Build the enhanced prompt
   const { systemPrompt, analyticsId } = await promptBuilder.buildPrompt(chatContext);
 
+  // Append time context to system prompt
+  const fullSystemPrompt = timeContextPrompt
+    ? `${systemPrompt}\n\n${timeContextPrompt}`
+    : systemPrompt;
+
   // Get recent message history for context (200 messages for better memory)
   const { data: recentMessages } = await supabase
     .from('chat_messages')
@@ -349,7 +339,7 @@ async function generateV2Response(
     .limit(200);
 
   // DEBUG: Log V2 conversation history
-  console.log('=== V2 CONVERSATION HISTORY ===');
+  console.log('===CONVERSATION HISTORY ===');
   console.log('Conversation ID:', convId);
   console.log('Messages loaded from DB:', recentMessages?.length || 0);
   console.log('Last 3 messages:', JSON.stringify(recentMessages?.slice(0, 3), null, 2));
@@ -372,19 +362,19 @@ async function generateV2Response(
   });
 
   // Generate AI response
-  let aiResponse = await callAnthropicAPIV2(
-    systemPrompt,
+  let aiResponse = await callAnthropicAPI(
+    fullSystemPrompt,
     messages,
     personality.response_length || 'medium'
   );
 
   // Compliance check
-  const complianceResult = checkComplianceV2(aiResponse);
+  const complianceResult = checkCompliance(aiResponse);
 
   if (!complianceResult.passed) {
-    console.warn('V2 Compliance issues:', complianceResult.issues);
-    aiResponse = await regenerateCompliantV2(
-      systemPrompt,
+    console.warn('Compliance issues:', complianceResult.issues);
+    aiResponse = await regenerateCompliant(
+      fullSystemPrompt,
       messages,
       personality.response_length || 'medium'
     );
@@ -406,6 +396,41 @@ async function generateV2Response(
   extractAndSaveMemories(userId, creatorId, message).catch(err =>
     console.error('Failed to extract memories:', err)
   );
+
+  // ===========================================
+  // UPDATE CONVERSATION STATE (async, non-blocking)
+  // ===========================================
+  try {
+    const newFacts = extractUserFacts(message);
+    const newTopics = detectConversationTopics(message);
+
+    console.log('=== STATE UPDATE ===');
+    console.log('New facts extracted:', newFacts);
+    console.log('New topics detected:', newTopics);
+
+    // Update state - fire and forget
+    updateConversationState(supabase, userId, creatorId, {
+      incrementMessageCount: true,
+    }).catch(err => console.error('State update error:', err));
+
+    // Store any new facts
+    for (const fact of newFacts) {
+      updateConversationState(supabase, userId, creatorId, {
+        newFact: fact,
+        incrementMessageCount: false,
+      }).catch(err => console.error('Fact update error:', err));
+    }
+
+    // Store any topics detected
+    for (const topic of newTopics) {
+      updateConversationState(supabase, userId, creatorId, {
+        newTopic: topic,
+        incrementMessageCount: false,
+      }).catch(err => console.error('Topic update error:', err));
+    }
+  } catch (err) {
+    console.error('State update error (non-fatal):', err);
+  }
 
   // Update conversation timestamp
   await supabase
@@ -431,7 +456,7 @@ async function generateV2Response(
 }
 
 // ===========================================
-// V2 HELPERS
+// CHAT HELPERS
 // ===========================================
 
 function getMaxTokensForLength(responseLength: 'short' | 'medium' | 'long' = 'medium'): number {
@@ -443,7 +468,7 @@ function getMaxTokensForLength(responseLength: 'short' | 'medium' | 'long' = 'me
   }
 }
 
-async function callAnthropicAPIV2(
+async function callAnthropicAPI(
   systemPrompt: string,
   messages: ChatMessage[],
   responseLength: 'short' | 'medium' | 'long' = 'medium'
@@ -457,7 +482,7 @@ async function callAnthropicAPIV2(
   const maxTokens = getMaxTokensForLength(responseLength);
 
   // DEBUG: Log V2 API call params
-  console.log('=== V2 API CALL DEBUG ===');
+  console.log('===API CALL DEBUG ===');
   console.log('Model:', 'claude-sonnet-4-20250514');
   console.log('System prompt length:', systemPrompt.length);
   console.log('Messages count:', messages.length);
@@ -490,7 +515,7 @@ async function callAnthropicAPIV2(
     }
 
     const data = await response.json();
-    console.log('=== V2 API RESPONSE ===');
+    console.log('===API RESPONSE ===');
     console.log('Response:', data.content[0].text.slice(0, 200));
     return data.content[0].text;
   } catch (error) {
@@ -499,11 +524,11 @@ async function callAnthropicAPIV2(
   }
 }
 
-function checkComplianceV2(response: string): { passed: boolean; issues: string[] } {
+function checkCompliance(response: string): { passed: boolean; issues: string[] } {
   const issues: string[] = [];
 
   // DEBUG: Log V2 compliance check
-  console.log('=== V2 COMPLIANCE CHECK DEBUG ===');
+  console.log('===COMPLIANCE CHECK DEBUG ===');
   console.log('Response preview:', response.slice(0, 150));
   console.log('Checking against', FORBIDDEN_PATTERNS_V2.length, 'patterns');
 
@@ -515,9 +540,9 @@ function checkComplianceV2(response: string): { passed: boolean; issues: string[
 
   // DEBUG: Log match results
   if (issues.length > 0) {
-    console.log('V2 FORBIDDEN PATTERNS MATCHED:', issues);
+    console.log('FORBIDDEN PATTERNS MATCHED:', issues);
   } else {
-    console.log('No V2 forbidden patterns detected');
+    console.log('No forbidden patterns detected');
 
     // DEBUG: Manual check for known bad phrases
     const manualCheck = [
@@ -533,7 +558,7 @@ function checkComplianceV2(response: string): { passed: boolean; issues: string[
       response.toLowerCase().includes(phrase.toLowerCase())
     );
     if (manualMatches.length > 0) {
-      console.log('V2 WARNING: These phrases should have matched:', manualMatches);
+      console.log('WARNING: These phrases should have matched:', manualMatches);
     }
   }
 
@@ -543,7 +568,7 @@ function checkComplianceV2(response: string): { passed: boolean; issues: string[
   };
 }
 
-async function regenerateCompliantV2(
+async function regenerateCompliant(
   systemPrompt: string,
   messages: ChatMessage[],
   responseLength: 'short' | 'medium' | 'long' = 'medium'
@@ -583,7 +608,7 @@ THE VIBE: Confident, playful, in control. YOU set the pace because you WANT to, 
 
 Generate a SHORT (1-2 sentences max) flirty redirect that sounds like texting, not a rejection letter:`;
 
-  return await callAnthropicAPIV2(stricterPrompt, messages, responseLength);
+  return await callAnthropicAPI(stricterPrompt, messages, responseLength);
 }
 
 function stripAsteriskActions(text: string): string {
