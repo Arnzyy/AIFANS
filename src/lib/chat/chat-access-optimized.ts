@@ -114,9 +114,8 @@ async function checkSubscriptionParallel(
   userId: string,
   creatorId: string
 ): Promise<ChatAccess> {
-  // Single query with OR to check both direct creatorId and via model
-  // This combines the model lookup + subscription check into one query
-  const { data: subscription, error } = await supabase
+  // First try direct creator_id match (for regular creator chat)
+  const { data: subscription } = await supabase
     .from('subscriptions')
     .select(`
       id,
@@ -125,42 +124,13 @@ async function checkSubscriptionParallel(
       creator_id
     `)
     .eq('subscriber_id', userId)
+    .eq('creator_id', creatorId)
     .eq('status', 'active')
     .in('subscription_type', ['content', 'chat', 'bundle'])
-    .or(`creator_id.eq.${creatorId}`)
     .limit(1)
     .maybeSingle();
 
-  // If no direct match, check if creatorId is a model and look up via model's creator_id
-  if (!subscription) {
-    // Try to find subscription via model's creator_id
-    const { data: modelSub } = await supabase
-      .from('subscriptions')
-      .select(`
-        id,
-        status,
-        subscription_type,
-        creator:creator_models!inner(id, creator_id)
-      `)
-      .eq('subscriber_id', userId)
-      .eq('status', 'active')
-      .in('subscription_type', ['content', 'chat', 'bundle'])
-      .eq('creator_models.id', creatorId)
-      .limit(1)
-      .maybeSingle();
-
-    if (!modelSub) {
-      return {
-        hasAccess: false,
-        accessType: 'none',
-        messagesRemaining: null,
-        canSendMessage: false,
-        requiresUnlock: true,
-        unlockOptions: [],
-        isLowMessages: false,
-      };
-    }
-
+  if (subscription) {
     return {
       hasAccess: true,
       accessType: 'subscription',
@@ -168,19 +138,53 @@ async function checkSubscriptionParallel(
       canSendMessage: true,
       requiresUnlock: false,
       unlockOptions: [],
-      subscriptionId: modelSub.id,
+      subscriptionId: subscription.id,
       isLowMessages: false,
     };
   }
 
+  // If no direct match, check if creatorId is a model UUID
+  // Look up the model to get its creator_id, then check subscription
+  const { data: model } = await supabase
+    .from('creator_models')
+    .select('creator_id')
+    .eq('id', creatorId)
+    .maybeSingle();
+
+  if (model?.creator_id) {
+    // Check subscription to the model's creator
+    const { data: modelSubscription } = await supabase
+      .from('subscriptions')
+      .select('id, status, subscription_type')
+      .eq('subscriber_id', userId)
+      .eq('creator_id', model.creator_id)
+      .eq('status', 'active')
+      .in('subscription_type', ['content', 'chat', 'bundle'])
+      .limit(1)
+      .maybeSingle();
+
+    if (modelSubscription) {
+      return {
+        hasAccess: true,
+        accessType: 'subscription',
+        messagesRemaining: null,
+        canSendMessage: true,
+        requiresUnlock: false,
+        unlockOptions: [],
+        subscriptionId: modelSubscription.id,
+        isLowMessages: false,
+      };
+    }
+  }
+
+  // No subscription found
   return {
-    hasAccess: true,
-    accessType: 'subscription',
+    hasAccess: false,
+    accessType: 'none',
     messagesRemaining: null,
-    canSendMessage: true,
-    requiresUnlock: false,
+    canSendMessage: false,
+    requiresUnlock: true,
     unlockOptions: [],
-    subscriptionId: subscription.id,
     isLowMessages: false,
   };
 }
