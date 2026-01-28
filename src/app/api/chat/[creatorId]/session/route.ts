@@ -73,7 +73,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .from('creator_models')
       .select('id, creator_id')
       .eq('id', creatorId)
-      .single();
+      .maybeSingle();
 
     if (modelFromId) {
       // creatorId is a model ID - use it as the model and get the actual creator
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .from('creators')
       .select('id, user_id')
       .eq('id', resolvedCreatorId)
-      .single();
+      .maybeSingle();
 
     if (!creator) {
       // Maybe creatorId is a profile ID? Check if user has a creator account
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         .from('creators')
         .select('id, user_id')
         .eq('user_id', creatorId)
-        .single();
+        .maybeSingle();
 
       if (!creatorByUserId) {
         return NextResponse.json({ error: 'Creator not found' }, { status: 404 });
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         .from('creator_models')
         .select('id, creator_id')
         .eq('id', modelId)
-        .single();
+        .maybeSingle();
 
       if (!model || model.creator_id !== resolvedCreatorId) {
         return NextResponse.json(
@@ -194,7 +194,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .eq('user_id', user.id)
       .eq('creator_id', creatorId)
       .eq('status', 'active')
-      .single();
+      .maybeSingle();
 
     if (!session) {
       return NextResponse.json({

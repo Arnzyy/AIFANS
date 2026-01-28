@@ -429,7 +429,7 @@ function getUnlockOptions(isSubscriber: boolean, remaining: number | null): Unlo
   if (!isSubscriber) {
     options.push({
       type: 'subscribe',
-      label: 'Subscribe for unlimited chat',
+      label: 'Subscribe (100 messages/month)',
       recommended: true,
     });
 

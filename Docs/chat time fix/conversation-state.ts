@@ -61,11 +61,11 @@ export async function getConversationState(
     .eq('user_id', userId)
     .eq('model_id', modelId)
     .single();
-
+  
   if (error && error.code !== 'PGRST116') {
     console.error('Error loading conversation state:', error);
   }
-
+  
   return data;
 }
 
@@ -87,18 +87,18 @@ export function calculateTimeContext(
       shouldAcknowledgeGap: false,
     };
   }
-
+  
   const lastTime = new Date(lastMessageAt).getTime();
   const now = Date.now();
   const diffMs = now - lastTime;
-
+  
   const minutes = Math.floor(diffMs / (1000 * 60));
   const hours = Math.floor(diffMs / (1000 * 60 * 60));
   const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
+  
   const isNewSession = hours >= THRESHOLDS.NEW_SESSION_HOURS;
   const shouldAcknowledgeGap = hours >= THRESHOLDS.MENTION_GAP_HOURS;
-
+  
   let gapDescription: string;
   if (days >= THRESHOLDS.VERY_LONG_GAP_DAYS) {
     gapDescription = `${days} days - they've been gone a while`;
@@ -113,7 +113,7 @@ export function calculateTimeContext(
   } else {
     gapDescription = 'active conversation';
   }
-
+  
   return {
     minutesSinceLastMessage: minutes,
     hoursSinceLastMessage: hours,
@@ -134,7 +134,7 @@ export function buildTimeContextPrompt(
   personaName: string
 ): string {
   const { daysSinceLastMessage, hoursSinceLastMessage, shouldAcknowledgeGap } = timeContext;
-
+  
   // No need to mention time if gap is small
   if (!shouldAcknowledgeGap) {
     // Still include user facts if we have them
@@ -151,7 +151,7 @@ Weave these in naturally when relevant.
     }
     return '';
   }
-
+  
   let prompt = `
 ═══════════════════════════════════════════════════════════════════
 TIME CONTEXT — IMPORTANT: ACKNOWLEDGE THE GAP
@@ -266,35 +266,35 @@ export async function updateConversationState(
       .eq('user_id', userId)
       .eq('model_id', modelId)
       .single();
-
+    
     const currentFacts: string[] = current?.user_facts || [];
     const currentTopics: string[] = current?.conversation_topics || [];
-
+    
     const updateData: any = {
       last_message_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-
+    
     // Increment message count
     if (updates.incrementMessageCount !== false) {
       updateData.message_count = (current?.message_count || 0) + 1;
     }
-
+    
     // Add new fact (avoid duplicates, keep last 20)
     if (updates.newFact && !currentFacts.includes(updates.newFact)) {
       updateData.user_facts = [...currentFacts, updates.newFact].slice(-20);
     }
-
+    
     // Add new topic (avoid duplicates, keep last 10)
     if (updates.newTopic && !currentTopics.includes(updates.newTopic)) {
       updateData.conversation_topics = [...currentTopics, updates.newTopic].slice(-10);
     }
-
+    
     // Update session summary
     if (updates.sessionSummary) {
       updateData.session_summary = updates.sessionSummary;
     }
-
+    
     if (current) {
       // Update existing
       await supabase
@@ -322,76 +322,6 @@ export async function updateConversationState(
 }
 
 /**
- * Extract facts from a user message using AI (Haiku)
- * Falls back to regex if AI fails
- */
-export async function extractUserFactsAI(userMessage: string): Promise<string[]> {
-  try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      console.warn('No API key, falling back to regex extraction');
-      return extractUserFacts(userMessage);
-    }
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-3-5-20241022',
-        max_tokens: 100,
-        messages: [{
-          role: 'user',
-          content: `Extract facts about the user from this message. Return ONLY a JSON array of strings, nothing else.
-
-Facts to extract:
-- Name (if mentioned)
-- Job/occupation
-- Location/city
-- Interests/hobbies
-- Relationship status
-- Any other personal facts
-
-Message: "${userMessage}"
-
-Return format: ["fact1", "fact2", "fact3"]
-If no facts, return: []`
-        }]
-      }),
-    });
-
-    if (!response.ok) {
-      console.warn('Haiku API failed, falling back to regex');
-      return extractUserFacts(userMessage);
-    }
-
-    const data = await response.json();
-    const content = data.content[0].text.trim();
-
-    // Parse JSON response
-    try {
-      const facts = JSON.parse(content);
-      if (Array.isArray(facts) && facts.length > 0) {
-        console.log('[AI Extraction] Found:', facts);
-        return facts;
-      }
-    } catch (e) {
-      console.warn('Failed to parse AI response, falling back to regex');
-    }
-
-    // Fallback to regex
-    return extractUserFacts(userMessage);
-
-  } catch (error) {
-    console.error('AI extraction error:', error);
-    return extractUserFacts(userMessage);
-  }
-}
-
-/**
  * Extract facts from a user message
  * Simple pattern matching version - can be enhanced with AI
  */
@@ -399,7 +329,7 @@ export function extractUserFacts(userMessage: string): string[] {
   const facts: string[] = [];
   const lower = userMessage.toLowerCase();
   const original = userMessage;
-
+  
   // Job/work mentions
   const workPatterns = [
     /i work (?:in|at|as|for) ([^.!?,]+)/i,
@@ -407,7 +337,7 @@ export function extractUserFacts(userMessage: string): string[] {
     /my job is ([^.!?,]+)/i,
     /i do ([^.!?,]+) for (?:work|a living)/i,
   ];
-
+  
   for (const pattern of workPatterns) {
     const match = original.match(pattern);
     if (match) {
@@ -415,13 +345,13 @@ export function extractUserFacts(userMessage: string): string[] {
       break;
     }
   }
-
+  
   // Location mentions
   const locationPatterns = [
     /i (?:live|am|'m) (?:in|from) ([^.!?,]+)/i,
     /i'm based (?:in|out of) ([^.!?,]+)/i,
   ];
-
+  
   for (const pattern of locationPatterns) {
     const match = original.match(pattern);
     if (match) {
@@ -429,12 +359,12 @@ export function extractUserFacts(userMessage: string): string[] {
       break;
     }
   }
-
+  
   // Name mentions
   const namePatterns = [
     /(?:my name is|i'm|call me|name's) (\w+)/i,
   ];
-
+  
   for (const pattern of namePatterns) {
     const match = original.match(pattern);
     if (match && match[1].length > 1 && match[1].length < 20) {
@@ -446,13 +376,13 @@ export function extractUserFacts(userMessage: string): string[] {
       }
     }
   }
-
+  
   // Interest/hobby mentions
   const interestPatterns = [
     /i (?:love|like|enjoy|'m into|am into) ([^.!?,]+)/i,
     /(?:my hobby is|my hobbies are|i'm passionate about) ([^.!?,]+)/i,
   ];
-
+  
   for (const pattern of interestPatterns) {
     const match = original.match(pattern);
     if (match) {
@@ -464,22 +394,22 @@ export function extractUserFacts(userMessage: string): string[] {
       }
     }
   }
-
+  
   // Specific topic detections
   if (lower.includes('crypto') || lower.includes('bitcoin') || lower.includes('trading')) {
     facts.push('Interested in: crypto/trading');
   }
-
+  
   if (lower.includes('gym') || lower.includes('workout') || lower.includes('fitness')) {
     facts.push('Interested in: fitness');
   }
-
+  
   if (lower.includes('music') || lower.includes('spotify') || lower.includes('concert')) {
     facts.push('Interested in: music');
   }
-
+  
   // Deduplicate
-  return Array.from(new Set(facts));
+  return [...new Set(facts)];
 }
 
 /**
@@ -488,7 +418,7 @@ export function extractUserFacts(userMessage: string): string[] {
 export function detectConversationTopics(userMessage: string): string[] {
   const topics: string[] = [];
   const lower = userMessage.toLowerCase();
-
+  
   const topicKeywords: Record<string, string[]> = {
     'work': ['work', 'job', 'career', 'office', 'boss', 'meeting', 'project'],
     'fitness': ['gym', 'workout', 'exercise', 'fitness', 'running', 'weights'],
@@ -501,12 +431,12 @@ export function detectConversationTopics(userMessage: string): string[] {
     'relationships': ['dating', 'relationship', 'girlfriend', 'boyfriend', 'single'],
     'crypto': ['crypto', 'bitcoin', 'trading', 'stocks', 'invest'],
   };
-
+  
   for (const [topic, keywords] of Object.entries(topicKeywords)) {
     if (keywords.some(kw => lower.includes(kw))) {
       topics.push(topic);
     }
   }
-
+  
   return topics;
 }

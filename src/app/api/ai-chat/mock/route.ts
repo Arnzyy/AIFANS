@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { generateMockResponse, ChatMessage } from '@/lib/ai/chat-service';
+import { generateMockResponse, ChatMessage } from '@/lib/ai/chat-utilities';
 import { getCreatorByUsername } from '@/lib/data/creators';
 import { cleanResponse } from '@/lib/ai/chat';
-import { buildChatContext, formatMemoryForPrompt, updateMemory } from '@/lib/ai/memory-system/memory-service';
+import { buildChatContext, formatMemoryForPrompt, updateMemory } from '@/lib/ai/memory-utilities';
 import { AIPersonalityFull } from '@/lib/ai/personality/prompt-builder';
 
 export async function POST(request: NextRequest) {

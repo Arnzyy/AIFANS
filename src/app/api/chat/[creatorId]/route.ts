@@ -19,6 +19,11 @@ import {
   extractUserFactsAI,
   detectConversationTopics
 } from '@/lib/ai/conversation-state';
+import {
+  checkMessageUsage,
+  decrementMessageCount,
+  MessageUsage
+} from '@/lib/chat/message-limits';
 
 export async function POST(
   request: NextRequest,
@@ -55,6 +60,42 @@ export async function POST(
 
     if (!message || typeof message !== 'string' || message.length > 2000) {
       return NextResponse.json({ error: 'Invalid message' }, { status: 400 });
+    }
+
+    // ===========================================
+    // CHECK MONTHLY MESSAGE LIMITS
+    // ===========================================
+    const messageUsage = await checkMessageUsage(supabase, user.id, creatorId);
+
+    if (messageUsage && messageUsage.is_depleted) {
+      // No messages left - return paywall
+      return NextResponse.json(
+        {
+          error: 'No messages remaining',
+          message_usage: messageUsage,
+          unlock_options: [
+            {
+              type: 'buy_messages',
+              label: '10 messages for 100 tokens',
+              messages: 10,
+              tokens: 100,
+            },
+            {
+              type: 'buy_messages',
+              label: '50 messages for 450 tokens (10% off)',
+              messages: 50,
+              tokens: 450,
+            },
+            {
+              type: 'buy_messages',
+              label: '100 messages for 800 tokens (20% off)',
+              messages: 100,
+              tokens: 800,
+            },
+          ],
+        },
+        { status: 403 }
+      );
     }
 
     // Get AI personality (OPTIMIZED: uses cache with 5min TTL)
@@ -118,22 +159,23 @@ export async function POST(
       console.warn('Compliance issues detected:', result.compliance_issues);
     }
 
-    // Decrement message count after successful response
-    const decrementResult = await decrementMessage(
-      supabase,
-      user.id,
-      creatorId,
-      access.accessType
-    );
+    // ===========================================
+    // DECREMENT MESSAGE COUNT (NEW SYSTEM)
+    // ===========================================
+    const updatedUsage = await decrementMessageCount(supabase, user.id, creatorId);
+
+    // Also decrement old system for backwards compatibility
+    await decrementMessage(supabase, user.id, creatorId, access.accessType);
 
     // Get updated access state (OPTIMIZED: passes user)
     const updatedAccess = await checkChatAccessOptimized(supabase, user, creatorId);
 
-    // Build response with access info
+    // Build response with message usage info
     const response: Record<string, unknown> = {
       response: result.response,
       conversationId: result.conversationId,
       passed_compliance: result.passed_compliance,
+      message_usage: updatedUsage || undefined,
       access: {
         messagesRemaining: updatedAccess.messagesRemaining,
         canSendMessage: updatedAccess.canSendMessage,
@@ -143,9 +185,14 @@ export async function POST(
       },
     };
 
-    // Add warning if messages are low
+    // Add warning if messages are low (≤20 messages)
+    if (updatedUsage && updatedUsage.is_low) {
+      response.messageWarning = `${updatedUsage.messages_remaining} messages left this month`;
+    }
+
+    // Add warning from old system if present
     if (updatedAccess.isLowMessages && updatedAccess.messagesRemaining !== null) {
-      response.messageWarning = updatedAccess.warningMessage;
+      response.legacyWarning = updatedAccess.warningMessage;
     }
 
     // If messages exhausted, include unlock options

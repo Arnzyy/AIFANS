@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server';
 import { createCreatorService } from '@/lib/creators';
 import { NextRequest, NextResponse } from 'next/server';
+import { invalidateCreator } from '@/lib/cache/creator-cache';
 
 // GET /api/creator/models/[id] - Get single model
 export async function GET(
@@ -134,6 +135,9 @@ export async function PUT(
     // Update model
     const updatedModel = await creatorService.updateModel(params.id, body);
 
+    // Invalidate cache so changes take effect immediately
+    invalidateCreator(params.id);
+
     return NextResponse.json({
       success: true,
       model: updatedModel,
@@ -205,6 +209,9 @@ export async function DELETE(
 
     // Delete model
     await creatorService.deleteModel(params.id);
+
+    // Invalidate cache
+    invalidateCreator(params.id);
 
     return NextResponse.json({
       success: true,

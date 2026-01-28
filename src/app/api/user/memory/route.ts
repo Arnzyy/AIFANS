@@ -9,7 +9,7 @@ import {
   getUserMemoryForReview,
   clearUserMemory,
   exportUserData
-} from '@/lib/ai/memory-system/memory-service';
+} from '@/lib/ai/memory-utilities';
 
 // GET - View user's stored memory
 export async function GET(request: NextRequest) {

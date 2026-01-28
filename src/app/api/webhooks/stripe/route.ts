@@ -148,22 +148,30 @@ async function createSubscription(session: any) {
   if (isModelSubscription) {
     // For model subscriptions, get the subscription price (creator_id already in metadata)
     const modelId = tier_id.replace('model-', '');
-    const { data: model } = await supabase
+    const { data: model, error: modelError } = await supabase
       .from('creator_models')
       .select('subscription_price')
       .eq('id', modelId)
-      .single();
+      .maybeSingle();
+
+    if (modelError) {
+      console.warn('Could not fetch model price for', modelId, modelError.message);
+    }
 
     if (model) {
       pricePaid = (model.subscription_price || 999) / 100; // Convert pence to pounds
     }
   } else if (tier_id) {
     // For regular tier subscriptions
-    const { data: tier } = await supabase
+    const { data: tier, error: tierError } = await supabase
       .from('subscription_tiers')
       .select('*')
       .eq('id', tier_id)
-      .single();
+      .maybeSingle();
+
+    if (tierError) {
+      console.warn('Could not fetch tier price for', tier_id, tierError.message);
+    }
 
     if (tier) {
       const priceField = billing_period === 'yearly'
@@ -228,7 +236,7 @@ async function createSubscription(session: any) {
   const typeLabel = typeLabels[subscription_type] || 'Fan';
 
   // Create transaction record
-  await supabase.from('transactions').insert({
+  const { error: txError } = await supabase.from('transactions').insert({
     user_id: user_id,
     creator_id: actualCreatorId,
     transaction_type: 'subscription',
@@ -242,9 +250,22 @@ async function createSubscription(session: any) {
     completed_at: new Date().toISOString(),
   });
 
+  if (txError) {
+    // Subscription created but transaction failed - log for reconciliation
+    console.error('RECONCILIATION NEEDED: Subscription created but transaction record failed', {
+      subscription_id: subscription.id,
+      user_id,
+      creator_id: actualCreatorId,
+      error: txError.message,
+    });
+  }
+
   // Increment subscriber count (only for content or bundle, as they access content)
   if (subscription_type === 'content' || subscription_type === 'bundle') {
-    await supabase.rpc('increment_subscriber_count', { p_creator_id: actualCreatorId });
+    const { error: countError } = await supabase.rpc('increment_subscriber_count', { p_creator_id: actualCreatorId });
+    if (countError) {
+      console.warn('Failed to increment subscriber count (non-critical):', countError.message);
+    }
   }
 
   // Create notification for creator
@@ -284,7 +305,7 @@ async function createTipTransaction(session: any) {
 
   const fees = calculateFees(amountInCents);
 
-  await supabase.from('transactions').insert({
+  const { error: tipError } = await supabase.from('transactions').insert({
     user_id: user_id,
     creator_id: creator_id,
     transaction_type: 'tip',
@@ -296,6 +317,11 @@ async function createTipTransaction(session: any) {
     description: message || 'Tip',
     completed_at: new Date().toISOString(),
   });
+
+  if (tipError) {
+    console.error('Failed to create tip transaction:', tipError);
+    throw new Error('Failed to record tip transaction');
+  }
 
   // Create notification
   try {
@@ -329,14 +355,19 @@ async function createPPVPurchase(session: any) {
   const fees = calculateFees(priceInCents);
 
   // Create purchase record
-  await supabase.from('post_purchases').insert({
+  const { error: purchaseError } = await supabase.from('post_purchases').insert({
     post_id: post_id,
     buyer_id: user_id,
     price_paid: fromCents(fees.grossAmount),
   });
 
+  if (purchaseError) {
+    console.error('Failed to create PPV purchase record:', purchaseError);
+    throw new Error('Failed to record PPV purchase');
+  }
+
   // Create transaction
-  await supabase.from('transactions').insert({
+  const { error: txError } = await supabase.from('transactions').insert({
     user_id: user_id,
     creator_id: creator_id,
     transaction_type: 'ppv',
@@ -349,6 +380,17 @@ async function createPPVPurchase(session: any) {
     description: 'PPV Post Unlock',
     completed_at: new Date().toISOString(),
   });
+
+  if (txError) {
+    console.error('Failed to create PPV transaction:', txError);
+    // Purchase record exists but transaction failed - log for manual reconciliation
+    console.error('RECONCILIATION NEEDED: PPV purchase recorded but transaction failed', {
+      post_id,
+      user_id,
+      creator_id,
+      payment_intent: session.payment_intent,
+    });
+  }
 
   console.log('PPV purchase created for post:', post_id);
 }
@@ -364,41 +406,70 @@ async function handleTokenPurchase(session: any) {
   const tokenAmount = parseInt(tokens, 10);
   console.log('Processing token purchase:', purchase_id, 'for user:', user_id, 'tokens:', tokenAmount);
 
-  // Update purchase status to COMPLETED
-  const { error: purchaseError } = await supabase
+  // Update purchase status to COMPLETED (with idempotency check)
+  // CRITICAL: Only credit tokens if we successfully transition from PENDING to COMPLETED
+  const { data: updatedPurchase, error: purchaseError } = await supabase
     .from('token_pack_purchases')
     .update({
       status: 'COMPLETED',
       stripe_payment_intent_id: session.payment_intent,
     })
     .eq('id', purchase_id)
-    .eq('status', 'PENDING'); // Only update if still pending (idempotency)
+    .eq('status', 'PENDING') // Only update if still pending (idempotency)
+    .select('id')
+    .maybeSingle();
 
   if (purchaseError) {
     console.error('Failed to update token purchase:', purchaseError);
-    // Don't throw - might already be processed
+    throw new Error('Failed to update token purchase status');
   }
 
-  // Credit tokens to user's wallet
-  // First, ensure wallet exists
-  const { data: wallet } = await supabase
+  // If no row was updated, this purchase was already processed - skip token credit
+  if (!updatedPurchase) {
+    console.log('Token purchase already processed (idempotency check):', purchase_id);
+    return;
+  }
+
+  // Credit tokens to user's wallet using atomic increment
+  // Use upsert with raw SQL increment to prevent race conditions
+  const { data: existingWallet } = await supabase
     .from('token_wallets')
-    .select('id, balance_tokens, lifetime_purchased')
+    .select('id')
     .eq('user_id', user_id)
     .maybeSingle();
 
-  if (wallet) {
-    // Update existing wallet
-    const { error: updateError } = await supabase
-      .from('token_wallets')
-      .update({
-        balance_tokens: wallet.balance_tokens + tokenAmount,
-        lifetime_purchased: (wallet.lifetime_purchased || 0) + tokenAmount,
-      })
-      .eq('user_id', user_id);
+  if (existingWallet) {
+    // Atomic increment for existing wallet
+    const { error: updateError } = await supabase.rpc('credit_tokens', {
+      p_user_id: user_id,
+      p_amount: tokenAmount,
+    }).maybeSingle();
 
-    if (updateError) {
-      console.error('Failed to update wallet:', updateError);
+    // Fallback to regular update if RPC doesn't exist
+    if (updateError && updateError.message.includes('function')) {
+      // RPC not available, use regular update (less safe but functional)
+      const { data: wallet } = await supabase
+        .from('token_wallets')
+        .select('balance_tokens, lifetime_purchased')
+        .eq('user_id', user_id)
+        .single();
+
+      if (wallet) {
+        const { error: fallbackError } = await supabase
+          .from('token_wallets')
+          .update({
+            balance_tokens: wallet.balance_tokens + tokenAmount,
+            lifetime_purchased: (wallet.lifetime_purchased || 0) + tokenAmount,
+          })
+          .eq('user_id', user_id);
+
+        if (fallbackError) {
+          console.error('Failed to update wallet:', fallbackError);
+          throw new Error('Failed to credit tokens to wallet');
+        }
+      }
+    } else if (updateError) {
+      console.error('Failed to credit tokens:', updateError);
       throw new Error('Failed to credit tokens to wallet');
     }
   } else {
@@ -419,11 +490,18 @@ async function handleTokenPurchase(session: any) {
 
   // Add ledger entry
   try {
+    // Get current balance for ledger entry
+    const { data: currentWallet } = await supabase
+      .from('token_wallets')
+      .select('balance_tokens')
+      .eq('user_id', user_id)
+      .maybeSingle();
+
     await supabase.from('token_ledger').insert({
       user_id: user_id,
       entry_type: 'PURCHASE',
       amount_tokens: tokenAmount,
-      balance_after: (wallet?.balance_tokens || 0) + tokenAmount,
+      balance_after: currentWallet?.balance_tokens || tokenAmount,
       reference_type: 'token_pack_purchase',
       reference_id: purchase_id,
       description: `Purchased ${tokenAmount} tokens`,
@@ -440,14 +518,20 @@ async function handleInvoicePaid(invoice: any) {
   // Handle subscription renewals
   if (!invoice.subscription) return;
 
-  const { data: subscription } = await supabase
+  const { data: subscription, error: subError } = await supabase
     .from('subscriptions')
     .select('*, tier:subscription_tiers(*)')
     .eq('external_subscription_id', invoice.subscription)
-    .single();
+    .maybeSingle();
+
+  if (subError) {
+    console.error('Error looking up subscription for invoice:', invoice.id, subError.message);
+    // Don't throw - log for investigation but don't block webhook processing
+    return;
+  }
 
   if (!subscription) {
-    console.error('Subscription not found for invoice:', invoice.id);
+    console.error('Subscription not found for invoice:', invoice.id, '- may be processed out of order');
     return;
   }
 
@@ -457,7 +541,7 @@ async function handleInvoicePaid(invoice: any) {
   ) as any;
 
   // Update subscription period
-  await supabase
+  const { error: updateError } = await supabase
     .from('subscriptions')
     .update({
       status: 'active',
@@ -466,10 +550,15 @@ async function handleInvoicePaid(invoice: any) {
     })
     .eq('id', subscription.id);
 
+  if (updateError) {
+    console.error('Failed to update subscription period:', updateError);
+    throw new Error('Failed to update subscription period');
+  }
+
   // Create renewal transaction
   const fees = calculateFees(invoice.amount_paid);
 
-  await supabase.from('transactions').insert({
+  const { error: txError } = await supabase.from('transactions').insert({
     user_id: subscription.subscriber_id,
     creator_id: subscription.creator_id,
     transaction_type: 'subscription',
@@ -483,17 +572,34 @@ async function handleInvoicePaid(invoice: any) {
     completed_at: new Date().toISOString(),
   });
 
+  if (txError) {
+    // Subscription updated but transaction failed - log for reconciliation
+    console.error('RECONCILIATION NEEDED: Subscription renewed but transaction record failed', {
+      subscription_id: subscription.id,
+      invoice_id: invoice.id,
+      error: txError.message,
+    });
+  }
+
   console.log('Subscription renewed:', subscription.id);
 }
 
 async function handleSubscriptionUpdated(stripeSubscription: any) {
-  const { data: subscription } = await supabase
+  const { data: subscription, error: subError } = await supabase
     .from('subscriptions')
     .select('id')
     .eq('external_subscription_id', stripeSubscription.id)
-    .single();
+    .maybeSingle();
 
-  if (!subscription) return;
+  if (subError) {
+    console.error('Error looking up subscription for update:', stripeSubscription.id, subError.message);
+    return;
+  }
+
+  if (!subscription) {
+    console.warn('Subscription not found for update:', stripeSubscription.id, '- may not exist yet');
+    return;
+  }
 
   // Map Stripe status to our status
   let status: string;
@@ -511,7 +617,7 @@ async function handleSubscriptionUpdated(stripeSubscription: any) {
       status = 'active';
   }
 
-  await supabase
+  const { error: updateError } = await supabase
     .from('subscriptions')
     .update({
       status: status,
@@ -519,19 +625,32 @@ async function handleSubscriptionUpdated(stripeSubscription: any) {
     })
     .eq('id', subscription.id);
 
+  if (updateError) {
+    console.error('Failed to update subscription status:', updateError);
+    throw new Error('Failed to update subscription status');
+  }
+
   console.log('Subscription updated:', subscription.id, status);
 }
 
 async function handleSubscriptionDeleted(stripeSubscription: any) {
-  const { data: subscription } = await supabase
+  const { data: subscription, error: subError } = await supabase
     .from('subscriptions')
     .select('id, creator_id')
     .eq('external_subscription_id', stripeSubscription.id)
-    .single();
+    .maybeSingle();
 
-  if (!subscription) return;
+  if (subError) {
+    console.error('Error looking up subscription for deletion:', stripeSubscription.id, subError.message);
+    return;
+  }
 
-  await supabase
+  if (!subscription) {
+    console.warn('Subscription not found for deletion:', stripeSubscription.id);
+    return;
+  }
+
+  const { error: updateError } = await supabase
     .from('subscriptions')
     .update({
       status: 'expired',
@@ -539,8 +658,16 @@ async function handleSubscriptionDeleted(stripeSubscription: any) {
     })
     .eq('id', subscription.id);
 
+  if (updateError) {
+    console.error('Failed to expire subscription:', updateError);
+    throw new Error('Failed to expire subscription');
+  }
+
   // Decrement subscriber count
-  await supabase.rpc('decrement_subscriber_count', { p_creator_id: subscription.creator_id });
+  const { error: countError } = await supabase.rpc('decrement_subscriber_count', { p_creator_id: subscription.creator_id });
+  if (countError) {
+    console.warn('Failed to decrement subscriber count (non-critical):', countError.message);
+  }
 
   console.log('Subscription deleted/expired:', subscription.id);
 }
@@ -550,10 +677,19 @@ async function handleChargeRefunded(charge: any) {
 
   if (!paymentIntentId) return;
 
-  await supabase
+  const { error } = await supabase
     .from('transactions')
     .update({ status: 'refunded' })
     .eq('external_transaction_id', paymentIntentId);
+
+  if (error) {
+    console.error('Failed to mark transaction as refunded:', error);
+    // Log for reconciliation - refund happened in Stripe but our record wasn't updated
+    console.error('RECONCILIATION NEEDED: Refund processed but transaction not updated', {
+      payment_intent_id: paymentIntentId,
+      charge_id: charge.id,
+    });
+  }
 
   console.log('Charge refunded:', paymentIntentId);
 }

@@ -1,7 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAIResponse, AIPersonality } from '@/lib/ai/chat';
-import { buildChatContext, formatMemoryForPrompt, updateMemory } from '@/lib/ai/memory-system/memory-service';
+import { buildChatContext, formatMemoryForPrompt, updateMemory } from '@/lib/ai/memory-utilities';
 
 // GET /api/ai-chat/[creatorId] - Get AI chat session
 export async function GET(

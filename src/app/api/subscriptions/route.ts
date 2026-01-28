@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       .from('creator_models')
       .select('id, creator_id, name, subscription_price')
       .eq('id', creatorId)
-      .single();
+      .maybeSingle();
 
     if (model) {
       // It's a model subscription
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
       .from('creator_profiles')
       .select('ai_chat_price_per_message')
       .eq('user_id', actualCreatorId)
-      .single();
+      .maybeSingle();
 
     // Chat monthly price (default £9.99 if not set)
     const chatMonthlyPriceGBP = 9.99; // Fixed monthly chat price
@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
         .eq('id', tierId)
         .eq('creator_id', actualCreatorId)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
       tier = data;
     } else if (subscriptionType !== 'chat') {
       // Get default tier (lowest price)
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
         .eq('is_active', true)
         .order('price_monthly', { ascending: true })
         .limit(1)
-        .single();
+        .maybeSingle();
       tier = data;
     }
 
@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
         .from('profiles')
         .select('username, display_name')
         .eq('id', creatorId)
-        .single();
+        .maybeSingle();
       displayName = creator?.display_name || creator?.username || 'Creator';
     }
 
@@ -278,7 +278,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .select('stripe_customer_id, email')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     let stripeCustomerId = profile?.stripe_customer_id;
 
@@ -384,7 +384,7 @@ export async function DELETE(request: NextRequest) {
       .select('*, external_subscription_id')
       .eq('id', subscriptionId)
       .eq('subscriber_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (!subscription) {
       return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });

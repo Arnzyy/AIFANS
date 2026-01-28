@@ -4,7 +4,7 @@
 // ===========================================
 
 import { FORBIDDEN_PATTERNS, GOOD_PATTERNS } from '../lib/ai/master-prompt';
-import { checkCompliance } from '../lib/ai/chat-service';
+import { checkCompliance } from '../lib/ai/chat-utilities';
 
 // ===========================================
 // TEST UTILITIES

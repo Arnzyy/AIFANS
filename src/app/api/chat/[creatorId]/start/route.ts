@@ -45,7 +45,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           .from('creator_models')
           .select('id, name, creator_id')
           .eq('id', modelId)
-          .single()
+          .maybeSingle()
       : { data: null };
 
     // If modelId provided, verify it belongs to this creator
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           .from('profiles')
           .select('display_name, username')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         userName = profile?.display_name || profile?.username;
       }
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         .from('token_wallets')
         .select('balance_tokens')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       tokenBalance = wallet?.balance_tokens ?? 0;
     }

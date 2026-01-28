@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server';
 import { createAdminService } from '@/lib/creators';
 import { NextRequest, NextResponse } from 'next/server';
+import { invalidateCreator } from '@/lib/cache/creator-cache';
 
 // POST /api/admin/models/[id]/approve - Approve a model
 export async function POST(
@@ -40,6 +41,9 @@ export async function POST(
 
     // Approve the model
     const model = await adminService.approveModel(params.id, user.id, notes);
+
+    // Invalidate cache so status change takes effect
+    invalidateCreator(params.id);
 
     return NextResponse.json({
       success: true,

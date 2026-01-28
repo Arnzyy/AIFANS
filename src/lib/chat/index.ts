@@ -16,6 +16,9 @@ export {
   type DecrementResult,
 } from './chat-access';
 
+// Optimized access check (Day 3 scaling)
+export { checkChatAccessOptimized } from './chat-access-optimized';
+
 // Opening message system
 export {
   generateOpeningMessage,

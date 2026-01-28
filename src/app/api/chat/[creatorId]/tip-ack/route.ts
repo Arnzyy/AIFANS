@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { generateTipAcknowledgement } from '@/lib/ai/chat-service';
+import { generateTipAcknowledgement } from '@/lib/ai/chat-utilities';
 
 export async function POST(
   request: NextRequest,
@@ -36,7 +36,7 @@ export async function POST(
       .select('*')
       .eq('creator_id', creatorId)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
     if (personalityData) {
       personality = personalityData;
@@ -52,7 +52,7 @@ export async function POST(
       .select('preferred_name')
       .eq('subscriber_id', user.id)
       .eq('creator_id', creatorId)
-      .single();
+      .maybeSingle();
 
     if (memory?.preferred_name) {
       fanName = memory.preferred_name;
@@ -62,7 +62,7 @@ export async function POST(
         .from('profiles')
         .select('display_name')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (fanProfile?.display_name) {
         fanName = fanProfile.display_name;

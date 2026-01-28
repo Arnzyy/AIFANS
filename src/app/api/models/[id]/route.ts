@@ -35,7 +35,7 @@ export async function GET(
       `)
       .eq('id', id)
       .eq('status', 'approved')
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('[API /api/models/[id]] Database error:', error);
@@ -60,7 +60,7 @@ export async function GET(
       .from('profiles')
       .select('id, username, display_name')
       .eq('id', model.creator_id)
-      .single();
+      .maybeSingle();
 
     console.log('[API /api/models/[id]] Creator lookup:', creator ? `Found: ${creator.username}` : 'Not found', creatorError?.message || '');
 

@@ -210,7 +210,7 @@ export function SubscribeModal({ creator, tiers, chatPrice = 999, onClose, onSuc
               </div>
               <div className="flex-1">
                 <p className="font-semibold">CHAT</p>
-                <p className="text-sm text-gray-400">AI chat access</p>
+                <p className="text-sm text-gray-400">100 messages/month</p>
               </div>
               <div className="text-right">
                 <p className="font-bold">£{chatMonthlyPrice.toFixed(2)}</p>
@@ -238,7 +238,7 @@ export function SubscribeModal({ creator, tiers, chatPrice = 999, onClose, onSuc
               </div>
               <div className="flex-1">
                 <p className="font-semibold">FAN + CHAT</p>
-                <p className="text-sm text-gray-400">Everything included</p>
+                <p className="text-sm text-gray-400">Posts + 100 messages/month</p>
               </div>
               <div className="text-right">
                 <p className="font-bold">£{bundleMonthlyPrice.toFixed(2)}</p>
@@ -321,7 +321,7 @@ export function SubscribeModal({ creator, tiers, chatPrice = 999, onClose, onSuc
           {/* Disclosure */}
           <p className="mt-4 text-xs text-gray-500 text-center">
             {subscriptionType === 'chat'
-              ? 'AI chat is for entertainment purposes. Messages are AI-generated.'
+              ? 'Includes 100 messages/month. Extra messages available with tokens. AI chat is for entertainment purposes.'
               : PURCHASE_DISCLOSURE.subscription}
           </p>
 

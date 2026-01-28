@@ -92,7 +92,7 @@ export async function POST(
     .from('profiles')
     .select('id, username, display_name, avatar_url')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
   return NextResponse.json({
     comment: {

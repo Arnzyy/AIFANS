@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server';
 import { createAdminService } from '@/lib/creators';
 import { NextRequest, NextResponse } from 'next/server';
+import { invalidateCreator } from '@/lib/cache/creator-cache';
 
 // POST /api/admin/models/[id]/reject - Reject a model
 export async function POST(
@@ -42,6 +43,9 @@ export async function POST(
 
     // Reject the model
     const model = await adminService.rejectModel(params.id, user.id, reason);
+
+    // Invalidate cache
+    invalidateCreator(params.id);
 
     return NextResponse.json({
       success: true,

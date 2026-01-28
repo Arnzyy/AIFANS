@@ -14,6 +14,8 @@ import { PurchaseSessionModal } from '@/components/chat/PurchaseSessionModal';
 import { InlineTokenBalance } from '@/components/chat/ChatTokenBalance';
 import { SubscribeModal } from '@/components/shared/SubscribeModal';
 import { InChatContentBrowser } from '@/components/chat/InChatContentBrowser';
+import { MessageLimitBanner } from '@/components/chat/MessageLimitBanner';
+import { BuyMessagesModal } from '@/components/chat/BuyMessagesModal';
 import { isAdminUser } from '@/lib/auth/admin';
 import type { ChatAccess, UnlockOption, MessagePack } from '@/lib/chat';
 
@@ -110,6 +112,10 @@ export default function AIChatPage() {
   const [quickTipSending, setQuickTipSending] = useState<number | null>(null);
   const [quickTipSuccess, setQuickTipSuccess] = useState<number | null>(null);
   const [showContentBrowser, setShowContentBrowser] = useState(false);
+
+  // Message limits
+  const [messageUsage, setMessageUsage] = useState<any>(null);
+  const [showBuyMessagesModal, setShowBuyMessagesModal] = useState(false);
 
   useEffect(() => {
     loadChat();
@@ -678,11 +684,22 @@ export default function AIChatPage() {
             setShowPurchaseModal(true);
             throw new Error('Chat access required');
           }
+          // Handle message limit exceeded
+          if (response.status === 403 && data.unlock_options) {
+            setMessageUsage(data.message_usage);
+            setShowBuyMessagesModal(true);
+            throw new Error('No messages remaining');
+          }
           throw new Error(data.error || 'Failed to send message');
         }
 
         if (data.conversationId && !conversationId) {
           setConversationId(data.conversationId);
+        }
+
+        // Update message usage from response
+        if (data.message_usage) {
+          setMessageUsage(data.message_usage);
         }
 
         if (data.access) {
@@ -946,6 +963,14 @@ export default function AIChatPage() {
             {AI_CHAT_DISCLOSURE.medium}
           </p>
         </div>
+      )}
+
+      {/* Message Limit Banner - Only shows when ≤20 messages remaining */}
+      {messageUsage && messageUsage.is_low && !messageUsage.is_depleted && (
+        <MessageLimitBanner
+          messagesRemaining={messageUsage.messages_remaining}
+          onBuyMore={() => setShowBuyMessagesModal(true)}
+        />
       )}
 
       {/* MESSAGES - This is the scrollable area */}
@@ -1230,6 +1255,32 @@ export default function AIChatPage() {
           defaultType="chat"
           isGuest={!currentUser}
           redirectPath={`/chat/${username}`}
+        />
+      )}
+
+      {/* Buy Messages Modal */}
+      {creator && (
+        <BuyMessagesModal
+          isOpen={showBuyMessagesModal}
+          onClose={() => setShowBuyMessagesModal(false)}
+          creatorId={creator.id}
+          tokenBalance={tokenBalance}
+          onPurchaseSuccess={(messagesAdded, newBalance) => {
+            setTokenBalance(newBalance);
+            setMessageUsage((prev: any) => {
+              if (!prev) return null;
+              const newPurchased = prev.messages_purchased + messagesAdded;
+              const newRemaining = prev.messages_remaining + messagesAdded;
+              return {
+                ...prev,
+                messages_purchased: newPurchased,
+                messages_remaining: newRemaining,
+                is_low: newRemaining <= 20 && newRemaining > 0,
+                is_depleted: false,
+              };
+            });
+            setShowBuyMessagesModal(false);
+          }}
         />
       )}
 

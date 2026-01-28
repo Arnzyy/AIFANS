@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { generateChatResponse, checkCompliance } from '@/lib/ai/chat-service';
+import { generateMockResponse, ChatMessage } from '@/lib/ai/chat-utilities';
 import { AIPersonalityFull } from '@/lib/ai/personality/types';
 
 export async function POST(request: NextRequest) {
@@ -39,26 +39,36 @@ export async function POST(request: NextRequest) {
     // Check if user has access (subscription check - optional)
     // For now, allow access if personality exists and is active
 
-    // Generate response using the new compliant chat service
-    const result = await generateChatResponse(
-      supabase as any,
-      {
-        subscriberId: user.id,
-        creatorId,
-        message,
-        conversationId,
-      },
+    // Get recent messages for context
+    let recentMessages: ChatMessage[] = [];
+    if (conversationId) {
+      const { data: messages } = await supabase
+        .from('chat_messages')
+        .select('role, content')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (messages) {
+        recentMessages = messages.reverse().map((m: any) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        }));
+      }
+    }
+
+    // Generate response using chat utilities
+    const response = await generateMockResponse(
+      personality.persona_name || 'AI',
+      message,
+      recentMessages,
+      undefined, // memoryContext
       personality as AIPersonalityFull
     );
 
-    // Log compliance issues if any (for monitoring)
-    if (!result.passed_compliance && result.compliance_issues) {
-      console.warn(`Compliance issues for creator ${creatorId}:`, result.compliance_issues);
-    }
-
     return NextResponse.json({
-      response: result.response,
-      conversationId: result.conversationId,
+      response,
+      conversationId,
     });
 
   } catch (error: any) {
