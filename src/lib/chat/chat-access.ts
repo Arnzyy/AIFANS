@@ -166,7 +166,7 @@ async function checkSubscriptionAccess(
     .eq('subscriber_id', userId)
     .in('creator_id', idsToCheck)
     .eq('status', 'active')
-    .in('subscription_type', ['chat', 'bundle'])
+    .in('subscription_type', ['content', 'chat', 'bundle'])
     .limit(1)
     .maybeSingle();
 

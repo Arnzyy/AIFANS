@@ -126,7 +126,7 @@ async function checkSubscriptionParallel(
     `)
     .eq('subscriber_id', userId)
     .eq('status', 'active')
-    .in('subscription_type', ['chat', 'bundle'])
+    .in('subscription_type', ['content', 'chat', 'bundle'])
     .or(`creator_id.eq.${creatorId}`)
     .limit(1)
     .maybeSingle();
@@ -144,7 +144,7 @@ async function checkSubscriptionParallel(
       `)
       .eq('subscriber_id', userId)
       .eq('status', 'active')
-      .in('subscription_type', ['chat', 'bundle'])
+      .in('subscription_type', ['content', 'chat', 'bundle'])
       .eq('creator_models.id', creatorId)
       .limit(1)
       .maybeSingle();

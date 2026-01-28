@@ -88,6 +88,7 @@ export default function AIChatPage() {
   const router = useRouter();
   const username = params.username as string;
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [creator, setCreator] = useState<Creator | null>(null);
@@ -121,9 +122,24 @@ export default function AIChatPage() {
     loadChat();
   }, [username]);
 
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
+    if (loading) {
+      // Don't scroll while loading
+      return;
+    }
+
+    // Use smooth scrolling for new messages during conversation
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typing]);
+
+  // Instant scroll to bottom when loading completes
+  useEffect(() => {
+    if (!loading && messagesContainerRef.current) {
+      // Force instant scroll to bottom on initial load
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [loading]);
 
   const loadChat = async () => {
     try {
@@ -975,7 +991,8 @@ export default function AIChatPage() {
 
       {/* MESSAGES - This is the scrollable area */}
       {/* min-h-0 is CRITICAL for iOS Safari flex scroll */}
-      <div 
+      <div
+        ref={messagesContainerRef}
         className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
