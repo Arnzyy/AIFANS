@@ -9,7 +9,7 @@ import { Home, Compass, MessageCircle, Bookmark, LayoutDashboard, Gem, Bell } fr
 const navItems = [
   { href: '/feed', label: 'Feed', icon: Home },
   { href: '/explore', label: 'Explore', icon: Compass },
-  { href: '/messages', label: 'Messages', icon: MessageCircle },
+  { href: '/messages', label: 'Chats', icon: MessageCircle },
   { href: '/bookmarks', label: 'Saved', icon: Bookmark },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
 ];
