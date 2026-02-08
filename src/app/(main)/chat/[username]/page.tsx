@@ -728,6 +728,14 @@ export default function AIChatPage() {
           } : null);
         }
 
+        // Handle API error - don't show fake message
+        if (data.response === '__API_ERROR__') {
+          console.error('AI response failed');
+          setMessages(prev => prev.filter(m => m.id !== tempUserMsg.id));
+          setNewMessage(messageContent);
+          return;
+        }
+
         const aiMsg: Message = {
           id: `ai-${Date.now()}`,
           content: data.response,

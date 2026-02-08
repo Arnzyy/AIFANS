@@ -384,7 +384,7 @@ async function generateChatResponse(
     .select('role, content')
     .eq('conversation_id', convId)
     .order('created_at', { ascending: false })
-    .limit(200);
+    .limit(40);
 
   // DEBUG: Log V2 conversation history
   console.log('===CONVERSATION HISTORY ===');
@@ -410,28 +410,60 @@ async function generateChatResponse(
   });
 
   // Generate AI response
-  let aiResponse = await callAnthropicAPI(
-    fullSystemPrompt,
-    messages,
-    personality.response_length || 'medium'
-  );
+  let aiResponse: string;
+  try {
+    aiResponse = await callAnthropicAPI(
+      fullSystemPrompt,
+      messages,
+      personality.response_length || 'medium'
+    );
+  } catch (apiError) {
+    console.error('API call failed:', apiError);
+    // Return error to frontend — do NOT save a fake message to the database
+    return {
+      response: '__API_ERROR__',
+      conversationId: convId!,
+      passed_compliance: false,
+      compliance_issues: ['API call failed'],
+    };
+  }
 
   // Compliance check
   const complianceResult = checkCompliance(aiResponse);
 
   if (!complianceResult.passed) {
     console.warn('Compliance issues:', complianceResult.issues);
-    aiResponse = await regenerateCompliant(
-      fullSystemPrompt,
-      messages,
-      personality.response_length || 'medium'
-    );
+    try {
+      aiResponse = await regenerateCompliant(
+        fullSystemPrompt,
+        messages,
+        personality.response_length || 'medium'
+      );
+    } catch (regenError) {
+      console.error('Regeneration also failed:', regenError);
+      return {
+        response: '__API_ERROR__',
+        conversationId: convId!,
+        passed_compliance: false,
+        compliance_issues: ['Regeneration failed'],
+      };
+    }
   }
 
   // Post-process: strip asterisks
-  aiResponse = stripAsteriskActions(aiResponse);
+  try {
+    aiResponse = stripAsteriskActions(aiResponse);
+  } catch (stripError) {
+    console.error('Response empty after stripping:', stripError);
+    return {
+      response: '__API_ERROR__',
+      conversationId: convId!,
+      passed_compliance: false,
+      compliance_issues: ['Response empty after processing'],
+    };
+  }
 
-  // Save AI response
+  // ONLY save to database if we got a real response
   await supabase.from('chat_messages').insert({
     conversation_id: convId,
     creator_id: creatorId,
@@ -528,52 +560,51 @@ async function callAnthropicAPI(
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
-    return "Hey you 💕 What's on your mind?";
+    throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
   const maxTokens = getMaxTokensForLength(responseLength);
 
-  // DEBUG: Log V2 API call params
-  console.log('===API CALL DEBUG ===');
+  console.log('=== API CALL DEBUG ===');
   console.log('Model:', 'claude-sonnet-4-20250514');
   console.log('System prompt length:', systemPrompt.length);
   console.log('Messages count:', messages.length);
-  console.log('Last user message:', messages[messages.length - 1]?.content?.slice(0, 100));
   console.log('Max tokens:', maxTokens);
-  console.log('Contains EXPLICIT INPUT HANDLING:', systemPrompt.includes('EXPLICIT INPUT HANDLING'));
 
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: maxTokens,
-        system: systemPrompt,
-        messages: messages.map(m => ({
-          role: m.role,
-          content: m.content,
-        })),
-      }),
-    });
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: messages.map(m => ({
+        role: m.role,
+        content: m.content,
+      })),
+    }),
+  });
 
-    if (!response.ok) {
-      console.error('API error:', await response.text());
-      return "Hey you 💕 What's on your mind?";
-    }
-
-    const data = await response.json();
-    console.log('===API RESPONSE ===');
-    console.log('Response:', data.content[0].text.slice(0, 200));
-    return data.content[0].text;
-  } catch (error) {
-    console.error('API call error:', error);
-    return "Hey you 💕 What's on your mind?";
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Anthropic API error:', response.status, errorText);
+    throw new Error(`Anthropic API error: ${response.status}`);
   }
+
+  const data = await response.json();
+
+  if (!data.content?.[0]?.text) {
+    console.error('Anthropic API returned empty response:', JSON.stringify(data));
+    throw new Error('Empty API response');
+  }
+
+  console.log('=== API RESPONSE ===');
+  console.log('Response:', data.content[0].text.slice(0, 200));
+  return data.content[0].text;
 }
 
 function checkCompliance(response: string): { passed: boolean; issues: string[] } {
@@ -669,7 +700,7 @@ function stripAsteriskActions(text: string): string {
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
   if (!cleaned || cleaned.length < 2) {
-    return "Hey you 😏";
+    throw new Error('Response empty after stripping asterisks');
   }
 
   cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
