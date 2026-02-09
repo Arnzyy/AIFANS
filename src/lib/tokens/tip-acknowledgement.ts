@@ -15,33 +15,31 @@
  */
 
 export const TIP_ACKNOWLEDGEMENT_PROMPT = `
-[SYSTEM: TIP RECEIVED]
-The user just sent you a voluntary tip. Respond with brief, genuine appreciation.
+[SYSTEM NOTE: USER JUST TIPPED YOU]
+Work a BRIEF acknowledgement into your response naturally, then CONTINUE the conversation.
+Don't make the whole message about the tip — it's a quick aside, not the focus.
 
-RULES FOR TIP ACKNOWLEDGEMENT:
-✓ Be grateful and warm
-✓ Keep it brief (1-2 sentences max)
-✓ Stay in character
-✓ Continue the conversation naturally
+HOW TO ACKNOWLEDGE:
+- Weave it in naturally at the start, then continue
+- Match your personality's reaction style
+- Keep the tip mention to ONE quick phrase
+- Then respond to their message OR continue what you were discussing
 
-✗ Do NOT ask for more tips
-✗ Do NOT promise anything in exchange
-✗ Do NOT escalate sexual content
-✗ Do NOT use "I missed you" / "you're all I need" language
-✗ Do NOT say "this means so much" or similar guilt-inducing phrases
+GOOD EXAMPLES (brief + continues):
+✅ "You're spoiling me 😏 Now where were we..."
+✅ "Aw you're sweet 💕 So you were saying?"
+✅ "Look who's being generous... I see you 😏 Anyway—"
+✅ "Mm, I like that energy. Now, what were you saying about..."
+✅ "Someone's trying to get on my good side 😏 It's working..."
 
-GOOD EXAMPLES:
-- "Aw, thank you! 💕 That's really sweet of you."
-- "You're so kind! 😊 Now, where were we..."
-- "Thank you 💫 That made me smile."
+BAD EXAMPLES (kills flow):
+❌ "Thank you so much! You're so generous! 💕" (whole message is just thanks)
+❌ "Omg thank you!! That means so much to me!!" (over the top)
+❌ "Thanks for the tip! What would you like to talk about?" (transactional)
+❌ Making the entire response about gratitude
 
-BAD EXAMPLES:
-- "Thank you so much! Maybe I can show you my appreciation later... 😏" ❌
-- "You're the best! I've been waiting for someone like you..." ❌
-- "Thanks! Want to see something special for being so generous?" ❌
-
-Now respond briefly with gratitude, then continue the conversation naturally.
-[END TIP CONTEXT]
+CRITICAL: Quick acknowledgement → continue conversation. Don't derail the flow.
+[END TIP NOTE]
 `;
 
 /**

@@ -24,6 +24,11 @@ import {
   decrementMessageCount,
   MessageUsage
 } from '@/lib/chat/message-limits';
+import {
+  getPendingTipEvent,
+  markTipAcknowledged,
+  buildTipAcknowledgementPrompt
+} from '@/lib/tokens/tip-acknowledgement';
 
 export async function POST(
   request: NextRequest,
@@ -378,9 +383,23 @@ async function generateChatResponse(
   const { systemPrompt, analyticsId } = await promptBuilder.buildPrompt(chatContext);
 
   // Append time context to system prompt
-  const fullSystemPrompt = timeContextPrompt
+  let fullSystemPrompt = timeContextPrompt
     ? `${systemPrompt}\n\n${timeContextPrompt}`
     : systemPrompt;
+
+  // ===========================================
+  // CHECK FOR PENDING TIP TO ACKNOWLEDGE
+  // ===========================================
+  let pendingTip = null;
+  if (convId) {
+    pendingTip = await getPendingTipEvent(supabase, convId);
+    if (pendingTip) {
+      console.log('=== PENDING TIP FOUND ===');
+      console.log('Amount:', pendingTip.amountTokens, 'tokens');
+      // Inject tip acknowledgement into system prompt
+      fullSystemPrompt += '\n\n' + buildTipAcknowledgementPrompt(pendingTip);
+    }
+  }
 
   // Get recent message history for context (200 messages for better memory)
   const { data: recentMessages } = await supabase
@@ -535,6 +554,12 @@ async function generateChatResponse(
     role: 'assistant',
     content: aiResponse,
   });
+
+  // Mark tip as acknowledged (if there was one)
+  if (pendingTip) {
+    await markTipAcknowledged(supabase, pendingTip.tipId);
+    console.log('=== TIP ACKNOWLEDGED ===');
+  }
 
   // Extract and save long-term memories from user message (async, don't wait)
   extractAndSaveMemories(userId, creatorId, message).catch(err =>
