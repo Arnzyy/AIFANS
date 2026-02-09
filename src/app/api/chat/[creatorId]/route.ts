@@ -545,10 +545,10 @@ async function generateChatResponse(
 
 function getMaxTokensForLength(responseLength: 'short' | 'medium' | 'long' = 'medium'): number {
   switch (responseLength) {
-    case 'short': return 50;   // ~35 words - punchy one-liners
-    case 'medium': return 120; // ~90 words - conversational
-    case 'long': return 250;   // ~180 words - detailed
-    default: return 120;
+    case 'short': return 100;  // ~70 words - punchy responses
+    case 'medium': return 250; // ~180 words - conversational
+    case 'long': return 400;   // ~300 words - detailed
+    default: return 250;
   }
 }
 
