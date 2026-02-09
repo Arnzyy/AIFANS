@@ -413,13 +413,41 @@ async function generateChatResponse(
     content: message,
   });
 
-  // Generate AI response
+  // ===========================================
+  // SMART MODEL ROUTING
+  // ===========================================
+  const stateForRouting = await getConversationState(supabase, userId, creatorId);
+  const msgCount = stateForRouting?.message_count || 0;
+
+  // Calculate heat level from recent messages
+  const heatKeywords = {
+    high: ['want you', 'need you', 'sexy', 'turn me on', 'making me', 'so bad', 'drive me crazy'],
+    medium: ['cute', 'hot', 'attractive', 'beautiful', 'miss you', 'thinking about you', 'flirty'],
+  };
+  const combinedRecent = (recentMessages || []).slice(-3).map((m: { role: string; content: string }) => m.content).join(' ').toLowerCase();
+  let currentHeat = 0;
+  if (heatKeywords.high.some(k => combinedRecent.includes(k))) currentHeat = 7;
+  else if (heatKeywords.medium.some(k => combinedRecent.includes(k))) currentHeat = 4;
+
+  const routing = routeToModel(
+    message,
+    currentHeat,
+    msgCount,
+    (recentMessages || []).slice(-6)
+  );
+
+  console.log('=== MODEL ROUTING ===');
+  console.log('Routed to:', routing.tier, '(' + routing.model + ')');
+  console.log('Reason:', routing.reason);
+
+  // Generate AI response with routed model
   let aiResponse: string;
   try {
     aiResponse = await callAnthropicAPI(
       fullSystemPrompt,
       messages,
-      personality.response_length || 'medium'
+      personality.response_length || 'medium',
+      routing.model
     );
   } catch (apiError) {
     console.error('API call failed:', apiError);
@@ -432,25 +460,57 @@ async function generateChatResponse(
     };
   }
 
-  // Compliance check
+  // Compliance check — if Haiku fails compliance, escalate to Sonnet
   const complianceResult = checkCompliance(aiResponse);
 
   if (!complianceResult.passed) {
-    console.warn('Compliance issues:', complianceResult.issues);
-    try {
-      aiResponse = await regenerateCompliant(
-        fullSystemPrompt,
-        messages,
-        personality.response_length || 'medium'
-      );
-    } catch (regenError) {
-      console.error('Regeneration also failed:', regenError);
-      return {
-        response: '__API_ERROR__',
-        conversationId: convId!,
-        passed_compliance: false,
-        compliance_issues: ['Regeneration failed'],
-      };
+    console.warn('Compliance failed on', routing.tier, '- issues:', complianceResult.issues);
+
+    if (routing.tier === 'haiku') {
+      // Haiku failed compliance — escalate to Sonnet
+      console.log('=== ESCALATING TO SONNET (compliance failure) ===');
+      try {
+        aiResponse = await callAnthropicAPI(
+          fullSystemPrompt,
+          messages,
+          personality.response_length || 'medium',
+          'claude-sonnet-4-20250514'
+        );
+        // Re-check compliance on Sonnet response
+        const sonnetCompliance = checkCompliance(aiResponse);
+        if (!sonnetCompliance.passed) {
+          aiResponse = await regenerateCompliant(
+            fullSystemPrompt,
+            messages,
+            personality.response_length || 'medium'
+          );
+        }
+      } catch (escalateError) {
+        console.error('Sonnet escalation also failed:', escalateError);
+        return {
+          response: '__API_ERROR__',
+          conversationId: convId!,
+          passed_compliance: false,
+          compliance_issues: ['Escalation failed'],
+        };
+      }
+    } else {
+      // Sonnet failed compliance — use regenerateCompliant
+      try {
+        aiResponse = await regenerateCompliant(
+          fullSystemPrompt,
+          messages,
+          personality.response_length || 'medium'
+        );
+      } catch (regenError) {
+        console.error('Regeneration failed:', regenError);
+        return {
+          response: '__API_ERROR__',
+          conversationId: convId!,
+          passed_compliance: false,
+          compliance_issues: ['Regeneration failed'],
+        };
+      }
     }
   }
 
@@ -544,6 +604,86 @@ async function generateChatResponse(
 }
 
 // ===========================================
+// SMART MODEL ROUTING
+// Routes messages to cheapest capable model
+// ===========================================
+
+type ModelTier = 'haiku' | 'sonnet';
+
+interface RoutingDecision {
+  model: string;
+  tier: ModelTier;
+  reason: string;
+}
+
+function routeToModel(
+  message: string,
+  heatLevel: number,
+  messageCount: number,
+  recentMessages: Array<{ role: string; content: string }>
+): RoutingDecision {
+
+  // ===========================================
+  // ALWAYS USE SONNET FOR:
+  // ===========================================
+
+  // 1. High heat conversations (flirty/sexual content needs nuance)
+  if (heatLevel >= 6) {
+    return { model: 'claude-sonnet-4-20250514', tier: 'sonnet', reason: 'high_heat' };
+  }
+
+  // 2. First 4 messages (first impressions matter — set the tone right)
+  if (messageCount <= 4) {
+    return { model: 'claude-sonnet-4-20250514', tier: 'sonnet', reason: 'early_conversation' };
+  }
+
+  // 3. Long/complex user messages (they put effort in, match it)
+  if (message.length > 200) {
+    return { model: 'claude-sonnet-4-20250514', tier: 'sonnet', reason: 'complex_message' };
+  }
+
+  // 4. Emotional content (needs sensitivity)
+  const emotionalPatterns = [
+    /i feel/i, /i('m| am) (sad|lonely|depressed|anxious|stressed|upset)/i,
+    /rough (day|week|time)/i, /miss(ing)? (you|this|that)/i,
+    /i love/i, /you mean/i, /special to me/i,
+    /bad day/i, /frustrated/i, /worried/i,
+  ];
+  if (emotionalPatterns.some(p => p.test(message))) {
+    return { model: 'claude-sonnet-4-20250514', tier: 'sonnet', reason: 'emotional_content' };
+  }
+
+  // 5. Questions about memory/past (needs good context reasoning)
+  const memoryPatterns = [
+    /do you remember/i, /last time/i, /you told me/i,
+    /we talked about/i, /what('s| is) my/i, /my name/i,
+    /did i tell you/i, /i mentioned/i,
+  ];
+  if (memoryPatterns.some(p => p.test(message))) {
+    return { model: 'claude-sonnet-4-20250514', tier: 'sonnet', reason: 'memory_recall' };
+  }
+
+  // 6. Explicit content (needs careful redirection)
+  const explicitPatterns = [
+    /fuck/i, /cock/i, /pussy/i, /dick/i, /cum/i,
+    /suck/i, /ride/i, /naked/i, /nude/i, /strip/i,
+    /touch (my|your)/i, /bend/i, /spank/i, /choke/i,
+  ];
+  if (explicitPatterns.some(p => p.test(message))) {
+    return { model: 'claude-sonnet-4-20250514', tier: 'sonnet', reason: 'explicit_handling' };
+  }
+
+  // ===========================================
+  // USE HAIKU FOR EVERYTHING ELSE:
+  // ===========================================
+
+  // Simple greetings, casual chat, short responses, banter
+  // Examples: "hey", "what's up", "lol", "how are you", "that's cool"
+
+  return { model: 'claude-3-5-haiku-20241022', tier: 'haiku', reason: 'simple_message' };
+}
+
+// ===========================================
 // CHAT HELPERS
 // ===========================================
 
@@ -559,7 +699,8 @@ function getMaxTokensForLength(responseLength: 'short' | 'medium' | 'long' = 'me
 async function callAnthropicAPI(
   systemPrompt: string,
   messages: ChatMessage[],
-  responseLength: 'short' | 'medium' | 'long' = 'medium'
+  responseLength: 'short' | 'medium' | 'long' = 'medium',
+  model: string = 'claude-sonnet-4-20250514'
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
@@ -570,7 +711,7 @@ async function callAnthropicAPI(
   const maxTokens = getMaxTokensForLength(responseLength);
 
   console.log('=== API CALL DEBUG ===');
-  console.log('Model:', 'claude-sonnet-4-20250514');
+  console.log('Model:', model);
   console.log('System prompt length:', systemPrompt.length);
   console.log('Messages count:', messages.length);
   console.log('Max tokens:', maxTokens);
@@ -583,7 +724,7 @@ async function callAnthropicAPI(
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model,
       max_tokens: maxTokens,
       system: systemPrompt,
       messages: messages.map(m => ({
@@ -607,6 +748,7 @@ async function callAnthropicAPI(
   }
 
   console.log('=== API RESPONSE ===');
+  console.log('Model used:', model);
   console.log('Response:', data.content[0].text.slice(0, 200));
   return data.content[0].text;
 }
@@ -695,7 +837,8 @@ THE VIBE: Confident, playful, in control. YOU set the pace because you WANT to, 
 
 Generate a SHORT (1-2 sentences max) flirty redirect that sounds like texting, not a rejection letter:`;
 
-  return await callAnthropicAPI(stricterPrompt, messages, responseLength);
+  // Compliance regeneration ALWAYS uses Sonnet (needs maximum instruction following)
+  return await callAnthropicAPI(stricterPrompt, messages, responseLength, 'claude-sonnet-4-20250514');
 }
 
 function stripAsteriskActions(text: string): string {
