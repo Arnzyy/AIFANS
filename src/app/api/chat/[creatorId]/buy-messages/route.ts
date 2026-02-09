@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
+import { getPersonality, getCreatorWithPersonality } from '@/lib/cache/creator-cache';
 
 const MESSAGE_PACKS = [
   { messages: 10, tokens: 100, label: '10 messages' },
@@ -26,6 +27,19 @@ export async function POST(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get real creator_id from personality (creatorId from URL may be model_id)
+    let realCreatorId = creatorId;
+    const cachedPersonality = await getPersonality(supabase, creatorId);
+    if (cachedPersonality?.data?.creator_id) {
+      realCreatorId = cachedPersonality.data.creator_id;
+    } else {
+      // Fallback: check creator_models
+      const { creator } = await getCreatorWithPersonality(supabase, creatorId);
+      if (creator?.creator_id) {
+        realCreatorId = creator.creator_id;
+      }
     }
 
     // Validate message pack
@@ -52,12 +66,12 @@ export async function POST(
     // Get current month
     const currentMonth = new Date().toISOString().slice(0, 7); // "2026-01"
 
-    // Start transaction
+    // Start transaction - use realCreatorId for proper FK relationship
     const { data: usage, error: usageError } = await supabase
       .from('monthly_message_usage')
       .select('*')
       .eq('user_id', user.id)
-      .eq('creator_id', creatorId)
+      .eq('creator_id', realCreatorId)
       .eq('month', currentMonth)
       .maybeSingle();
 
@@ -86,7 +100,7 @@ export async function POST(
         .from('monthly_message_usage')
         .insert({
           user_id: user.id,
-          creator_id: creatorId,
+          creator_id: realCreatorId,
           month: currentMonth,
           messages_used: 0,
           messages_included: 100, // Default subscription amount (£9.99/month)
