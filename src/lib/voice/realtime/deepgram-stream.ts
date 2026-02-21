@@ -143,7 +143,9 @@ export class DeepgramStream {
     }
 
     try {
-      this.connection.send(audioBuffer);
+      // Convert Buffer to Uint8Array for Deepgram SDK compatibility
+      const uint8Array = new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.byteLength);
+      this.connection.send(uint8Array);
     } catch (error) {
       console.error('[Deepgram] Error sending audio:', error);
     }
