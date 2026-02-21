@@ -4,12 +4,30 @@
 // Horizontally scalable with Redis coordination
 // ===========================================
 
+// Immediate startup log
+console.log('[VoiceWS] ========================================');
+console.log('[VoiceWS] Voice WebSocket Server Starting...');
+console.log('[VoiceWS] Node version:', process.version);
+console.log('[VoiceWS] ========================================');
+
+// Global error handlers to catch crashes
+process.on('uncaughtException', (error) => {
+  console.error('[VoiceWS] UNCAUGHT EXCEPTION:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[VoiceWS] UNHANDLED REJECTION:', reason);
+});
+
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { createClient } from '@supabase/supabase-js';
 import Redis from 'ioredis';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
+
+console.log('[VoiceWS] Imports loaded successfully');
 
 // ===========================================
 // TYPES
