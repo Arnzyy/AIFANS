@@ -29,6 +29,12 @@ import {
   markTipAcknowledged,
   buildTipAcknowledgementPrompt
 } from '@/lib/tokens/tip-acknowledgement';
+import { chatRateLimit, checkRateLimit } from '@/lib/rate-limit';
+import {
+  getRelationshipStage,
+  getStagePromptInstructions,
+  incrementMessageCount as incrementRelationshipMessage,
+} from '@/lib/ai/relationship-stage';
 
 export async function POST(
   request: NextRequest,
@@ -44,6 +50,18 @@ export async function POST(
     } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Rate limiting: 30 messages per hour per user
+    const rateLimitResult = await checkRateLimit(user.id, chatRateLimit);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded. Please wait before sending more messages.',
+          retryAfter: rateLimitResult.reset,
+        },
+        { status: 429 }
+      );
     }
 
     // Check chat access (OPTIMIZED: passes user to avoid duplicate auth call)
@@ -308,13 +326,6 @@ async function generateChatResponse(
   passed_compliance: boolean;
   compliance_issues?: string[];
 }> {
-  // DEBUG: Log V2 personality data
-  console.log('===PERSONALITY DATA LOADED ===');
-  console.log('Personality ID:', personality?.id);
-  console.log('Personality keys:', personality ? Object.keys(personality) : 'NULL');
-  console.log('Persona name:', personality?.persona_name);
-  console.log('Full personality:', JSON.stringify(personality, null, 2));
-
   // Get or create conversation
   let convId = conversationId;
   if (!convId) {
@@ -371,10 +382,15 @@ async function generateChatResponse(
   }
 
   // Build the chat context
+  // IMPORTANT: Use personality.creator_id (real UUID) for memory consistency
+  // The URL creatorId might be model_id which differs from stored memories
+  const personaIdForMemory = personality.creator_id || creatorId;
+  console.log('[Chat] ID mapping:', { urlCreatorId: creatorId, personaIdForMemory });
+
   const chatContext: ChatContext = {
     conversationId: convId!,
     userId,
-    personaId: creatorId,
+    personaId: personaIdForMemory,
     persona: personality,
     currentMessage: message,
   };
@@ -386,6 +402,22 @@ async function generateChatResponse(
   let fullSystemPrompt = timeContextPrompt
     ? `${systemPrompt}\n\n${timeContextPrompt}`
     : systemPrompt;
+
+  // ===========================================
+  // RELATIONSHIP STAGE AWARENESS
+  // ===========================================
+  let relationshipStage: 'new' | 'familiar' | 'intimate' = 'new';
+  try {
+    relationshipStage = await getRelationshipStage(supabase, userId, creatorId);
+    const stagePrompt = getStagePromptInstructions(relationshipStage);
+    if (stagePrompt) {
+      fullSystemPrompt += '\n\n' + stagePrompt;
+    }
+    console.log('=== RELATIONSHIP STAGE ===');
+    console.log('Stage:', relationshipStage);
+  } catch (err) {
+    console.error('Relationship stage error (non-fatal):', err);
+  }
 
   // ===========================================
   // CHECK FOR PENDING TIP TO ACKNOWLEDGE
@@ -562,7 +594,8 @@ async function generateChatResponse(
   }
 
   // Extract and save long-term memories from user message (async, don't wait)
-  extractAndSaveMemories(userId, creatorId, message).catch(err =>
+  // Use personaIdForMemory (real UUID) for consistent storage/retrieval
+  extractAndSaveMemories(userId, personaIdForMemory, message).catch(err =>
     console.error('Failed to extract memories:', err)
   );
 
@@ -584,6 +617,10 @@ async function generateChatResponse(
       updateConversationState(supabase, userId, creatorId, {
         incrementMessageCount: true,
       }).catch(err => console.error('State update error:', err));
+
+      // Update relationship state (for stage progression)
+      incrementRelationshipMessage(supabase, userId, creatorId)
+        .catch(err => console.error('Relationship update error:', err));
 
       // Store any new facts
       for (const fact of newFacts) {
@@ -888,6 +925,11 @@ async function extractAndSaveMemories(
   creatorId: string,
   userMessage: string
 ) {
+  console.log('[Memory] extractAndSaveMemories called with:', {
+    userId,
+    creatorId,
+    messagePreview: userMessage.slice(0, 50),
+  });
   try {
     const memoryService = getMemoryService(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

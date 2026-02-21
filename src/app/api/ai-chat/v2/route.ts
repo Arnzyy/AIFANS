@@ -8,6 +8,7 @@ import { createServerClient } from '@/lib/supabase/server';
 import { getPromptBuilder, ChatContext } from '@/lib/ai/enhanced-chat/prompt-builder';
 import { FORBIDDEN_PATTERNS_V2 } from '@/lib/ai/enhanced-chat/master-prompt-v2';
 import { AIPersonalityFull } from '@/lib/ai/personality/types';
+import { chatRateLimit, checkRateLimit } from '@/lib/rate-limit';
 
 // ===========================================
 // TYPES
@@ -29,6 +30,18 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Rate limiting: 30 messages per hour per user
+    const rateLimitResult = await checkRateLimit(user.id, chatRateLimit);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded. Please wait before sending more messages.',
+          retryAfter: rateLimitResult.reset,
+        },
+        { status: 429 }
+      );
     }
 
     const { creatorId, message, conversationId, previousBotMessageId, abTestVariant } = await request.json();

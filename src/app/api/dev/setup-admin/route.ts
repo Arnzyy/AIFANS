@@ -3,9 +3,9 @@ import { NextResponse } from 'next/server';
 
 // POST /api/dev/setup-admin - Create a dedicated admin account (DEV ONLY)
 export async function POST() {
-  // Only allow in development or with specific flag
-  if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_DEV_ENDPOINTS) {
-    return NextResponse.json({ error: 'Not available in production' }, { status: 403 });
+  // SECURITY: Only allow in development - no bypass flags
+  if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json({ error: 'Not available' }, { status: 404 });
   }
 
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@joinlyra.com';
@@ -87,13 +87,10 @@ export async function POST() {
       }
     }
 
+    // SECURITY: Never return credentials in API responses
     return NextResponse.json({
       success: true,
       message: 'Admin account ready',
-      credentials: {
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-      },
       userId,
     });
   } catch (error: any) {

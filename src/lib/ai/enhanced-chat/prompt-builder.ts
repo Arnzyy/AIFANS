@@ -101,6 +101,10 @@ export class PromptBuilderService {
     const prefHints = this.prefsService.generatePreferenceHints(prefs);
 
     // 6. Get relevant memories
+    console.log('[PromptBuilder] Fetching memories for:', {
+      userId: context.userId,
+      personaId: context.personaId,
+    });
     const memories = await this.memoryService.getRelevantMemories(
       context.userId,
       context.personaId,
@@ -108,6 +112,7 @@ export class PromptBuilderService {
       state.messagesThisSession
     );
     const memoryContext = this.memoryService.formatMemoriesForPrompt(memories);
+    console.log('[PromptBuilder] Memory context:', memoryContext);
 
     // 7. Get few-shot examples for current heat level
     // Cast when_complimented to expected type (may be free-form string in DB)

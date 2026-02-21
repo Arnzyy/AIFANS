@@ -1,12 +1,14 @@
 // ===========================================
 // API ROUTE: /api/chat/[creatorId]/welcome-back
 // Returns welcome message if user has been away
+// Enhanced with memory context for AI generation
 // ===========================================
 
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { getWelcomeBackMessage } from '@/lib/ai/welcome-back';
 import { updateConversationState } from '@/lib/ai/conversation-state';
+import { getRelationshipStage, getMemoryLimitByStage } from '@/lib/ai/relationship-stage';
 
 export async function GET(
   request: Request,
@@ -37,20 +39,53 @@ export async function GET(
       });
     }
 
-    // Check for welcome back message
+    // Get relationship stage and fetch memories for AI generation
+    const relationshipStage = await getRelationshipStage(supabase, user.id, creatorId);
+    const memoryLimit = getMemoryLimitByStage(relationshipStage);
+
+    // Fetch top memories for welcome-back context
+    const { data: memoriesData } = await supabase
+      .from('user_memories_v2')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('persona_id', creatorId)
+      .order('emotional_weight', { ascending: false })
+      .limit(memoryLimit);
+
+    // Map to UserMemory format
+    const memories = (memoriesData || []).map((m: any) => ({
+      id: m.id,
+      userId: m.user_id,
+      personaId: m.persona_id,
+      category: m.category,
+      fact: m.fact,
+      confidence: m.confidence,
+      emotionalWeight: m.emotional_weight ?? 5,
+      source: m.source,
+      recency: m.recency,
+      lastMentioned: new Date(m.last_mentioned),
+      mentionCount: m.mention_count,
+      createdAt: new Date(m.created_at),
+      updatedAt: new Date(m.updated_at),
+    }));
+
+    // Check for welcome back message (with memories for AI generation)
     const result = await getWelcomeBackMessage(
       supabase,
       user.id,
       creatorId,
-      personality
+      personality,
+      memories
     );
 
     console.log('[welcome-back] Check result:', {
       userId: user.id,
-      modelId: creatorId,
+      creatorId,
       shouldSend: result.shouldSendWelcome,
       hours: result.hoursSinceLastMessage,
       gap: result.gapDescription,
+      stage: result.relationshipStage,
+      aiGenerated: result.wasAiGenerated,
     });
 
     if (!result.shouldSendWelcome || !result.message) {
@@ -126,7 +161,9 @@ export async function GET(
       shouldShow: true,
       message: result.message,
       gap: result.gapDescription,
-      hours: result.hoursSinceLastMessage
+      hours: result.hoursSinceLastMessage,
+      stage: result.relationshipStage,
+      aiGenerated: result.wasAiGenerated,
     });
 
   } catch (error) {

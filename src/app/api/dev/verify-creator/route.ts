@@ -2,6 +2,11 @@ import { createServerClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 export async function POST() {
+  // SECURITY: Only allow in development - no bypass flags
+  if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json({ error: 'Not available' }, { status: 404 });
+  }
+
   try {
     const supabase = await createServerClient();
 
@@ -64,6 +69,11 @@ export async function POST() {
 }
 
 export async function GET() {
+  // SECURITY: Only allow in development - no bypass flags
+  if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json({ error: 'Not available' }, { status: 404 });
+  }
+
   try {
     const supabase = await createServerClient();
 

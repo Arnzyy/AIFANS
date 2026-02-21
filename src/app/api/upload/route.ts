@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { getPresignedUploadUrl, getAvatarPath, getBannerPath, getPostMediaPath } from '@/lib/storage/r2'
+import { uploadRateLimit, checkRateLimit } from '@/lib/rate-limit'
 
 // Get a presigned URL for direct upload to R2
 export async function POST(request: NextRequest) {
@@ -12,6 +13,18 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized', details: authError?.message }, { status: 401 })
+    }
+
+    // Rate limiting: 10 uploads per hour per user
+    const rateLimitResult = await checkRateLimit(user.id, uploadRateLimit)
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded. Please wait before uploading more files.',
+          retryAfter: rateLimitResult.reset,
+        },
+        { status: 429 }
+      )
     }
 
     const body = await request.json()

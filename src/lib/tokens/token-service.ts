@@ -255,6 +255,20 @@ export async function sendTip(
     // Get new balance
     const wallet = await getWallet(supabase, userId);
 
+    // Mark tip for AI acknowledgement (if in chat thread)
+    if (data && threadId) {
+      await supabase
+        .from('tips')
+        .update({
+          metadata: {
+            needs_acknowledgement: true,
+            acknowledged_at: null,
+          },
+        })
+        .eq('id', data);
+      console.log('[Tip] Marked for acknowledgement:', data);
+    }
+
     return {
       success: true,
       tip_id: data,

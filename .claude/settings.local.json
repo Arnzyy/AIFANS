@@ -23,7 +23,8 @@
       "Bash(findstr:*)",
       "Bash(git check-ignore:*)",
       "Bash(npm install:*)",
-      "Bash(npm audit:*)"
+      "Bash(npm audit:*)",
+      "Bash(node -e:*)"
     ]
   }
 }

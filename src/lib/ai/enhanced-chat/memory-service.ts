@@ -1,9 +1,11 @@
 // ===========================================
 // SMART MEMORY SERVICE
 // Contextual memory injection based on conversation
+// Enhanced with emotional weighting and relationship-based limits
 // ===========================================
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { RelationshipStage, getMemoryLimitByStage } from '../relationship-stage';
 
 // ===========================================
 // TYPE DEFINITIONS
@@ -16,6 +18,7 @@ export interface UserMemory {
   category: MemoryCategory;
   fact: string;
   confidence: number; // 0-1, how confident we are this is accurate
+  emotionalWeight: number; // 1-10, importance score for retrieval
   source: 'user_stated' | 'inferred' | 'corrected';
   recency: 'recent' | 'established' | 'old';
   lastMentioned: Date;
@@ -63,6 +66,25 @@ const CATEGORY_KEYWORDS: Record<MemoryCategory, string[]> = {
 };
 
 // ===========================================
+// MEMORY SCORING WEIGHTS
+// Based on spec: emotional_weight * recency_multiplier * frequency_boost
+// ===========================================
+
+const RECENCY_MULTIPLIERS = {
+  recent: 1.5,      // Mentioned in last 7 days
+  established: 1.0, // 7-30 days
+  old: 0.5,         // 30+ days
+};
+
+const FREQUENCY_BOOST = {
+  threshold: 3, // Memories mentioned 3+ times get boost
+  multiplier: 1.2,
+};
+
+// Categories that should always be prioritized
+const PRIORITY_CATEGORIES: MemoryCategory[] = ['name', 'recent_event', 'running_joke'];
+
+// ===========================================
 // MEMORY SERVICE
 // ===========================================
 
@@ -95,14 +117,19 @@ export class MemoryService {
 
   // ===========================================
   // GET RELEVANT MEMORIES FOR CONTEXT
+  // Enhanced with emotional weighting and stage-based limits
   // ===========================================
 
   async getRelevantMemories(
     userId: string,
     personaId: string,
     currentMessage: string,
-    messageCount: number
+    messageCount: number,
+    relationshipStage: RelationshipStage = 'new'
   ): Promise<UserMemory[]> {
+    // Apply lazy decay evaluation first
+    await this.applyLazyDecay(userId, personaId);
+
     const allMemories = await this.getAllMemories(userId, personaId);
 
     if (allMemories.length === 0) {
@@ -110,54 +137,134 @@ export class MemoryService {
     }
 
     const messageLower = currentMessage.toLowerCase();
-    const relevant: UserMemory[] = [];
 
-    // Always include name if we have it
-    const nameMemory = allMemories.find(m => m.category === 'name');
+    // Calculate score for each memory
+    const scoredMemories = allMemories.map(memory => ({
+      memory,
+      score: this.calculateMemoryScore(memory, messageLower, messageCount),
+    }));
+
+    // Sort by score descending
+    scoredMemories.sort((a, b) => b.score - a.score);
+
+    // Get stage-based limit
+    const limit = getMemoryLimitByStage(relationshipStage);
+
+    // Always include name if available (doesn't count against limit)
+    const nameMemory = scoredMemories.find(sm => sm.memory.category === 'name');
+    const others = scoredMemories.filter(sm => sm.memory.category !== 'name');
+
+    const result: UserMemory[] = [];
     if (nameMemory) {
-      relevant.push(nameMemory);
+      result.push(nameMemory.memory);
     }
 
-    // Check for category relevance based on keywords
-    for (const memory of allMemories) {
-      if (memory.category === 'name') continue; // Already added
+    // Add top-scored memories up to limit
+    for (const { memory } of others) {
+      if (result.length >= limit) break;
+      result.push(memory);
+    }
 
-      const keywords = CATEGORY_KEYWORDS[memory.category] || [];
-      const isRelevant = keywords.some(keyword => messageLower.includes(keyword));
+    console.log('[Memory] Retrieved memories:', {
+      userId,
+      stage: relationshipStage,
+      limit,
+      total: allMemories.length,
+      retrieved: result.length,
+      topScores: scoredMemories.slice(0, 5).map(sm => ({
+        category: sm.memory.category,
+        score: sm.score.toFixed(2),
+      })),
+    });
 
-      if (isRelevant) {
-        relevant.push(memory);
+    return result;
+  }
+
+  /**
+   * Calculate memory retrieval score
+   * Formula: emotional_weight * recency_multiplier * frequency_boost * relevance_boost
+   */
+  private calculateMemoryScore(
+    memory: UserMemory,
+    currentMessage: string,
+    messageCount: number
+  ): number {
+    // Base score from emotional weight (1-10)
+    let score = memory.emotionalWeight;
+
+    // Apply recency multiplier
+    const recencyMultiplier = RECENCY_MULTIPLIERS[memory.recency] || 1.0;
+    score *= recencyMultiplier;
+
+    // Apply frequency boost if mentioned 3+ times
+    if (memory.mentionCount >= FREQUENCY_BOOST.threshold) {
+      score *= FREQUENCY_BOOST.multiplier;
+    }
+
+    // Relevance boost: check if current message relates to memory category
+    const keywords = CATEGORY_KEYWORDS[memory.category] || [];
+    const isRelevantToMessage = keywords.some(kw => currentMessage.includes(kw));
+    if (isRelevantToMessage) {
+      score *= 2.0; // Double score for relevant memories
+    }
+
+    // Priority category boost
+    if (PRIORITY_CATEGORIES.includes(memory.category)) {
+      score *= 1.3;
+    }
+
+    // Early conversation boost for recent memories
+    if (messageCount < 5 && memory.recency === 'recent') {
+      score *= 1.2;
+    }
+
+    return score;
+  }
+
+  /**
+   * Apply lazy decay evaluation during retrieval
+   * Calls database function to update stale memories
+   */
+  private async applyLazyDecay(userId: string, personaId: string): Promise<void> {
+    try {
+      const { data, error } = await this.supabase.rpc('apply_memory_decay', {
+        p_user_id: userId,
+        p_persona_id: personaId,
+      });
+
+      if (error) {
+        // Non-fatal - RPC might not exist yet in some environments
+        console.log('[Memory] Decay function not available:', error.message);
+        return;
       }
+
+      if (data && data > 0) {
+        console.log('[Memory] Applied decay to', data, 'memories');
+      }
+    } catch (err) {
+      // Silently fail - decay is optimization, not critical
     }
-
-    // In early messages (< 5), include recent facts to establish familiarity
-    if (messageCount < 5) {
-      const recentMemories = allMemories
-        .filter(m => m.recency === 'recent' && !relevant.includes(m))
-        .slice(0, 2);
-      relevant.push(...recentMemories);
-    }
-
-    // Include high-confidence, frequently mentioned facts
-    const importantMemories = allMemories
-      .filter(m => m.mentionCount >= 3 && m.confidence >= 0.8 && !relevant.includes(m))
-      .slice(0, 2);
-    relevant.push(...importantMemories);
-
-    // Limit to prevent context bloat
-    return relevant.slice(0, 8);
   }
 
   // ===========================================
   // FORMAT MEMORIES FOR PROMPT INJECTION
   // ===========================================
 
-  formatMemoriesForPrompt(memories: UserMemory[]): string {
+  /**
+   * Format memories for prompt injection
+   * @param memories - Array of memories to format
+   * @param compressed - If true, use token-efficient compact format
+   */
+  formatMemoriesForPrompt(memories: UserMemory[], compressed: boolean = false): string {
     if (memories.length === 0) {
       return 'No memory context available yet. This may be a new user.';
     }
 
-    // Group by category for cleaner presentation
+    if (compressed) {
+      return this.formatCompressed(memories);
+    }
+
+    // Standard format: grouped by category
     const grouped: Record<string, string[]> = {};
 
     for (const memory of memories) {
@@ -179,6 +286,35 @@ export class MemoryService {
     }
 
     return lines.join('\n');
+  }
+
+  /**
+   * Compressed format for token efficiency
+   * Uses shorthand notation: "category:fact|category:fact"
+   */
+  private formatCompressed(memories: UserMemory[]): string {
+    const shortCategories: Record<MemoryCategory, string> = {
+      name: 'N',
+      age: 'A',
+      location: 'L',
+      occupation: 'W',
+      interests: 'I',
+      physical: 'P',
+      pets: 'PT',
+      favorites: 'F',
+      relationship: 'R',
+      goals: 'G',
+      routine: 'RO',
+      preferences: 'PR',
+      running_joke: 'J',
+      recent_event: 'RE',
+      family: 'FA',
+      education: 'ED',
+    };
+
+    return memories
+      .map(m => `${shortCategories[m.category] || m.category}:${m.fact}`)
+      .join('|');
   }
 
   private getCategoryLabel(category: MemoryCategory): string {
@@ -212,9 +348,13 @@ export class MemoryService {
     personaId: string,
     category: MemoryCategory,
     fact: string,
-    source: 'user_stated' | 'inferred' = 'user_stated'
+    source: 'user_stated' | 'inferred' = 'user_stated',
+    emotionalWeight?: number
   ): Promise<UserMemory | null> {
     const now = new Date();
+
+    // Calculate initial emotional weight if not provided
+    const weight = emotionalWeight ?? this.calculateInitialWeight(category, source);
 
     // Check for existing memory in same category
     const { data: existing } = await this.supabase
@@ -226,7 +366,9 @@ export class MemoryService {
       .single();
 
     if (existing) {
-      // Update existing memory
+      // Update existing memory - boost weight slightly when reinforced
+      const newWeight = Math.min(10, (existing.emotional_weight || 5) + (source === 'user_stated' ? 1 : 0));
+
       const { data, error } = await this.supabase
         .from('user_memories_v2')
         .update({
@@ -236,6 +378,7 @@ export class MemoryService {
           last_mentioned: now.toISOString(),
           mention_count: existing.mention_count + 1,
           confidence: source === 'user_stated' ? 1.0 : Math.min(existing.confidence + 0.1, 1.0),
+          emotional_weight: newWeight,
           updated_at: now.toISOString(),
         })
         .eq('id', existing.id)
@@ -259,6 +402,7 @@ export class MemoryService {
         category,
         fact,
         confidence: source === 'user_stated' ? 1.0 : 0.7,
+        emotional_weight: weight,
         source,
         recency: 'recent',
         last_mentioned: now.toISOString(),
@@ -275,6 +419,41 @@ export class MemoryService {
     }
 
     return this.deserializeMemory(data);
+  }
+
+  /**
+   * Calculate initial emotional weight based on category and source
+   * Higher weights for identity/relationship facts
+   */
+  private calculateInitialWeight(category: MemoryCategory, source: string): number {
+    // Base weight by category importance
+    const categoryWeights: Record<MemoryCategory, number> = {
+      name: 9,           // Identity - very important
+      running_joke: 8,   // Relationship bonding
+      pets: 7,           // Personal attachment
+      relationship: 7,   // Personal info
+      family: 7,         // Personal info
+      goals: 6,          // Aspirations
+      favorites: 6,      // Preferences
+      occupation: 5,     // Regular info
+      interests: 5,      // Regular info
+      physical: 5,       // Physical traits
+      routine: 4,        // Habits
+      preferences: 4,    // General preferences
+      location: 4,       // Geography
+      age: 4,            // Basic info
+      education: 4,      // Background
+      recent_event: 3,   // Temporary
+    };
+
+    let weight = categoryWeights[category] ?? 5;
+
+    // Boost if user explicitly stated (not inferred)
+    if (source === 'user_stated') {
+      weight = Math.min(10, weight + 1);
+    }
+
+    return weight;
   }
 
   // ===========================================
@@ -402,6 +581,7 @@ export class MemoryService {
       category: data.category,
       fact: data.fact,
       confidence: data.confidence,
+      emotionalWeight: data.emotional_weight ?? 5, // Default to 5 if not set
       source: data.source,
       recency: data.recency,
       lastMentioned: new Date(data.last_mentioned),

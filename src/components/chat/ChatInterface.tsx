@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, Image, MoreVertical } from 'lucide-react';
 import { InChatContentBrowser } from './InChatContentBrowser';
+import { InlineVoiceMic, VoiceCallScreen } from '@/components/voice';
 
 // ===========================================
 // TYPES
@@ -25,6 +26,9 @@ interface Creator {
   persona_name: string;
   avatar_url: string;
   is_online?: boolean;
+  personality_id?: string;  // For voice calls
+  is_voice_enabled?: boolean;
+  is_user_premium?: boolean;
 }
 
 interface ChatInterfaceProps {
@@ -43,21 +47,25 @@ export function ChatInterface({
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isWelcomeBackLoading, setIsWelcomeBackLoading] = useState(false);
   const [showContentBrowser, setShowContentBrowser] = useState(false);
+  const [showVoiceCall, setShowVoiceCall] = useState(false);
   const [messagesRemaining, setMessagesRemaining] = useState<number | null>(
     null
   );
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const welcomeBackChecked = useRef(false);
 
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isWelcomeBackLoading]);
 
-  // Load chat history
+  // Load chat history and check welcome-back
   useEffect(() => {
     loadChatHistory();
+    checkWelcomeBack();
   }, [creator.id]);
 
   const loadChatHistory = async () => {
@@ -69,6 +77,38 @@ export function ChatInterface({
       }
     } catch (error) {
       console.error('Failed to load chat history:', error);
+    }
+  };
+
+  // Check for welcome-back message
+  const checkWelcomeBack = async () => {
+    // Only check once per mount
+    if (welcomeBackChecked.current) return;
+    welcomeBackChecked.current = true;
+
+    try {
+      // Show typing indicator briefly
+      setIsWelcomeBackLoading(true);
+
+      const res = await fetch(`/api/chat/${creator.id}/welcome-back`);
+      const data = await res.json();
+
+      if (data.shouldShow && data.message) {
+        // Small delay for natural feel (AI is "typing")
+        await new Promise((resolve) => setTimeout(resolve, 800 + Math.random() * 700));
+
+        const welcomeMessage: Message = {
+          id: `welcome_${Date.now()}`,
+          role: 'assistant',
+          content: data.message,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, welcomeMessage]);
+      }
+    } catch (error) {
+      console.error('Welcome-back check error:', error);
+    } finally {
+      setIsWelcomeBackLoading(false);
     }
   };
 
@@ -219,7 +259,7 @@ export function ChatInterface({
           />
         ))}
 
-        {isLoading && (
+        {(isLoading || isWelcomeBackLoading) && (
           <div className="flex items-start gap-3">
             <img
               src={creator.avatar_url}
@@ -273,6 +313,42 @@ export function ChatInterface({
             />
           </div>
 
+          {/* Voice button */}
+          {creator.personality_id && (
+            <InlineVoiceMic
+              personalityId={creator.personality_id}
+              personalityName={creator.persona_name}
+              isPremium={creator.is_user_premium ?? false}
+              isVoiceEnabled={creator.is_voice_enabled ?? false}
+              onOpenFullScreen={() => setShowVoiceCall(true)}
+              onTranscript={(userText, aiText) => {
+                // Add voice transcript to chat history
+                if (userText) {
+                  setMessages((prev) => [
+                    ...prev,
+                    {
+                      id: `voice_user_${Date.now()}`,
+                      role: 'user',
+                      content: userText,
+                      created_at: new Date().toISOString(),
+                    },
+                  ]);
+                }
+                if (aiText) {
+                  setMessages((prev) => [
+                    ...prev,
+                    {
+                      id: `voice_ai_${Date.now()}`,
+                      role: 'assistant',
+                      content: aiText,
+                      created_at: new Date().toISOString(),
+                    },
+                  ]);
+                }
+              }}
+            />
+          )}
+
           {/* Send button */}
           <button
             onClick={sendMessage}
@@ -298,6 +374,16 @@ export function ChatInterface({
         onClose={() => setShowContentBrowser(false)}
         onSendToChat={handleContentMention}
       />
+
+      {/* Voice Call Screen */}
+      {showVoiceCall && creator.personality_id && (
+        <VoiceCallScreen
+          personalityId={creator.personality_id}
+          personalityName={creator.persona_name}
+          personalityAvatar={creator.avatar_url}
+          onClose={() => setShowVoiceCall(false)}
+        />
+      )}
     </div>
   );
 }

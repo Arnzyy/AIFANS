@@ -3,9 +3,9 @@ import { NextResponse } from 'next/server';
 
 // POST /api/dev/make-admin - Make current user an admin (DEV ONLY)
 export async function POST() {
-  // Only allow in development or with specific flag
-  if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_DEV_ENDPOINTS) {
-    return NextResponse.json({ error: 'Not available in production' }, { status: 403 });
+  // SECURITY: Only allow in development - no bypass flags
+  if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json({ error: 'Not available' }, { status: 404 });
   }
 
   try {

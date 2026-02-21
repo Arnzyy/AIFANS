@@ -10,10 +10,16 @@ import { processJobQueue, recoverStaleJobs, getQueueStats } from '@/lib/moderati
 const CRON_SECRET = process.env.CRON_SECRET;
 
 export async function GET(request: NextRequest) {
+  // SECURITY: Require CRON_SECRET - fail if not set
+  if (!CRON_SECRET) {
+    console.error('[Moderation Cron] CRON_SECRET environment variable not configured');
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+  }
+
   // Verify cron authorization
   const authHeader = request.headers.get('authorization');
 
-  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

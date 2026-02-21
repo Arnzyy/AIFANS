@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { sendTip, getTokenConfig } from '@/lib/tokens/token-service';
+import { apiRateLimit, checkRateLimit } from '@/lib/rate-limit';
 
 // POST - Send a tip using tokens
 export async function POST(request: NextRequest) {
@@ -17,6 +18,15 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Rate limiting: 60 requests per minute per user
+    const rateLimitResult = await checkRateLimit(user.id, apiRateLimit);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', retryAfter: rateLimitResult.reset },
+        { status: 429 }
+      );
     }
 
     const body = await request.json();
