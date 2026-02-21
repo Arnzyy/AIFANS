@@ -31,6 +31,7 @@ import {
   Home,
   MoreHorizontal,
   Compass,
+  Mic,
 } from 'lucide-react';
 
 // ===========================================
@@ -72,6 +73,7 @@ const CREATOR_NAV_ITEMS = [
   { href: '/dashboard/subscribers', icon: Users, label: 'Subscribers' },
   { href: '/dashboard/messages', icon: MessageCircle, label: 'Messages' },
   { href: '/dashboard/chat-modes', icon: Bot, label: 'Chat Modes' },
+  { href: '/dashboard/voice', icon: Mic, label: 'Voice' },
   { href: '/dashboard/earnings', icon: PoundSterling, label: 'Earnings' },
   { href: '/dashboard/settings', icon: Settings, label: 'Settings' },
 ];

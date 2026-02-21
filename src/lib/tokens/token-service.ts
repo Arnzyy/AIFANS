@@ -262,8 +262,9 @@ export async function sendTip(
     console.log('[Tip] RPC returned:', { tipId, success: rpcResult?.success });
 
     // Mark tip for AI acknowledgement (if in chat thread)
+    // RLS policy requires user_id filter for UPDATE
     if (tipId && threadId) {
-      const { error: updateError } = await supabase
+      const { error: updateError, data: updateData } = await supabase
         .from('tips')
         .update({
           metadata: {
@@ -271,10 +272,14 @@ export async function sendTip(
             acknowledged_at: null,
           },
         })
-        .eq('id', tipId);
+        .eq('id', tipId)
+        .eq('user_id', userId)
+        .select('id');
 
       if (updateError) {
         console.error('[Tip] Failed to mark for acknowledgement:', updateError);
+      } else if (!updateData || updateData.length === 0) {
+        console.error('[Tip] Update matched 0 rows - check RLS UPDATE policy on tips table');
       } else {
         console.log('[Tip] Marked for acknowledgement:', tipId);
       }

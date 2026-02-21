@@ -1,12 +1,15 @@
 // ===========================================
 // VOICE WEBSOCKET SERVER
 // Standalone Node.js server for real-time voice
+// Horizontally scalable with Redis coordination
 // ===========================================
 
 import { WebSocketServer, WebSocket } from 'ws';
 import { createClient } from '@supabase/supabase-js';
+import Redis from 'ioredis';
 import jwt from 'jsonwebtoken';
 import type { IncomingMessage } from 'http';
+import { randomUUID } from 'crypto';
 
 // ===========================================
 // TYPES
@@ -62,15 +65,20 @@ interface ActiveSession {
 // CONFIGURATION
 // ===========================================
 
-const PORT = parseInt(process.env.VOICE_WS_PORT || '3001', 10);
+const PORT = parseInt(process.env.PORT || process.env.VOICE_WS_PORT || '3001', 10);
 const JWT_SECRET = process.env.VOICE_JWT_SECRET;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const REDIS_URL = process.env.REDIS_URL;
+
+// Unique server instance ID for multi-replica coordination
+const SERVER_ID = randomUUID();
 
 // Session limits
 const MAX_SESSION_MS = 30 * 60 * 1000; // 30 minutes
 const PING_INTERVAL_MS = 30 * 1000; // 30 seconds
 const INACTIVITY_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+const SESSION_LOCK_TTL = 60; // Redis lock TTL in seconds
 
 // ===========================================
 // INITIALIZATION
@@ -90,8 +98,113 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-// Active sessions map
+// Initialize Redis (optional - falls back to local-only mode)
+let redis: Redis | null = null;
+let redisSub: Redis | null = null;
+
+if (REDIS_URL) {
+  redis = new Redis(REDIS_URL);
+  redisSub = new Redis(REDIS_URL);
+
+  redis.on('connect', () => console.log('[VoiceWS] Redis connected'));
+  redis.on('error', (err) => console.error('[VoiceWS] Redis error:', err));
+
+  // Subscribe to cross-server messages
+  redisSub.subscribe('voice:commands', (err) => {
+    if (err) console.error('[VoiceWS] Redis subscribe error:', err);
+  });
+
+  redisSub.on('message', (channel, message) => {
+    handleRedisMessage(channel, message);
+  });
+
+  console.log('[VoiceWS] Redis enabled - horizontal scaling ready');
+} else {
+  console.log('[VoiceWS] Redis not configured - single instance mode');
+}
+
+// Active sessions map (local to this server instance)
 const activeSessions = new Map<string, ActiveSession>();
+
+// ===========================================
+// REDIS HELPERS
+// ===========================================
+
+async function acquireSessionLock(sessionId: string): Promise<boolean> {
+  if (!redis) return true; // No Redis = single instance, always succeed
+
+  const lockKey = `voice:lock:${sessionId}`;
+  const result = await redis.set(lockKey, SERVER_ID, 'EX', SESSION_LOCK_TTL, 'NX');
+  return result === 'OK';
+}
+
+async function releaseSessionLock(sessionId: string): Promise<void> {
+  if (!redis) return;
+
+  const lockKey = `voice:lock:${sessionId}`;
+  const owner = await redis.get(lockKey);
+  if (owner === SERVER_ID) {
+    await redis.del(lockKey);
+  }
+}
+
+async function refreshSessionLock(sessionId: string): Promise<void> {
+  if (!redis) return;
+
+  const lockKey = `voice:lock:${sessionId}`;
+  await redis.expire(lockKey, SESSION_LOCK_TTL);
+}
+
+async function registerActiveSession(sessionId: string, userId: string): Promise<void> {
+  if (!redis) return;
+
+  await redis.hset('voice:active', sessionId, JSON.stringify({
+    serverId: SERVER_ID,
+    userId,
+    startTime: Date.now(),
+  }));
+}
+
+async function unregisterActiveSession(sessionId: string): Promise<void> {
+  if (!redis) return;
+
+  await redis.hdel('voice:active', sessionId);
+}
+
+async function getActiveSessionCount(): Promise<number> {
+  if (!redis) return activeSessions.size;
+
+  return await redis.hlen('voice:active');
+}
+
+function handleRedisMessage(channel: string, message: string): void {
+  try {
+    const data = JSON.parse(message);
+
+    // Ignore messages from self
+    if (data.serverId === SERVER_ID) return;
+
+    if (data.type === 'END_SESSION' && activeSessions.has(data.sessionId)) {
+      const session = activeSessions.get(data.sessionId);
+      if (session) {
+        endSession(session, 'remote_termination');
+      }
+    }
+  } catch (error) {
+    console.error('[VoiceWS] Redis message error:', error);
+  }
+}
+
+async function broadcastCommand(type: string, sessionId: string): Promise<void> {
+  if (!redis) return;
+
+  await redis.publish('voice:commands', JSON.stringify({
+    type,
+    sessionId,
+    serverId: SERVER_ID,
+    timestamp: Date.now(),
+  }));
+}
 
 // ===========================================
 // WEBSOCKET SERVER
@@ -138,10 +251,20 @@ wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
     mode: payload.mode,
   });
 
-  // Check for existing session (prevent concurrent connections)
+  // Try to acquire session lock (prevents concurrent connections across replicas)
+  const lockAcquired = await acquireSessionLock(payload.sessionId);
+  if (!lockAcquired) {
+    console.log('[VoiceWS] Session locked by another server:', payload.sessionId);
+    sendError(ws, 'Session already connected', 'CONCURRENT_SESSION');
+    ws.close(4002, 'Session already active');
+    return;
+  }
+
+  // Check for existing local session
   const existingSession = activeSessions.get(payload.sessionId);
   if (existingSession) {
-    console.log('[VoiceWS] Session already active:', payload.sessionId);
+    console.log('[VoiceWS] Session already active locally:', payload.sessionId);
+    await releaseSessionLock(payload.sessionId);
     sendError(ws, 'Session already connected', 'CONCURRENT_SESSION');
     ws.close(4002, 'Session already active');
     return;
@@ -157,6 +280,9 @@ wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
   };
 
   activeSessions.set(payload.sessionId, session);
+
+  // Register in Redis for cross-server visibility
+  await registerActiveSession(payload.sessionId, payload.userId);
 
   // Update session status in database
   await updateSessionStatus(payload.sessionId, 'active');

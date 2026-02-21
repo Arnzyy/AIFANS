@@ -16,6 +16,7 @@ import { SubscribeModal } from '@/components/shared/SubscribeModal';
 import { InChatContentBrowser } from '@/components/chat/InChatContentBrowser';
 import { MessageLimitBanner } from '@/components/chat/MessageLimitBanner';
 import { BuyMessagesModal } from '@/components/chat/BuyMessagesModal';
+import { InlineVoiceMic, VoiceCallScreen } from '@/components/voice/realtime';
 import { isAdminUser } from '@/lib/auth/admin';
 import type { ChatAccess, UnlockOption, MessagePack } from '@/lib/chat';
 
@@ -117,6 +118,10 @@ export default function AIChatPage() {
   // Message limits
   const [messageUsage, setMessageUsage] = useState<any>(null);
   const [showBuyMessagesModal, setShowBuyMessagesModal] = useState(false);
+
+  // Voice chat
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
+  const [showVoiceCall, setShowVoiceCall] = useState(false);
 
   useEffect(() => {
     loadChat();

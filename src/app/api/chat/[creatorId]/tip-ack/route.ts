@@ -5,7 +5,7 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, createAdminClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 
 export async function POST(
   request: NextRequest,
@@ -29,13 +29,11 @@ export async function POST(
       return NextResponse.json({ error: 'Missing tipAmount' }, { status: 400 });
     }
 
-    // Use admin client for updates (bypasses RLS)
-    const adminClient = createAdminClient();
-
     // Mark the tip for acknowledgement in the next message
     // The main chat route will pick this up and inject it into the system prompt
+    // RLS policy allows users to update their own tips
     if (tipId) {
-      const { error: updateError } = await adminClient
+      const { error: updateError } = await supabase
         .from('tips')
         .update({
           metadata: {
@@ -43,7 +41,8 @@ export async function POST(
             acknowledged_at: null,
           },
         })
-        .eq('id', tipId);
+        .eq('id', tipId)
+        .eq('user_id', user.id);
 
       if (updateError) {
         console.error('[Tip] Failed to mark for acknowledgement:', updateError);
@@ -63,7 +62,7 @@ export async function POST(
         .maybeSingle();
 
       if (recentTip) {
-        const { error: updateError } = await adminClient
+        const { error: updateError } = await supabase
           .from('tips')
           .update({
             metadata: {
@@ -71,7 +70,8 @@ export async function POST(
               acknowledged_at: null,
             },
           })
-          .eq('id', recentTip.id);
+          .eq('id', recentTip.id)
+          .eq('user_id', user.id);
 
         if (updateError) {
           console.error('[Tip] Failed to mark recent tip:', updateError);
