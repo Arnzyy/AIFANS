@@ -1,7 +1,7 @@
 // ===========================================
 // VOICE WEBSOCKET SERVER
 // Standalone Node.js server for real-time voice
-// Horizontally scalable with Redis coordination
+// Pipeline: Deepgram STT → Claude AI → ElevenLabs TTS
 // ===========================================
 
 // Immediate startup log
@@ -23,6 +23,7 @@ process.on('unhandledRejection', (reason, promise) => {
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createDeepgramClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import Redis from 'ioredis';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
@@ -77,6 +78,31 @@ interface ActiveSession {
   startTime: number;
   lastActivity: number;
   isProcessing: boolean;
+  // Voice pipeline state
+  deepgramConnection: any | null;
+  personality: PersonalityData | null;
+  voiceSettings: VoiceSettingsData | null;
+  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
+  currentUserTranscript: string;
+  isAISpeaking: boolean;
+  abortController: AbortController | null;
+}
+
+interface PersonalityData {
+  id: string;
+  persona_name: string;
+  backstory: string | null;
+  personality_traits: string[] | null;
+  speaking_style: string | null;
+  sample_dialogues: string[] | null;
+}
+
+interface VoiceSettingsData {
+  voice_id: string;
+  stability: number;
+  similarity_boost: number;
+  style: number;
+  speed: number;
 }
 
 // ===========================================
@@ -88,6 +114,9 @@ const JWT_SECRET = process.env.VOICE_JWT_SECRET;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const REDIS_URL = process.env.REDIS_URL;
+const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY;
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 
 // Unique server instance ID for multi-replica coordination
 const SERVER_ID = randomUUID();
@@ -113,8 +142,26 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   process.exit(1);
 }
 
-// Initialize Supabase client
+if (!DEEPGRAM_API_KEY) {
+  console.error('[VoiceWS] DEEPGRAM_API_KEY not configured');
+  process.exit(1);
+}
+
+if (!ANTHROPIC_API_KEY) {
+  console.error('[VoiceWS] ANTHROPIC_API_KEY not configured');
+  process.exit(1);
+}
+
+if (!ELEVENLABS_API_KEY) {
+  console.error('[VoiceWS] ELEVENLABS_API_KEY not configured');
+  process.exit(1);
+}
+
+// Initialize clients
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const deepgram = createDeepgramClient(DEEPGRAM_API_KEY);
+
+console.log('[VoiceWS] Deepgram client initialized');
 
 // Initialize Redis (optional - falls back to local-only mode)
 let redis: Redis | null = null;
@@ -330,6 +377,23 @@ wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
     return;
   }
 
+  // Fetch personality and voice settings
+  const [personalityResult, voiceSettingsResult] = await Promise.all([
+    fetchPersonality(payload.personalityId),
+    fetchVoiceSettings(payload.personalityId),
+  ]);
+
+  if (!personalityResult) {
+    console.error('[VoiceWS] Personality not found:', payload.personalityId);
+    sendError(ws, 'Personality not found', 'PERSONALITY_NOT_FOUND');
+    ws.close(4005, 'Personality not found');
+    await releaseSessionLock(payload.sessionId);
+    return;
+  }
+
+  console.log('[VoiceWS] Loaded personality:', personalityResult.persona_name);
+  console.log('[VoiceWS] Voice settings:', voiceSettingsResult?.voice_id || 'default');
+
   // Create session entry
   const session: ActiveSession = {
     ws,
@@ -337,6 +401,14 @@ wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
     startTime: Date.now(),
     lastActivity: Date.now(),
     isProcessing: false,
+    // Voice pipeline state
+    deepgramConnection: null,
+    personality: personalityResult,
+    voiceSettings: voiceSettingsResult,
+    conversationHistory: [],
+    currentUserTranscript: '',
+    isAISpeaking: false,
+    abortController: null,
   };
 
   activeSessions.set(payload.sessionId, session);
@@ -346,6 +418,9 @@ wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
 
   // Update session status in database
   await updateSessionStatus(payload.sessionId, 'active');
+
+  // Initialize Deepgram connection for this session
+  await initializeDeepgram(session);
 
   // Send session ready message
   const config: SessionConfig = {
@@ -437,38 +512,427 @@ wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
 });
 
 // ===========================================
+// DATA FETCHING
+// ===========================================
+
+async function fetchPersonality(personalityId: string): Promise<PersonalityData | null> {
+  try {
+    const { data, error } = await supabase
+      .from('ai_personalities')
+      .select('id, persona_name, backstory, personality_traits, speaking_style, sample_dialogues')
+      .eq('id', personalityId)
+      .single();
+
+    if (error) {
+      console.error('[VoiceWS] Fetch personality error:', error);
+      return null;
+    }
+    return data as PersonalityData;
+  } catch (error) {
+    console.error('[VoiceWS] Fetch personality error:', error);
+    return null;
+  }
+}
+
+async function fetchVoiceSettings(personalityId: string): Promise<VoiceSettingsData | null> {
+  try {
+    const { data, error } = await supabase
+      .from('model_voice_settings')
+      .select('elevenlabs_voice_id, stability, similarity_boost, style, speed')
+      .eq('personality_id', personalityId)
+      .single();
+
+    if (error || !data) {
+      // Return default voice settings
+      return {
+        voice_id: 'EXAVITQu4vr4xnSDxMaL', // Default ElevenLabs voice (Sarah)
+        stability: 0.5,
+        similarity_boost: 0.75,
+        style: 0.0,
+        speed: 1.0,
+      };
+    }
+    return {
+      voice_id: data.elevenlabs_voice_id || 'EXAVITQu4vr4xnSDxMaL',
+      stability: data.stability ?? 0.5,
+      similarity_boost: data.similarity_boost ?? 0.75,
+      style: data.style ?? 0.0,
+      speed: data.speed ?? 1.0,
+    };
+  } catch (error) {
+    console.error('[VoiceWS] Fetch voice settings error:', error);
+    return null;
+  }
+}
+
+// ===========================================
+// DEEPGRAM INITIALIZATION
+// ===========================================
+
+async function initializeDeepgram(session: ActiveSession): Promise<void> {
+  try {
+    console.log('[VoiceWS] Initializing Deepgram for session:', session.payload.sessionId);
+
+    const connection = deepgram.listen.live({
+      model: 'nova-2',
+      language: 'en',
+      encoding: 'linear16',
+      sample_rate: 16000,
+      channels: 1,
+      interim_results: true,
+      utterance_end_ms: 1500,
+      vad_events: true,
+      smart_format: true,
+    });
+
+    connection.on(LiveTranscriptionEvents.Open, () => {
+      console.log('[Deepgram] Connection opened for session:', session.payload.sessionId);
+    });
+
+    connection.on(LiveTranscriptionEvents.Transcript, (data: any) => {
+      const transcript = data.channel?.alternatives?.[0]?.transcript;
+      if (transcript) {
+        const isFinal = data.is_final || false;
+
+        // Accumulate transcript
+        if (isFinal) {
+          session.currentUserTranscript += (session.currentUserTranscript ? ' ' : '') + transcript;
+        }
+
+        // Send to client
+        sendMessage(session.ws, {
+          type: 'TRANSCRIPT_USER',
+          text: isFinal ? session.currentUserTranscript : session.currentUserTranscript + ' ' + transcript,
+          isFinal: false,
+        });
+
+        console.log('[Deepgram] Transcript:', transcript, '(final:', isFinal, ')');
+      }
+    });
+
+    connection.on(LiveTranscriptionEvents.UtteranceEnd, async () => {
+      console.log('[Deepgram] Utterance end - user finished speaking');
+
+      const userText = session.currentUserTranscript.trim();
+      if (userText) {
+        // Send final transcript to client
+        sendMessage(session.ws, {
+          type: 'TRANSCRIPT_USER',
+          text: userText,
+          isFinal: true,
+        });
+
+        // Clear for next utterance
+        session.currentUserTranscript = '';
+
+        // Process with Claude
+        await processUserMessage(session, userText);
+      }
+    });
+
+    connection.on(LiveTranscriptionEvents.Error, (error: any) => {
+      console.error('[Deepgram] Error:', error);
+      sendMessage(session.ws, {
+        type: 'ERROR',
+        message: 'Speech recognition error',
+        code: 'STT_ERROR',
+      });
+    });
+
+    connection.on(LiveTranscriptionEvents.Close, () => {
+      console.log('[Deepgram] Connection closed for session:', session.payload.sessionId);
+    });
+
+    session.deepgramConnection = connection;
+    console.log('[VoiceWS] Deepgram initialized successfully');
+  } catch (error) {
+    console.error('[VoiceWS] Deepgram init error:', error);
+    sendMessage(session.ws, {
+      type: 'ERROR',
+      message: 'Failed to initialize speech recognition',
+      code: 'STT_INIT_ERROR',
+    });
+  }
+}
+
+// ===========================================
+// CLAUDE STREAMING
+// ===========================================
+
+function buildVoicePrompt(personality: PersonalityData): string {
+  const traits = personality.personality_traits?.join(', ') || 'friendly, warm';
+  const style = personality.speaking_style || 'conversational and natural';
+
+  return `You are ${personality.persona_name}.
+
+${personality.backstory || ''}
+
+PERSONALITY: ${traits}
+SPEAKING STYLE: ${style}
+
+${personality.sample_dialogues?.length ? `EXAMPLE CONVERSATIONS:\n${personality.sample_dialogues.join('\n\n')}` : ''}
+
+═══════════════════════════════════════════
+VOICE CONVERSATION MODE
+═══════════════════════════════════════════
+
+You are in a LIVE VOICE CALL. Your responses will be spoken aloud.
+
+CRITICAL RULES:
+- Keep responses SHORT: 1-3 sentences max
+- Use natural SPOKEN language
+- NO markdown, NO bullet points, NO emojis, NO asterisks
+- Sound like a real person on a phone call
+- Be warm, engaging, and conversational
+- End with questions to keep conversation flowing
+- React naturally to what the user says`;
+}
+
+async function processUserMessage(session: ActiveSession, userText: string): Promise<void> {
+  if (session.isProcessing) {
+    console.log('[Claude] Already processing, skipping');
+    return;
+  }
+
+  session.isProcessing = true;
+  session.isAISpeaking = true;
+  session.abortController = new AbortController();
+
+  try {
+    console.log('[Claude] Processing user message:', userText);
+    sendMessage(session.ws, { type: 'AI_SPEAKING_START' });
+
+    // Add user message to history
+    session.conversationHistory.push({ role: 'user', content: userText });
+
+    // Keep history manageable (last 10 exchanges)
+    if (session.conversationHistory.length > 20) {
+      session.conversationHistory = session.conversationHistory.slice(-20);
+    }
+
+    const systemPrompt = buildVoicePrompt(session.personality!);
+
+    // Stream from Claude
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY!,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        system: systemPrompt,
+        messages: session.conversationHistory,
+        stream: true,
+      }),
+      signal: session.abortController.signal,
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[Claude] API error:', error);
+      throw new Error(`Claude API error: ${response.status}`);
+    }
+
+    // Process SSE stream
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('No response body');
+
+    const decoder = new TextDecoder();
+    let fullResponse = '';
+    let sentenceBuffer = '';
+    let audioSequence = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6);
+        if (data === '[DONE]') continue;
+
+        try {
+          const event = JSON.parse(data);
+
+          if (event.type === 'content_block_delta' && event.delta?.text) {
+            const text = event.delta.text;
+            fullResponse += text;
+            sentenceBuffer += text;
+
+            // Send transcript update
+            sendMessage(session.ws, {
+              type: 'TRANSCRIPT_AI',
+              text: fullResponse,
+              isFinal: false,
+            });
+
+            // Check for sentence completion for TTS
+            const sentenceEnds = ['.', '!', '?', '...'];
+            const lastChar = sentenceBuffer.trim().slice(-1);
+
+            if (sentenceEnds.some(end => sentenceBuffer.includes(end)) && sentenceBuffer.trim().length > 10) {
+              // Extract complete sentence
+              const sentenceMatch = sentenceBuffer.match(/[^.!?]+[.!?]+/);
+              if (sentenceMatch) {
+                const sentence = sentenceMatch[0].trim();
+                sentenceBuffer = sentenceBuffer.slice(sentenceMatch[0].length);
+
+                // Stream TTS for this sentence
+                await streamTTSToClient(session, sentence, audioSequence++);
+              }
+            }
+          }
+        } catch (e) {
+          // Skip invalid JSON lines
+        }
+      }
+    }
+
+    // Send any remaining text to TTS
+    if (sentenceBuffer.trim()) {
+      await streamTTSToClient(session, sentenceBuffer.trim(), audioSequence++);
+    }
+
+    // Send final transcript
+    sendMessage(session.ws, {
+      type: 'TRANSCRIPT_AI',
+      text: fullResponse,
+      isFinal: true,
+    });
+
+    // Add to conversation history
+    session.conversationHistory.push({ role: 'assistant', content: fullResponse });
+
+    console.log('[Claude] Response complete:', fullResponse.length, 'chars');
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.log('[Claude] Request aborted (barge-in)');
+    } else {
+      console.error('[Claude] Error:', error);
+      sendMessage(session.ws, {
+        type: 'ERROR',
+        message: 'AI response error',
+        code: 'AI_ERROR',
+      });
+    }
+  } finally {
+    session.isProcessing = false;
+    session.isAISpeaking = false;
+    session.abortController = null;
+    sendMessage(session.ws, { type: 'AI_SPEAKING_END' });
+  }
+}
+
+// ===========================================
+// ELEVENLABS TTS
+// ===========================================
+
+async function streamTTSToClient(session: ActiveSession, text: string, sequence: number): Promise<void> {
+  if (!session.voiceSettings) return;
+
+  try {
+    console.log('[ElevenLabs] Streaming TTS:', text.substring(0, 50) + '...');
+
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${session.voiceSettings.voice_id}/stream`,
+      {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': ELEVENLABS_API_KEY!,
+        },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_turbo_v2_5',
+          voice_settings: {
+            stability: session.voiceSettings.stability,
+            similarity_boost: session.voiceSettings.similarity_boost,
+            style: session.voiceSettings.style,
+            use_speaker_boost: true,
+          },
+        }),
+        signal: session.abortController?.signal,
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[ElevenLabs] API error:', error);
+      return;
+    }
+
+    // Stream audio chunks to client
+    const reader = response.body?.getReader();
+    if (!reader) return;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      // Convert to base64 and send to client
+      const base64 = Buffer.from(value).toString('base64');
+      sendMessage(session.ws, {
+        type: 'AUDIO_CHUNK',
+        data: base64,
+        sequence,
+      });
+    }
+
+    console.log('[ElevenLabs] TTS complete for sequence:', sequence);
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.log('[ElevenLabs] TTS aborted');
+    } else {
+      console.error('[ElevenLabs] Error:', error);
+    }
+  }
+}
+
+// ===========================================
 // MESSAGE HANDLERS
 // ===========================================
 
 async function handleAudioChunk(session: ActiveSession, audioBase64: string): Promise<void> {
-  // In full implementation, this would:
-  // 1. Send audio to Deepgram for transcription
-  // 2. When utterance ends, send to Claude for response
-  // 3. Stream Claude response to ElevenLabs for TTS
-  // 4. Send audio chunks back to client
-
-  // For now, we'll implement a simplified echo/acknowledgment
-  // Full implementation requires the VoiceSessionManager to be adapted for Node.js context
-
-  console.log('[VoiceWS] Audio chunk received:', {
-    sessionId: session.payload.sessionId,
-    size: audioBase64.length,
-  });
-
-  // TODO: Integrate full voice pipeline
-  // This requires adapting the VoiceSessionManager for the standalone server context
+  // Send audio to Deepgram for transcription
+  if (session.deepgramConnection) {
+    try {
+      // Decode base64 to buffer
+      const audioBuffer = Buffer.from(audioBase64, 'base64');
+      session.deepgramConnection.send(audioBuffer);
+    } catch (error) {
+      console.error('[VoiceWS] Audio send error:', error);
+    }
+  }
 }
 
 function handleBargeIn(session: ActiveSession): void {
   console.log('[VoiceWS] Barge-in:', session.payload.sessionId);
 
-  // TODO: Stop current TTS playback and Claude generation
+  // Abort current AI processing
+  if (session.abortController) {
+    session.abortController.abort();
+  }
+
+  session.isAISpeaking = false;
+  session.isProcessing = false;
+
   sendMessage(session.ws, { type: 'BARGE_IN_ACK' });
   sendMessage(session.ws, { type: 'AI_SPEAKING_END' });
 }
 
 function handleVADStart(session: ActiveSession): void {
   console.log('[VoiceWS] VAD start:', session.payload.sessionId);
+  // User started speaking - could trigger barge-in if AI is speaking
+  if (session.isAISpeaking) {
+    handleBargeIn(session);
+  }
 }
 
 function handleVADEnd(session: ActiveSession): void {
@@ -499,6 +963,21 @@ async function endSession(session: ActiveSession, reason: string): Promise<void>
 
 async function cleanupSession(session: ActiveSession, reason: string): Promise<void> {
   const sessionId = session.payload.sessionId;
+
+  // Abort any ongoing AI processing
+  if (session.abortController) {
+    session.abortController.abort();
+  }
+
+  // Close Deepgram connection
+  if (session.deepgramConnection) {
+    try {
+      session.deepgramConnection.finish();
+    } catch (e) {
+      // Ignore close errors
+    }
+    session.deepgramConnection = null;
+  }
 
   // Clear timers
   if ((session as any).sessionTimer) {
@@ -537,6 +1016,10 @@ async function cleanupSession(session: ActiveSession, reason: string): Promise<v
   } catch (error) {
     console.error('[VoiceWS] Cleanup error:', error);
   }
+
+  // Release Redis locks
+  await releaseSessionLock(sessionId);
+  await unregisterActiveSession(sessionId);
 }
 
 // ===========================================
