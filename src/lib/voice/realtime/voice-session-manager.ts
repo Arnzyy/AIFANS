@@ -65,6 +65,8 @@ export class VoiceSessionManager {
       onUtteranceEnd: this.handleUtteranceEnd.bind(this),
       onVADStart: this.handleVADStart.bind(this),
       onVADEnd: this.handleVADEnd.bind(this),
+      onError: this.handleDeepgramError.bind(this),
+      onClose: this.handleDeepgramClose.bind(this),
     });
 
     this.claude = new ClaudeStream(config.personality);
@@ -179,6 +181,33 @@ export class VoiceSessionManager {
    */
   private handleVADEnd(): void {
     this.bargeIn.onVADEnd();
+  }
+
+  /**
+   * Handle Deepgram error
+   */
+  private handleDeepgramError(error: Error): void {
+    console.error('[VoiceSession] Deepgram error:', error);
+    this.sendMessage({
+      type: 'ERROR',
+      message: 'Speech recognition error',
+      code: 'STT_ERROR',
+    });
+  }
+
+  /**
+   * Handle Deepgram connection close
+   */
+  private handleDeepgramClose(): void {
+    console.log('[VoiceSession] Deepgram connection closed');
+    // Attempt reconnect if session is still active
+    if (this.isActive) {
+      console.log('[VoiceSession] Attempting to reconnect Deepgram...');
+      this.deepgram.reconnect().catch((err) => {
+        console.error('[VoiceSession] Reconnect failed:', err);
+        this.end('stt_connection_lost');
+      });
+    }
   }
 
   /**

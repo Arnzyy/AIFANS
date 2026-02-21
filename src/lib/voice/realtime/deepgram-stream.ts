@@ -10,6 +10,8 @@ import { DEFAULT_DEEPGRAM_CONFIG } from './types';
 export interface DeepgramCallbacks {
   onTranscript: (text: string, isFinal: boolean) => void;
   onUtteranceEnd: (fullText: string) => void;
+  onVADStart?: () => void;
+  onVADEnd?: () => void;
   onError: (error: Error) => void;
   onClose: () => void;
 }
@@ -104,6 +106,9 @@ export class DeepgramStream {
 
     // Utterance end - complete thought detected
     this.connection.on(LiveTranscriptionEvents.UtteranceEnd, () => {
+      // VAD end happens when speech stops
+      this.callbacks.onVADEnd?.();
+
       if (this.currentUtterance.trim()) {
         console.log('[Deepgram] Utterance complete:', this.currentUtterance);
         this.callbacks.onUtteranceEnd(this.currentUtterance.trim());
@@ -114,6 +119,7 @@ export class DeepgramStream {
     // VAD speech started
     this.connection.on(LiveTranscriptionEvents.SpeechStarted, () => {
       console.log('[Deepgram] Speech started');
+      this.callbacks.onVADStart?.();
     });
 
     // Error handling
@@ -143,9 +149,13 @@ export class DeepgramStream {
     }
 
     try {
-      // Convert Buffer to Uint8Array for Deepgram SDK compatibility
-      const uint8Array = new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.byteLength);
-      this.connection.send(uint8Array);
+      // Convert Buffer to ArrayBuffer for Deepgram SDK compatibility
+      // Using slice to get a proper ArrayBuffer (not a view)
+      const arrayBuffer = audioBuffer.buffer.slice(
+        audioBuffer.byteOffset,
+        audioBuffer.byteOffset + audioBuffer.byteLength
+      );
+      this.connection.send(arrayBuffer);
     } catch (error) {
       console.error('[Deepgram] Error sending audio:', error);
     }
