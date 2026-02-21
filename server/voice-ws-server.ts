@@ -412,7 +412,7 @@ process.on('SIGTERM', async () => {
   console.log('[VoiceWS] SIGTERM received, shutting down...');
 
   // End all active sessions
-  for (const [sessionId, session] of activeSessions) {
+  for (const session of Array.from(activeSessions.values())) {
     await endSession(session, 'server_shutdown');
   }
 
@@ -425,7 +425,7 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   console.log('[VoiceWS] SIGINT received, shutting down...');
 
-  for (const [sessionId, session] of activeSessions) {
+  for (const session of Array.from(activeSessions.values())) {
     await endSession(session, 'server_shutdown');
   }
 
