@@ -86,6 +86,10 @@ interface ActiveSession {
   currentUserTranscript: string;
   isAISpeaking: boolean;
   abortController: AbortController | null;
+  // Memory integration
+  memoryContext: string;
+  stagePrompt: string;
+  conversationId: string | null;
 }
 
 interface PersonalityData {
@@ -116,6 +120,7 @@ const REDIS_URL = process.env.REDIS_URL;
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+const VERCEL_URL = process.env.VERCEL_URL || 'https://www.joinlyra.com';
 
 // Unique server instance ID for multi-replica coordination
 const SERVER_ID = randomUUID();
@@ -376,10 +381,11 @@ wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
     return;
   }
 
-  // Fetch personality and voice settings
-  const [personalityResult, voiceSettingsResult] = await Promise.all([
+  // Fetch personality, voice settings, and memory context in parallel
+  const [personalityResult, voiceSettingsResult, memoryResult] = await Promise.all([
     fetchPersonality(payload.personalityId),
     fetchVoiceSettings(payload.personalityId),
+    fetchMemoryContext(payload.userId, payload.personalityId, payload.creatorId),
   ]);
 
   if (!personalityResult) {
@@ -392,6 +398,19 @@ wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
 
   console.log('[VoiceWS] Loaded personality:', personalityResult.persona_name);
   console.log('[VoiceWS] Voice settings:', voiceSettingsResult?.voice_id || 'default');
+  console.log('[VoiceWS] Memory context loaded:', memoryResult?.relationshipStage || 'none');
+
+  // Preload recent text chat history if available
+  const preloadedHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  if (memoryResult?.recentHistory?.length) {
+    for (const msg of memoryResult.recentHistory) {
+      preloadedHistory.push({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+      });
+    }
+    console.log('[VoiceWS] Preloaded', preloadedHistory.length, 'messages from text chat');
+  }
 
   // Create session entry
   const session: ActiveSession = {
@@ -404,10 +423,14 @@ wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
     deepgramConnection: null,
     personality: personalityResult,
     voiceSettings: voiceSettingsResult,
-    conversationHistory: [],
+    conversationHistory: preloadedHistory,
     currentUserTranscript: '',
     isAISpeaking: false,
     abortController: null,
+    // Memory integration
+    memoryContext: memoryResult?.memories || '',
+    stagePrompt: memoryResult?.stagePrompt || '',
+    conversationId: memoryResult?.conversationId || null,
   };
 
   activeSessions.set(payload.sessionId, session);
@@ -590,6 +613,81 @@ async function fetchVoiceSettings(personalityId: string): Promise<VoiceSettingsD
   }
 }
 
+interface MemoryContextData {
+  memories: string;
+  relationshipStage: string;
+  stagePrompt: string;
+  recentHistory: Array<{ role: string; content: string }>;
+  conversationId: string | null;
+}
+
+async function fetchMemoryContext(
+  userId: string,
+  personaId: string,
+  creatorId: string
+): Promise<MemoryContextData | null> {
+  try {
+    console.log('[VoiceWS] Fetching memory context for user:', userId);
+
+    const response = await fetch(
+      `${VERCEL_URL}/api/voice/memory?` +
+        new URLSearchParams({
+          userId,
+          personaId,
+          creatorId,
+        })
+    );
+
+    if (!response.ok) {
+      console.error('[VoiceWS] Memory fetch failed:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('[VoiceWS] Memory context loaded:', {
+      hasMemories: !!data.memories,
+      stage: data.relationshipStage,
+      historyCount: data.recentHistory?.length || 0,
+    });
+
+    return data;
+  } catch (error) {
+    console.error('[VoiceWS] Fetch memory context error:', error);
+    return null;
+  }
+}
+
+async function saveTranscript(
+  userId: string,
+  creatorId: string,
+  personaId: string,
+  conversationId: string | null,
+  role: 'user' | 'assistant',
+  content: string,
+  sessionId: string
+): Promise<void> {
+  try {
+    // Fire and forget - don't block on this
+    fetch(`${VERCEL_URL}/api/voice/memory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        creatorId,
+        personaId,
+        conversationId,
+        role,
+        content,
+        sessionId,
+      }),
+    }).catch((err) => {
+      console.error('[VoiceWS] Save transcript error:', err);
+    });
+  } catch (error) {
+    console.error('[VoiceWS] Save transcript exception:', error);
+  }
+}
+
 // ===========================================
 // DEEPGRAM INITIALIZATION
 // ===========================================
@@ -684,9 +782,22 @@ async function initializeDeepgram(session: ActiveSession): Promise<void> {
 // CLAUDE STREAMING
 // ===========================================
 
-function buildVoicePrompt(personality: PersonalityData): string {
+function buildVoicePrompt(
+  personality: PersonalityData,
+  memoryContext: string,
+  stagePrompt: string
+): string {
   const traits = personality.personality_traits?.join(', ') || 'friendly, warm';
   const style = personality.speaking_style || 'conversational and natural';
+
+  const memorySection = memoryContext && memoryContext !== 'No memory context available yet. This may be a new user.'
+    ? `
+═══════════════════════════════════════════
+WHAT YOU REMEMBER ABOUT THIS USER
+═══════════════════════════════════════════
+${memoryContext}
+`
+    : '';
 
   return `You are ${personality.persona_name}.
 
@@ -694,6 +805,8 @@ ${personality.backstory || ''}
 
 PERSONALITY: ${traits}
 SPEAKING STYLE: ${style}
+${memorySection}
+${stagePrompt}
 
 ═══════════════════════════════════════════
 VOICE CONVERSATION MODE
@@ -708,7 +821,8 @@ CRITICAL RULES:
 - Sound like a real person on a phone call
 - Be warm, engaging, and conversational
 - End with questions to keep conversation flowing
-- React naturally to what the user says`;
+- React naturally to what the user says
+- Reference things you remember about the user naturally`;
 }
 
 async function processUserMessage(session: ActiveSession, userText: string): Promise<void> {
@@ -733,7 +847,22 @@ async function processUserMessage(session: ActiveSession, userText: string): Pro
       session.conversationHistory = session.conversationHistory.slice(-20);
     }
 
-    const systemPrompt = buildVoicePrompt(session.personality!);
+    const systemPrompt = buildVoicePrompt(
+      session.personality!,
+      session.memoryContext,
+      session.stagePrompt
+    );
+
+    // Save user transcript (async, non-blocking)
+    saveTranscript(
+      session.payload.userId,
+      session.payload.creatorId,
+      session.payload.personalityId,
+      session.conversationId,
+      'user',
+      userText,
+      session.payload.sessionId
+    );
 
     // Stream from Claude
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -831,6 +960,17 @@ async function processUserMessage(session: ActiveSession, userText: string): Pro
 
     // Add to conversation history
     session.conversationHistory.push({ role: 'assistant', content: fullResponse });
+
+    // Save AI transcript (async, non-blocking)
+    saveTranscript(
+      session.payload.userId,
+      session.payload.creatorId,
+      session.payload.personalityId,
+      session.conversationId,
+      'assistant',
+      fullResponse,
+      session.payload.sessionId
+    );
 
     console.log('[Claude] Response complete:', fullResponse.length, 'chars');
   } catch (error: any) {

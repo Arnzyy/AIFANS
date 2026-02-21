@@ -111,12 +111,6 @@ export function useRealtimeVoice(
     if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
 
     isPlayingRef.current = true;
-    const audioContext = audioContextRef.current;
-
-    if (!audioContext || audioContext.state === 'closed') {
-      isPlayingRef.current = false;
-      return;
-    }
 
     while (audioQueueRef.current.length > 0) {
       const base64Audio = audioQueueRef.current.shift();
@@ -130,18 +124,46 @@ export function useRealtimeVoice(
           bytes[i] = binaryString.charCodeAt(i);
         }
 
-        // Decode MP3 to audio buffer
-        const audioBuffer = await audioContext.decodeAudioData(bytes.buffer);
+        // Try Web Audio API first (best latency on desktop)
+        const audioContext = audioContextRef.current;
+        if (audioContext && audioContext.state !== 'closed') {
+          try {
+            // Need to copy buffer for decodeAudioData (it detaches the original)
+            const audioBuffer = await audioContext.decodeAudioData(bytes.buffer.slice(0));
+            const source = audioContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(audioContext.destination);
+            source.start();
+            await new Promise<void>((resolve) => {
+              source.onended = () => resolve();
+            });
+            continue; // Success, move to next chunk
+          } catch (decodeError) {
+            console.warn('[Voice] Web Audio decode failed, using HTML5 Audio fallback');
+          }
+        }
 
-        // Play audio
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContext.destination);
-        source.start();
+        // Fallback: HTML5 Audio element (works better on iOS Safari)
+        const blob = new Blob([bytes], { type: 'audio/mpeg' });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.setAttribute('playsinline', 'true');
 
-        // Wait for audio to finish
-        await new Promise<void>((resolve) => {
-          source.onended = () => resolve();
+        await new Promise<void>((resolve, reject) => {
+          audio.onended = () => {
+            URL.revokeObjectURL(url);
+            resolve();
+          };
+          audio.onerror = (e) => {
+            URL.revokeObjectURL(url);
+            console.error('[Voice] HTML5 Audio error:', e);
+            resolve(); // Don't reject, just move on
+          };
+          audio.play().catch((e) => {
+            URL.revokeObjectURL(url);
+            console.error('[Voice] Audio play error:', e);
+            resolve(); // Don't reject, just move on
+          });
         });
       } catch (error) {
         console.error('[Voice] Audio playback error:', error);
