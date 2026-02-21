@@ -130,15 +130,19 @@ export async function getPendingTipEvent(
   supabase: any,
   threadId: string
 ): Promise<TipEvent | null> {
+  console.log('[Tip] Looking for pending tip in thread:', threadId);
+
   const { data, error } = await supabase
     .from('tips')
-    .select('id, user_id, creator_id, amount_tokens, thread_id, created_at')
+    .select('id, user_id, creator_id, amount_tokens, thread_id, created_at, metadata')
     .eq('thread_id', threadId)
     .eq('status', 'SUCCEEDED')
-    .is('metadata->needs_acknowledgement', true)
+    .contains('metadata', { needs_acknowledgement: true })
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
+
+  console.log('[Tip] Query result:', { found: !!data, error: error?.message });
 
   if (error || !data) {
     return null;
