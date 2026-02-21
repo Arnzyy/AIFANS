@@ -255,9 +255,11 @@ export async function sendTip(
     // Get new balance
     const wallet = await getWallet(supabase, userId);
 
-    // Extract tip ID from RPC response (might be string or object)
-    const tipId = typeof data === 'string' ? data : data?.id || data;
-    console.log('[Tip] RPC returned:', { data, tipId });
+    // Extract tip ID from RPC response
+    // RPC returns array: [{ success, tip_id, new_balance, error_message }]
+    const rpcResult = Array.isArray(data) ? data[0] : data;
+    const tipId = rpcResult?.tip_id || (typeof data === 'string' ? data : null);
+    console.log('[Tip] RPC returned:', { tipId, success: rpcResult?.success });
 
     // Mark tip for AI acknowledgement (if in chat thread)
     if (tipId && threadId) {
@@ -281,7 +283,7 @@ export async function sendTip(
     return {
       success: true,
       tip_id: tipId,
-      new_balance: wallet.balance_tokens,
+      new_balance: rpcResult?.new_balance ?? wallet.balance_tokens,
     };
   } catch (error: any) {
     console.error('Tip error:', error);
