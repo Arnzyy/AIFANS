@@ -257,7 +257,7 @@ export async function sendTip(
 
     // Mark tip for AI acknowledgement (if in chat thread)
     if (data && threadId) {
-      await supabase
+      const { error: updateError } = await supabase
         .from('tips')
         .update({
           metadata: {
@@ -266,7 +266,12 @@ export async function sendTip(
           },
         })
         .eq('id', data);
-      console.log('[Tip] Marked for acknowledgement:', data);
+
+      if (updateError) {
+        console.error('[Tip] Failed to mark for acknowledgement:', updateError);
+      } else {
+        console.log('[Tip] Marked for acknowledgement:', data);
+      }
     }
 
     return {
