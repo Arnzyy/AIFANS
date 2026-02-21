@@ -288,9 +288,12 @@ export function useRealtimeVoice(
         }
 
         // Convert to base64
-        const base64 = btoa(
-          String.fromCharCode(...new Uint8Array(int16Data.buffer))
-        );
+        const uint8Array = new Uint8Array(int16Data.buffer);
+        let binary = '';
+        for (let i = 0; i < uint8Array.length; i++) {
+          binary += String.fromCharCode(uint8Array[i]);
+        }
+        const base64 = btoa(binary);
 
         // Send to WebSocket
         if (wsRef.current?.readyState === WebSocket.OPEN) {
