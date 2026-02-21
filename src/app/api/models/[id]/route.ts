@@ -113,6 +113,23 @@ export async function GET(
       (model.personality_traits && model.personality_traits.length > 0)
     );
 
+    // Check voice settings if subscribed
+    let voiceSettings = null;
+    if (isSubscribed) {
+      const { data: voiceData } = await supabase
+        .from('model_voice_settings')
+        .select('realtime_enabled, voice_enabled')
+        .eq('personality_id', model.id)
+        .maybeSingle();
+
+      if (voiceData) {
+        voiceSettings = {
+          voiceEnabled: voiceData.voice_enabled,
+          realtimeEnabled: voiceData.realtime_enabled,
+        };
+      }
+    }
+
     return NextResponse.json({
       model: {
         id: model.id,
@@ -137,6 +154,8 @@ export async function GET(
           personalityTraits: model.personality_traits || [],
           emojiUsage: model.emoji_usage || 'moderate',
         } : null,
+        // Voice settings (only for subscribers)
+        voiceSettings,
       },
       isSubscribed,
     });

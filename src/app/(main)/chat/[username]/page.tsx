@@ -222,6 +222,11 @@ export default function AIChatPage() {
                   console.error('[AIChatPage] Error fetching wallet:', walletErr);
                 }
 
+                // Check if voice is enabled for this model (from model response)
+                if (model.voiceSettings?.realtimeEnabled) {
+                  setIsVoiceEnabled(true);
+                }
+
                 let hasExistingMessages = false;
                 try {
                   const { data: existingConv } = await supabase
@@ -1155,7 +1160,7 @@ export default function AIChatPage() {
                 isLoading={accessLoading}
                 creatorUsername={creator?.username}
               >
-                <form onSubmit={sendMessage} className="flex gap-2 md:gap-3">
+                <form onSubmit={sendMessage} className="flex gap-2 md:gap-3 items-center">
                   <input
                     type="text"
                     value={newMessage}
@@ -1164,6 +1169,38 @@ export default function AIChatPage() {
                     className="flex-1 px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-colors text-base"
                     disabled={sending || !currentUser}
                   />
+                  {/* Voice Button */}
+                  {isModelChat && creator && (
+                    <InlineVoiceMic
+                      personalityId={creator.id}
+                      personalityName={creator.display_name || creator.username}
+                      isPremium={chatAccess?.accessType === 'subscription'}
+                      isVoiceEnabled={isVoiceEnabled}
+                      onOpenFullScreen={() => setShowVoiceCall(true)}
+                      onTranscript={(userText, aiText) => {
+                        if (userText) {
+                          setMessages(prev => [...prev, {
+                            id: `voice_user_${Date.now()}`,
+                            content: userText,
+                            sender_id: currentUser?.id || '',
+                            receiver_id: creator.id,
+                            created_at: new Date().toISOString(),
+                            is_ai_generated: false,
+                          }]);
+                        }
+                        if (aiText) {
+                          setMessages(prev => [...prev, {
+                            id: `voice_ai_${Date.now()}`,
+                            content: aiText,
+                            sender_id: creator.id,
+                            receiver_id: currentUser?.id || '',
+                            created_at: new Date().toISOString(),
+                            is_ai_generated: true,
+                          }]);
+                        }
+                      }}
+                    />
+                  )}
                   <button
                     type="submit"
                     disabled={!newMessage.trim() || sending || !currentUser}
@@ -1228,7 +1265,7 @@ export default function AIChatPage() {
                 </div>
               </div>
             ) : (
-              <form onSubmit={sendMessage} className="flex gap-2 md:gap-3">
+              <form onSubmit={sendMessage} className="flex gap-2 md:gap-3 items-center">
                 <input
                   type="text"
                   value={newMessage}
@@ -1325,6 +1362,16 @@ export default function AIChatPage() {
             setShowContentBrowser(false);
             setShowSubscribeModal(true);
           }}
+        />
+      )}
+
+      {/* Voice Call Screen */}
+      {showVoiceCall && creator && isVoiceEnabled && (
+        <VoiceCallScreen
+          personalityId={creator.id}
+          personalityName={creator.display_name || creator.username}
+          personalityAvatar={creator.avatar_url || undefined}
+          onClose={() => setShowVoiceCall(false)}
         />
       )}
     </div>
