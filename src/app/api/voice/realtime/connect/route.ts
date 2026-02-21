@@ -101,12 +101,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check chat access (premium subscription required for voice)
+    // Check chat access (subscription required for voice)
     const access = await checkChatAccessOptimized(supabase, user, creator.id);
-    if (!access.hasAccess || !access.isPremium) {
+    if (!access.hasAccess || access.accessType !== 'subscription') {
       return NextResponse.json(
         {
-          error: 'Voice calls require a premium subscription',
+          error: 'Voice calls require a subscription',
           access,
         },
         { status: 403 }
