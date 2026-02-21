@@ -15,8 +15,8 @@ export interface VoiceTokenPayload {
   exp: number;
 }
 
-// Token expires in 1 hour
-const TOKEN_EXPIRY_SECONDS = 3600;
+// Token expires in 5 minutes (only needed for initial WebSocket connection)
+const TOKEN_EXPIRY_SECONDS = 300;
 
 /**
  * Get the JWT secret, ensuring it exists

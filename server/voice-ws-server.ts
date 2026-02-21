@@ -251,6 +251,28 @@ wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
     mode: payload.mode,
   });
 
+  // Verify session belongs to user (prevents token reuse attacks)
+  const { data: sessionCheck, error: sessionCheckError } = await supabase
+    .from('voice_sessions')
+    .select('id, subscriber_id, status')
+    .eq('id', payload.sessionId)
+    .eq('subscriber_id', payload.userId)
+    .single();
+
+  if (sessionCheckError || !sessionCheck) {
+    console.log('[VoiceWS] Session-user mismatch:', payload.sessionId, payload.userId);
+    sendError(ws, 'Invalid session', 'SESSION_INVALID');
+    ws.close(4003, 'Session invalid');
+    return;
+  }
+
+  if (sessionCheck.status === 'ended') {
+    console.log('[VoiceWS] Session already ended:', payload.sessionId);
+    sendError(ws, 'Session has ended', 'SESSION_ENDED');
+    ws.close(4004, 'Session ended');
+    return;
+  }
+
   // Try to acquire session lock (prevents concurrent connections across replicas)
   const lockAcquired = await acquireSessionLock(payload.sessionId);
   if (!lockAcquired) {

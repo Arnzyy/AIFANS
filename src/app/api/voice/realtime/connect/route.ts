@@ -10,6 +10,7 @@ import { getPersonality } from '@/lib/cache/creator-cache';
 import { getVoiceSettings, isRealtimeEnabled, getElevenLabsVoiceId } from '@/lib/voice';
 import { generateVoiceToken } from '@/lib/voice/realtime/jwt-service';
 import { FeatureFlagService } from '@/lib/feature-flags';
+import { voiceRateLimit, checkRateLimit } from '@/lib/rate-limit';
 import type { ConnectRequest, ConnectResponse, SessionConfig } from '@/lib/voice/realtime/types';
 
 // Feature flag names
@@ -36,6 +37,15 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Rate limit check (5 connects per minute)
+    const rateLimitResult = await checkRateLimit(user.id, voiceRateLimit);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many voice session requests. Please wait a moment.' },
+        { status: 429 }
+      );
     }
 
     // Parse request body
@@ -151,7 +161,7 @@ export async function POST(request: NextRequest) {
     const { data: existingSession } = await supabase
       .from('voice_sessions')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('subscriber_id', user.id)
       .is('ended_at', null)
       .single();
 
@@ -166,7 +176,7 @@ export async function POST(request: NextRequest) {
     const { data: session, error: sessionError } = await supabase
       .from('voice_sessions')
       .insert({
-        user_id: user.id,
+        subscriber_id: user.id,
         creator_id: creator.id,
         personality_id: personalityId,
         status: 'connecting',

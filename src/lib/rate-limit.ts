@@ -64,6 +64,17 @@ export const apiRateLimit = redis
     })
   : null;
 
+// Voice endpoints: 5 session creates per minute per user
+// Prevents voice session spam
+export const voiceRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(5, '1 m'),
+      prefix: 'ratelimit:voice',
+      analytics: true,
+    })
+  : null;
+
 /**
  * Helper function to check rate limit and return appropriate response
  * @param identifier - Unique identifier (IP address, user ID, etc.)
