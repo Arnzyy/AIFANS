@@ -5,10 +5,10 @@
 // ===========================================
 
 import { WebSocketServer, WebSocket } from 'ws';
+import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { createClient } from '@supabase/supabase-js';
 import Redis from 'ioredis';
 import jwt from 'jsonwebtoken';
-import type { IncomingMessage } from 'http';
 import { randomUUID } from 'crypto';
 
 // ===========================================
@@ -207,15 +207,35 @@ async function broadcastCommand(type: string, sessionId: string): Promise<void> 
 }
 
 // ===========================================
-// WEBSOCKET SERVER
+// HTTP + WEBSOCKET SERVER
 // ===========================================
 
-const wss = new WebSocketServer({ port: PORT });
+// Create HTTP server for Railway proxy compatibility
+const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
+  // Health check endpoint for Railway
+  if (req.url === '/health' || req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: 'ok',
+      server: 'voice-ws',
+      activeSessions: activeSessions.size,
+      timestamp: new Date().toISOString(),
+    }));
+    return;
+  }
 
-console.log(`[VoiceWS] Server starting on port ${PORT}...`);
+  // 404 for other routes
+  res.writeHead(404);
+  res.end('Not found');
+});
 
-wss.on('listening', () => {
-  console.log(`[VoiceWS] Server listening on ws://localhost:${PORT}`);
+// Attach WebSocket server to HTTP server
+const wss = new WebSocketServer({ server: httpServer });
+
+// Start HTTP server
+httpServer.listen(PORT, () => {
+  console.log(`[VoiceWS] HTTP server listening on port ${PORT}`);
+  console.log(`[VoiceWS] WebSocket ready at ws://localhost:${PORT}`);
 });
 
 wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
@@ -565,8 +585,10 @@ process.on('SIGTERM', async () => {
   }
 
   wss.close(() => {
-    console.log('[VoiceWS] Server closed');
-    process.exit(0);
+    httpServer.close(() => {
+      console.log('[VoiceWS] Server closed');
+      process.exit(0);
+    });
   });
 });
 
@@ -578,8 +600,10 @@ process.on('SIGINT', async () => {
   }
 
   wss.close(() => {
-    console.log('[VoiceWS] Server closed');
-    process.exit(0);
+    httpServer.close(() => {
+      console.log('[VoiceWS] Server closed');
+      process.exit(0);
+    });
   });
 });
 
