@@ -208,12 +208,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate JWT token
+    // Generate JWT token (use actual personality.id)
     const token = generateVoiceToken({
       sessionId: session.id,
       userId: user.id,
       creatorId: creator.id,
-      personalityId,
+      personalityId: personality.id,
       mode,
     });
 
@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
     console.log('[VoiceConnect] Session created:', {
       sessionId: session.id,
       userId: user.id,
-      personalityId,
+      personalityId: personality.id,
       mode,
     });
 
