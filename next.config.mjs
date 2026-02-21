@@ -44,7 +44,7 @@ const nextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'geolocation=(), microphone=(), camera=()',
+            value: 'geolocation=(), microphone=(self), camera=()',
           },
           {
             key: 'Content-Security-Policy',
@@ -54,7 +54,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co https://api.stripe.com https://*.r2.dev",
+              "connect-src 'self' https://*.supabase.co https://api.stripe.com https://*.r2.dev wss://*.railway.app",
               "frame-src https://js.stripe.com https://hooks.stripe.com",
               "object-src 'none'",
               "base-uri 'self'",
