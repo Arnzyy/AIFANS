@@ -517,19 +517,45 @@ wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
 
 async function fetchPersonality(personalityId: string): Promise<PersonalityData | null> {
   try {
+    console.log('[VoiceWS] Fetching personality by ID:', personalityId);
+
+    // First try direct lookup by id
     const { data, error } = await supabase
       .from('ai_personalities')
       .select('id, persona_name, backstory, personality_traits, speaking_style, sample_dialogues')
       .eq('id', personalityId)
-      .single();
+      .maybeSingle();
 
     if (error) {
-      console.error('[VoiceWS] Fetch personality error:', error);
-      return null;
+      console.error('[VoiceWS] Fetch personality error:', error.message, error.code, error.details);
     }
-    return data as PersonalityData;
+
+    if (data) {
+      console.log('[VoiceWS] Found personality:', data.persona_name);
+      return data as PersonalityData;
+    }
+
+    // Fallback: try lookup by model_id
+    console.log('[VoiceWS] Trying fallback lookup by model_id...');
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('ai_personalities')
+      .select('id, persona_name, backstory, personality_traits, speaking_style, sample_dialogues')
+      .eq('model_id', personalityId)
+      .maybeSingle();
+
+    if (fallbackError) {
+      console.error('[VoiceWS] Fallback lookup error:', fallbackError.message);
+    }
+
+    if (fallbackData) {
+      console.log('[VoiceWS] Found personality via model_id:', fallbackData.persona_name);
+      return fallbackData as PersonalityData;
+    }
+
+    console.error('[VoiceWS] Personality not found by id or model_id:', personalityId);
+    return null;
   } catch (error) {
-    console.error('[VoiceWS] Fetch personality error:', error);
+    console.error('[VoiceWS] Fetch personality exception:', error);
     return null;
   }
 }
