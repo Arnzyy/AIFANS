@@ -5,7 +5,7 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/server';
+import { createServerClient, createAdminClient } from '@/lib/supabase/server';
 
 export async function POST(
   request: NextRequest,
@@ -29,10 +29,13 @@ export async function POST(
       return NextResponse.json({ error: 'Missing tipAmount' }, { status: 400 });
     }
 
+    // Use admin client for updates (bypasses RLS)
+    const adminClient = createAdminClient();
+
     // Mark the tip for acknowledgement in the next message
     // The main chat route will pick this up and inject it into the system prompt
     if (tipId) {
-      await supabase
+      const { error: updateError } = await adminClient
         .from('tips')
         .update({
           metadata: {
@@ -42,7 +45,11 @@ export async function POST(
         })
         .eq('id', tipId);
 
-      console.log('[Tip] Marked for acknowledgement:', tipId, tipAmount, 'tokens');
+      if (updateError) {
+        console.error('[Tip] Failed to mark for acknowledgement:', updateError);
+      } else {
+        console.log('[Tip] Marked for acknowledgement:', tipId, tipAmount, 'tokens');
+      }
     } else if (conversationId) {
       // If no tipId, try to mark the most recent tip for this conversation
       const { data: recentTip } = await supabase
@@ -56,7 +63,7 @@ export async function POST(
         .maybeSingle();
 
       if (recentTip) {
-        await supabase
+        const { error: updateError } = await adminClient
           .from('tips')
           .update({
             metadata: {
@@ -66,7 +73,11 @@ export async function POST(
           })
           .eq('id', recentTip.id);
 
-        console.log('[Tip] Marked recent tip for acknowledgement:', recentTip.id);
+        if (updateError) {
+          console.error('[Tip] Failed to mark recent tip:', updateError);
+        } else {
+          console.log('[Tip] Marked recent tip for acknowledgement:', recentTip.id);
+        }
       }
     }
 
