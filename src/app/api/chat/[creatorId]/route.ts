@@ -433,8 +433,10 @@ async function generateChatResponse(
         console.error('=== PENDING TIP FOUND ===');
         console.error('Tip ID:', pendingTip.tipId);
         console.error('Amount:', pendingTip.amountTokens, 'tokens');
-        // Inject tip acknowledgement into system prompt
-        fullSystemPrompt += '\n\n' + buildTipAcknowledgementPrompt(pendingTip);
+        // PREPEND tip acknowledgement to system prompt so AI sees it first
+        // This ensures the AI follows the tip instruction instead of ignoring it
+        const tipPrompt = buildTipAcknowledgementPrompt(pendingTip);
+        fullSystemPrompt = tipPrompt + '\n\n' + fullSystemPrompt;
       } else {
         console.error('[Tip] No pending tip found for this conversation');
       }

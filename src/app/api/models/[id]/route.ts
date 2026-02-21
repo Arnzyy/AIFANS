@@ -114,19 +114,29 @@ export async function GET(
     );
 
     // Check voice settings if subscribed
+    // First find the ai_personality linked to this model, then get voice settings
     let voiceSettings = null;
     if (isSubscribed) {
-      const { data: voiceData } = await supabase
-        .from('model_voice_settings')
-        .select('realtime_enabled, voice_enabled')
-        .eq('personality_id', model.id)
+      // ai_personalities.model_id links to creator_models.id
+      const { data: personality } = await supabase
+        .from('ai_personalities')
+        .select('id')
+        .eq('model_id', model.id)
         .maybeSingle();
 
-      if (voiceData) {
-        voiceSettings = {
-          voiceEnabled: voiceData.voice_enabled,
-          realtimeEnabled: voiceData.realtime_enabled,
-        };
+      if (personality) {
+        const { data: voiceData } = await supabase
+          .from('model_voice_settings')
+          .select('realtime_enabled, voice_enabled')
+          .eq('personality_id', personality.id)
+          .maybeSingle();
+
+        if (voiceData) {
+          voiceSettings = {
+            voiceEnabled: voiceData.voice_enabled,
+            realtimeEnabled: voiceData.realtime_enabled,
+          };
+        }
       }
     }
 

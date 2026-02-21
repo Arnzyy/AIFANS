@@ -76,14 +76,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get personality and verify it exists
-    const { data: personality, error: personalityError } = await supabase
+    // Get personality - personalityId might be ai_personalities.id OR creator_models.id
+    // First try direct lookup, then try via model_id link
+    let personality = null;
+
+    const { data: directPersonality } = await supabase
       .from('ai_personalities')
       .select('id, creator_id, persona_name, is_active')
       .eq('id', personalityId)
-      .single();
+      .maybeSingle();
 
-    if (personalityError || !personality) {
+    if (directPersonality) {
+      personality = directPersonality;
+    } else {
+      // Try looking up by model_id (personalityId is actually a creator_models.id)
+      const { data: linkedPersonality } = await supabase
+        .from('ai_personalities')
+        .select('id, creator_id, persona_name, is_active')
+        .eq('model_id', personalityId)
+        .maybeSingle();
+
+      personality = linkedPersonality;
+    }
+
+    if (!personality) {
       return NextResponse.json(
         { error: 'Personality not found' },
         { status: 404 }
@@ -123,8 +139,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if realtime is enabled for this personality
-    const realtimeEnabled = await isRealtimeEnabled(supabase, personalityId);
+    // Check if realtime is enabled for this personality (use actual personality.id)
+    const realtimeEnabled = await isRealtimeEnabled(supabase, personality.id);
     if (!realtimeEnabled) {
       return NextResponse.json(
         { error: 'Voice calls are not enabled for this creator' },
@@ -133,7 +149,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check voice ID is configured
-    const voiceId = await getElevenLabsVoiceId(supabase, personalityId);
+    const voiceId = await getElevenLabsVoiceId(supabase, personality.id);
     if (!voiceId) {
       return NextResponse.json(
         { error: 'Voice is not configured for this creator' },
@@ -172,13 +188,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create session record
+    // Create session record (use actual personality.id)
     const { data: session, error: sessionError } = await supabase
       .from('voice_sessions')
       .insert({
         subscriber_id: user.id,
         creator_id: creator.id,
-        personality_id: personalityId,
+        personality_id: personality.id,
         status: 'connecting',
       })
       .select()
