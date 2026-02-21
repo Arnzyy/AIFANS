@@ -643,7 +643,7 @@ async function fetchMemoryContext(
       return null;
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as MemoryContextData;
     console.log('[VoiceWS] Memory context loaded:', {
       hasMemories: !!data.memories,
       stage: data.relationshipStage,
