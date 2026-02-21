@@ -329,12 +329,12 @@ export class CreatorService {
     return data;
   }
 
-  async createModel(creatorId: string, data: ModelFormData): Promise<CreatorModel> {
-    // Check model limit
-    const creator = await this.getCreatorById(creatorId);
+  async createModel(userId: string, data: ModelFormData): Promise<CreatorModel> {
+    // Check model limit - get creator by user_id to verify limits
+    const creator = await this.getCreator(userId);
     if (!creator) throw new Error('Creator not found');
 
-    const existingModels = await this.getModels(creatorId);
+    const existingModels = await this.getModels(userId);
     if (existingModels.length >= creator.max_models) {
       throw new Error(`Maximum models limit reached (${creator.max_models})`);
     }
@@ -342,7 +342,7 @@ export class CreatorService {
     const { data: model, error } = await this.supabase
       .from('creator_models')
       .insert({
-        creator_id: creatorId,
+        creator_id: userId, // FK to profiles table (auth user id)
         name: data.name,
         age: data.age,
         bio: data.bio,

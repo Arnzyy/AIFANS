@@ -26,8 +26,8 @@ export async function GET() {
       );
     }
 
-    // Get models
-    const models = await creatorService.getModels(creator.id);
+    // Get models (creator_models.creator_id references profiles, not creators table)
+    const models = await creatorService.getModels(user.id);
 
     return NextResponse.json({
       models,
@@ -100,8 +100,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create model
-    const model = await creatorService.createModel(creator.id, body);
+    // Create model (creator_models.creator_id references profiles, not creators table)
+    const model = await creatorService.createModel(user.id, body);
 
     return NextResponse.json({
       success: true,
