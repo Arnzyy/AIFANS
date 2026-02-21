@@ -790,16 +790,22 @@ export default function AIChatPage() {
 
       if (response.ok) {
         const data = await response.json();
-        if (data.acknowledgement) {
+        // Use 'response' field from the new immediate tip-ack endpoint
+        const aiResponse = data.response || data.acknowledgement;
+        if (aiResponse) {
           const tipAckMsg: Message = {
             id: `tip-ack-${Date.now()}`,
-            content: data.acknowledgement,
+            content: aiResponse,
             sender_id: creator.id,
             receiver_id: currentUser?.id || '',
             created_at: new Date().toISOString(),
             is_ai_generated: true
           };
           setMessages(prev => [...prev, tipAckMsg]);
+          // Update conversationId if we got one back
+          if (data.conversationId && !conversationId) {
+            setConversationId(data.conversationId);
+          }
         }
       } else {
         const fallbackMsg: Message = {
