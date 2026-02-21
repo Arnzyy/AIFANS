@@ -1,0 +1,20 @@
+{
+  "name": "aifans-voice-server",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/voice-ws-server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "jsonwebtoken": "^9.0.3",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.1.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.5.4"
+  }
+}
