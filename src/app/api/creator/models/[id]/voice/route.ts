@@ -42,14 +42,8 @@ export async function GET(
       return NextResponse.json({ error: 'Personality not found' }, { status: 404 });
     }
 
-    // Check creator ownership
-    const { data: creator, error: creatorError } = await supabase
-      .from('creators')
-      .select('id, user_id')
-      .eq('id', personality.creator_id)
-      .single();
-
-    if (creatorError || !creator || creator.user_id !== user.id) {
+    // Check ownership - ai_personalities.creator_id stores the user's auth ID
+    if (personality.creator_id !== user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -95,15 +89,20 @@ export async function PUT(
       return NextResponse.json({ error: 'Personality not found' }, { status: 404 });
     }
 
-    // Check creator ownership
+    // Check ownership - ai_personalities.creator_id stores the user's auth ID
+    if (personality.creator_id !== user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    // Get creator record for voice settings FK
     const { data: creator, error: creatorError } = await supabase
       .from('creators')
-      .select('id, user_id')
-      .eq('id', personality.creator_id)
+      .select('id')
+      .eq('user_id', user.id)
       .single();
 
-    if (creatorError || !creator || creator.user_id !== user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (creatorError || !creator) {
+      return NextResponse.json({ error: 'Creator not found' }, { status: 404 });
     }
 
     // Parse request body

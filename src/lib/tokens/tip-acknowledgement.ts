@@ -132,19 +132,36 @@ export async function getPendingTipEvent(
 ): Promise<TipEvent | null> {
   console.log('[Tip] Looking for pending tip in thread:', threadId);
 
-  const { data, error } = await supabase
+  // First try: get all recent tips for this thread and filter in code
+  // This avoids potential issues with JSONB contains queries
+  const { data: allTips, error } = await supabase
     .from('tips')
     .select('id, user_id, creator_id, amount_tokens, thread_id, created_at, metadata')
     .eq('thread_id', threadId)
     .eq('status', 'SUCCEEDED')
-    .contains('metadata', { needs_acknowledgement: true })
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(5);
 
-  console.log('[Tip] Query result:', { found: !!data, error: error?.message });
+  console.log('[Tip] Query result:', {
+    tipsFound: allTips?.length || 0,
+    error: error?.message,
+    tips: allTips?.map((t: any) => ({ id: t.id, metadata: t.metadata }))
+  });
 
-  if (error || !data) {
+  if (error || !allTips || allTips.length === 0) {
+    console.log('[Tip] No tips found for thread');
+    return null;
+  }
+
+  // Filter for tips that need acknowledgement
+  const data = allTips.find((tip: any) =>
+    tip.metadata?.needs_acknowledgement === true
+  );
+
+  console.log('[Tip] Pending tip after filter:', data ? data.id : 'none');
+
+  if (!data) {
+    console.log('[Tip] No tips need acknowledgement');
     return null;
   }
 
