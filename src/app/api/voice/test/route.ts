@@ -47,8 +47,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check for placeholder IDs
-    if (elevenLabsVoiceId.startsWith('REPLACE_WITH_')) {
+    // Check for null or placeholder IDs
+    if (!elevenLabsVoiceId || elevenLabsVoiceId.startsWith('REPLACE_WITH_')) {
       return NextResponse.json(
         { error: 'Voice preview not available - voice ID not configured' },
         { status: 400 }
