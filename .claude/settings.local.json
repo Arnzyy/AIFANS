@@ -26,7 +26,8 @@
       "Bash(npm audit:*)",
       "Bash(node -e:*)",
       "Bash(npx supabase sql:*)",
-      "Bash(npx supabase:*)"
+      "Bash(npx supabase:*)",
+      "Bash(git status:*)"
     ]
   }
 }

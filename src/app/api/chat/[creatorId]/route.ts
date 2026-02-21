@@ -423,20 +423,28 @@ async function generateChatResponse(
   // CHECK FOR PENDING TIP TO ACKNOWLEDGE
   // ===========================================
   let pendingTip = null;
-  console.log('[Tip] Checking for pending tip, convId:', convId);
+  console.error('========== TIP CHECK START ==========');
+  console.error('[Tip] convId for tip check:', convId);
   if (convId) {
-    pendingTip = await getPendingTipEvent(supabase, convId);
-    if (pendingTip) {
-      console.log('=== PENDING TIP FOUND ===');
-      console.log('Amount:', pendingTip.amountTokens, 'tokens');
-      // Inject tip acknowledgement into system prompt
-      fullSystemPrompt += '\n\n' + buildTipAcknowledgementPrompt(pendingTip);
-    } else {
-      console.log('[Tip] No pending tip found for this conversation');
+    try {
+      pendingTip = await getPendingTipEvent(supabase, convId);
+      console.error('[Tip] getPendingTipEvent returned:', pendingTip ? 'TIP FOUND' : 'null');
+      if (pendingTip) {
+        console.error('=== PENDING TIP FOUND ===');
+        console.error('Tip ID:', pendingTip.tipId);
+        console.error('Amount:', pendingTip.amountTokens, 'tokens');
+        // Inject tip acknowledgement into system prompt
+        fullSystemPrompt += '\n\n' + buildTipAcknowledgementPrompt(pendingTip);
+      } else {
+        console.error('[Tip] No pending tip found for this conversation');
+      }
+    } catch (tipError) {
+      console.error('[Tip] ERROR in getPendingTipEvent:', tipError);
     }
   } else {
-    console.log('[Tip] No convId available, skipping tip check');
+    console.error('[Tip] No convId available, skipping tip check');
   }
+  console.error('========== TIP CHECK END ==========');
 
   // Get recent message history for context (200 messages for better memory)
   const { data: recentMessages } = await supabase
