@@ -129,7 +129,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check chat access (subscription required for voice)
-    const access = await checkChatAccessOptimized(supabase, user, creator.id);
+    // subscriptions.creator_id is user's auth ID, not creators.id
+    const access = await checkChatAccessOptimized(supabase, user, creator.user_id);
     if (!access.hasAccess || access.accessType !== 'subscription') {
       return NextResponse.json(
         {
