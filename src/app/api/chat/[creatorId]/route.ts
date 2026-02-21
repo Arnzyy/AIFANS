@@ -423,6 +423,7 @@ async function generateChatResponse(
   // CHECK FOR PENDING TIP TO ACKNOWLEDGE
   // ===========================================
   let pendingTip = null;
+  console.log('[Tip] Checking for pending tip, convId:', convId);
   if (convId) {
     pendingTip = await getPendingTipEvent(supabase, convId);
     if (pendingTip) {
@@ -430,7 +431,11 @@ async function generateChatResponse(
       console.log('Amount:', pendingTip.amountTokens, 'tokens');
       // Inject tip acknowledgement into system prompt
       fullSystemPrompt += '\n\n' + buildTipAcknowledgementPrompt(pendingTip);
+    } else {
+      console.log('[Tip] No pending tip found for this conversation');
     }
+  } else {
+    console.log('[Tip] No convId available, skipping tip check');
   }
 
   // Get recent message history for context (200 messages for better memory)
