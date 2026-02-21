@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
     const { data: existingSession } = await supabase
       .from('voice_sessions')
       .select('id')
-      .eq('subscriber_id', user.id)
+      .eq('user_id', user.id)
       .is('ended_at', null)
       .single();
 
@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
     const { data: session, error: sessionError } = await supabase
       .from('voice_sessions')
       .insert({
-        subscriber_id: user.id,
+        user_id: user.id,
         creator_id: creator.id,
         personality_id: personality.id,
         status: 'connecting',
