@@ -114,10 +114,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Get creator info for chat access check
+    // personality.creator_id is the user's auth ID, not creators.id
     const { data: creator, error: creatorError } = await supabase
       .from('creators')
       .select('id, user_id')
-      .eq('id', personality.creator_id)
+      .eq('user_id', personality.creator_id)
       .single();
 
     if (creatorError || !creator) {
