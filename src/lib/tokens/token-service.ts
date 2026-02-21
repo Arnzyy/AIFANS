@@ -255,8 +255,12 @@ export async function sendTip(
     // Get new balance
     const wallet = await getWallet(supabase, userId);
 
+    // Extract tip ID from RPC response (might be string or object)
+    const tipId = typeof data === 'string' ? data : data?.id || data;
+    console.log('[Tip] RPC returned:', { data, tipId });
+
     // Mark tip for AI acknowledgement (if in chat thread)
-    if (data && threadId) {
+    if (tipId && threadId) {
       const { error: updateError } = await supabase
         .from('tips')
         .update({
@@ -265,18 +269,18 @@ export async function sendTip(
             acknowledged_at: null,
           },
         })
-        .eq('id', data);
+        .eq('id', tipId);
 
       if (updateError) {
         console.error('[Tip] Failed to mark for acknowledgement:', updateError);
       } else {
-        console.log('[Tip] Marked for acknowledgement:', data);
+        console.log('[Tip] Marked for acknowledgement:', tipId);
       }
     }
 
     return {
       success: true,
-      tip_id: data,
+      tip_id: tipId,
       new_balance: wallet.balance_tokens,
     };
   } catch (error: any) {
