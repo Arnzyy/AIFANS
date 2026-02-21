@@ -94,7 +94,6 @@ interface PersonalityData {
   backstory: string | null;
   personality_traits: string[] | null;
   speaking_style: string | null;
-  sample_dialogues: string[] | null;
 }
 
 interface VoiceSettingsData {
@@ -522,7 +521,7 @@ async function fetchPersonality(personalityId: string): Promise<PersonalityData 
     // First try direct lookup by id
     const { data, error } = await supabase
       .from('ai_personalities')
-      .select('id, persona_name, backstory, personality_traits, speaking_style, sample_dialogues')
+      .select('id, persona_name, backstory, personality_traits, speaking_style')
       .eq('id', personalityId)
       .maybeSingle();
 
@@ -539,7 +538,7 @@ async function fetchPersonality(personalityId: string): Promise<PersonalityData 
     console.log('[VoiceWS] Trying fallback lookup by model_id...');
     const { data: fallbackData, error: fallbackError } = await supabase
       .from('ai_personalities')
-      .select('id, persona_name, backstory, personality_traits, speaking_style, sample_dialogues')
+      .select('id, persona_name, backstory, personality_traits, speaking_style')
       .eq('model_id', personalityId)
       .maybeSingle();
 
@@ -695,8 +694,6 @@ ${personality.backstory || ''}
 
 PERSONALITY: ${traits}
 SPEAKING STYLE: ${style}
-
-${personality.sample_dialogues?.length ? `EXAMPLE CONVERSATIONS:\n${personality.sample_dialogues.join('\n\n')}` : ''}
 
 ═══════════════════════════════════════════
 VOICE CONVERSATION MODE
