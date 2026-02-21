@@ -254,9 +254,9 @@ wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
   // Verify session belongs to user (prevents token reuse attacks)
   const { data: sessionCheck, error: sessionCheckError } = await supabase
     .from('voice_sessions')
-    .select('id, subscriber_id, status')
+    .select('id, user_id, status')
     .eq('id', payload.sessionId)
-    .eq('subscriber_id', payload.userId)
+    .eq('user_id', payload.userId)
     .single();
 
   if (sessionCheckError || !sessionCheck) {
