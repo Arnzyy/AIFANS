@@ -108,15 +108,22 @@ export function useRealtimeVoice(
   // ===========================================
 
   const playAudioQueue = useCallback(async () => {
-    if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
+    console.log('[Voice] playAudioQueue called, isPlaying:', isPlayingRef.current, 'queueLength:', audioQueueRef.current.length);
+    if (isPlayingRef.current || audioQueueRef.current.length === 0) {
+      console.log('[Voice] Skipping playAudioQueue - already playing or empty queue');
+      return;
+    }
 
     isPlayingRef.current = true;
+    console.log('[Voice] Starting audio playback loop');
 
     while (audioQueueRef.current.length > 0) {
       const base64Audio = audioQueueRef.current.shift();
       if (!base64Audio) continue;
 
       try {
+        console.log('[Voice] Playing audio chunk, base64 length:', base64Audio.length);
+
         // Decode base64 to array buffer
         const binaryString = atob(base64Audio);
         const bytes = new Uint8Array(binaryString.length);
@@ -130,17 +137,23 @@ export function useRealtimeVoice(
         const audio = new Audio(url);
         audio.setAttribute('playsinline', 'true');
 
+        console.log('[Voice] Created audio element, calling play()');
+
         await new Promise<void>((resolve) => {
           audio.onended = () => {
+            console.log('[Voice] Audio ended successfully');
             URL.revokeObjectURL(url);
             resolve();
           };
-          audio.onerror = () => {
+          audio.onerror = (e) => {
             URL.revokeObjectURL(url);
-            console.warn('[Voice] Audio error, skipping segment');
+            console.warn('[Voice] Audio error:', e);
             resolve();
           };
-          audio.play().catch(() => {
+          audio.play().then(() => {
+            console.log('[Voice] Audio play() succeeded');
+          }).catch((e) => {
+            console.warn('[Voice] Audio play() failed:', e);
             URL.revokeObjectURL(url);
             resolve();
           });
@@ -151,6 +164,7 @@ export function useRealtimeVoice(
     }
 
     isPlayingRef.current = false;
+    console.log('[Voice] Audio queue empty, playback loop done');
   }, []);
 
   // ===========================================
@@ -160,6 +174,9 @@ export function useRealtimeVoice(
   const handleWSMessage = useCallback((event: MessageEvent) => {
     try {
       const message: ServerWSMessage = JSON.parse(event.data);
+
+      // Debug: log all incoming messages
+      console.log('[Voice] WS message:', message.type, message.type === 'AUDIO_CHUNK' ? `(${(message.data as string)?.length} bytes)` : '');
 
       switch (message.type) {
         case 'SESSION_READY':
@@ -172,7 +189,9 @@ export function useRealtimeVoice(
           break;
 
         case 'AUDIO_CHUNK':
+          console.log('[Voice] Received AUDIO_CHUNK, queue size before:', audioQueueRef.current.length);
           audioQueueRef.current.push(message.data as string);
+          console.log('[Voice] Queue size after:', audioQueueRef.current.length, 'calling playAudioQueue');
           playAudioQueue();
           break;
 
