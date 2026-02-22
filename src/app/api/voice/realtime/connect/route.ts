@@ -178,16 +178,34 @@ export async function POST(request: NextRequest) {
     // Check for existing active session (prevent concurrent calls)
     const { data: existingSession } = await supabase
       .from('voice_sessions')
-      .select('id')
+      .select('id, created_at')
       .eq('user_id', user.id)
       .is('ended_at', null)
       .single();
 
     if (existingSession) {
-      return NextResponse.json(
-        { error: 'You already have an active voice session' },
-        { status: 409 }
-      );
+      // Auto-cleanup stale sessions older than 5 minutes
+      const sessionAge = Date.now() - new Date(existingSession.created_at).getTime();
+      const STALE_SESSION_MS = 5 * 60 * 1000; // 5 minutes
+
+      if (sessionAge > STALE_SESSION_MS) {
+        // Close the stale session
+        await supabase
+          .from('voice_sessions')
+          .update({
+            ended_at: new Date().toISOString(),
+            status: 'ended',
+            end_reason: 'stale_cleanup',
+          })
+          .eq('id', existingSession.id);
+
+        console.log('[VoiceConnect] Cleaned up stale session:', existingSession.id);
+      } else {
+        return NextResponse.json(
+          { error: 'You already have an active voice session' },
+          { status: 409 }
+        );
+      }
     }
 
     // Create session record (use actual personality.id)
