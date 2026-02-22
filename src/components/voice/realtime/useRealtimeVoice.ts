@@ -118,68 +118,72 @@ export function useRealtimeVoice(
       if (!base64Audio) continue;
 
       try {
-        // Decode base64 to array buffer
+        // Decode base64 to ArrayBuffer
         const binaryString = atob(base64Audio);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i);
         }
 
-        // Use HTML5 Audio with iOS-specific settings
-        const blob = new Blob([bytes], { type: 'audio/mpeg' });
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
+        console.log('[Voice] Playing audio, size:', bytes.length);
 
-        // iOS-specific attributes for loudspeaker playback
-        audio.setAttribute('playsinline', 'true');
-        audio.setAttribute('webkit-playsinline', 'true');
-        audio.volume = 1.0;
-        audio.muted = false;
-
-        // Force speaker output on iOS by setting these properties
-        (audio as any).mozAudioChannelType = 'content';
-        (audio as any).webkitAudioDecodedByteCount = 0;
-
-        console.log('[Voice] Playing audio, blob size:', blob.size);
-
-        // Resume playback context if it got suspended (iOS can suspend it)
+        // Resume playback context if suspended (iOS can suspend it)
         if (playbackContextRef.current?.state === 'suspended') {
           await playbackContextRef.current.resume();
           console.log('[Voice] Resumed suspended playback context');
         }
 
-        await new Promise<void>((resolve) => {
-          let resolved = false;
-          const cleanup = () => {
-            if (!resolved) {
-              resolved = true;
-              URL.revokeObjectURL(url);
-              resolve();
-            }
-          };
+        // Try Web Audio API first (more reliable on iOS), fallback to HTML5 Audio
+        if (playbackContextRef.current) {
+          try {
+            // Use Web Audio API - decode and play through AudioContext
+            const audioBuffer = await playbackContextRef.current.decodeAudioData(bytes.buffer.slice(0));
+            const source = playbackContextRef.current.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(playbackContextRef.current.destination);
 
-          // Timeout - don't let audio hang forever (max 30s per chunk)
+            await new Promise<void>((resolve) => {
+              source.onended = () => {
+                console.log('[Voice] Web Audio ended');
+                resolve();
+              };
+              source.start(0);
+              console.log('[Voice] Web Audio started, duration:', audioBuffer.duration);
+            });
+            continue; // Skip HTML5 fallback
+          } catch (decodeErr) {
+            console.warn('[Voice] Web Audio decode failed, trying HTML5:', decodeErr);
+          }
+        }
+
+        // Fallback: HTML5 Audio
+        const blob = new Blob([bytes], { type: 'audio/mpeg' });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.setAttribute('playsinline', 'true');
+        audio.volume = 1.0;
+
+        await new Promise<void>((resolve) => {
           const timeout = setTimeout(() => {
-            console.warn('[Voice] Audio timeout, moving to next');
-            cleanup();
+            console.warn('[Voice] Audio timeout');
+            URL.revokeObjectURL(url);
+            resolve();
           }, 30000);
 
           audio.onended = () => {
-            console.log('[Voice] Audio ended');
             clearTimeout(timeout);
-            cleanup();
+            URL.revokeObjectURL(url);
+            resolve();
           };
           audio.onerror = () => {
-            console.warn('[Voice] Audio error');
             clearTimeout(timeout);
-            cleanup();
+            URL.revokeObjectURL(url);
+            resolve();
           };
-          audio.play().then(() => {
-            console.log('[Voice] play() started, duration:', audio.duration);
-          }).catch((err) => {
-            console.warn('[Voice] play() failed:', err.message);
+          audio.play().catch(() => {
             clearTimeout(timeout);
-            cleanup();
+            URL.revokeObjectURL(url);
+            resolve();
           });
         });
       } catch (error) {
