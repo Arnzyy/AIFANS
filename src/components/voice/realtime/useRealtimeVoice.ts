@@ -124,49 +124,29 @@ export function useRealtimeVoice(
           bytes[i] = binaryString.charCodeAt(i);
         }
 
-        // Try Web Audio API first (best latency on desktop)
-        const audioContext = audioContextRef.current;
-        if (audioContext && audioContext.state !== 'closed') {
-          try {
-            // Need to copy buffer for decodeAudioData (it detaches the original)
-            const audioBuffer = await audioContext.decodeAudioData(bytes.buffer.slice(0));
-            const source = audioContext.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(audioContext.destination);
-            source.start();
-            await new Promise<void>((resolve) => {
-              source.onended = () => resolve();
-            });
-            continue; // Success, move to next chunk
-          } catch (decodeError) {
-            console.warn('[Voice] Web Audio decode failed, using HTML5 Audio fallback');
-          }
-        }
-
-        // Fallback: HTML5 Audio element (works better on iOS Safari)
+        // Use HTML5 Audio - most reliable across all platforms
         const blob = new Blob([bytes], { type: 'audio/mpeg' });
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         audio.setAttribute('playsinline', 'true');
 
-        await new Promise<void>((resolve, reject) => {
+        await new Promise<void>((resolve) => {
           audio.onended = () => {
             URL.revokeObjectURL(url);
             resolve();
           };
-          audio.onerror = (e) => {
+          audio.onerror = () => {
             URL.revokeObjectURL(url);
-            console.error('[Voice] HTML5 Audio error:', e);
-            resolve(); // Don't reject, just move on
+            console.warn('[Voice] Audio error, skipping segment');
+            resolve();
           };
-          audio.play().catch((e) => {
+          audio.play().catch(() => {
             URL.revokeObjectURL(url);
-            console.error('[Voice] Audio play error:', e);
-            resolve(); // Don't reject, just move on
+            resolve();
           });
         });
       } catch (error) {
-        console.error('[Voice] Audio playback error:', error);
+        console.warn('[Voice] Audio playback error:', error);
       }
     }
 

@@ -1035,20 +1035,28 @@ async function streamTTSToClient(session: ActiveSession, text: string, sequence:
     const reader = response.body?.getReader();
     if (!reader) return;
 
+    // Accumulate all chunks for this sentence
+    const chunks: Buffer[] = [];
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-
-      // Convert to base64 and send to client
-      const base64 = Buffer.from(value).toString('base64');
-      sendMessage(session.ws, {
-        type: 'AUDIO_CHUNK',
-        data: base64,
-        sequence,
-      });
+      chunks.push(Buffer.from(value));
     }
 
-    console.log('[ElevenLabs] TTS complete for sequence:', sequence);
+    // Combine all chunks into one complete audio file
+    const completeAudio = Buffer.concat(chunks);
+    const base64 = completeAudio.toString('base64');
+
+    // Send complete audio for this sentence
+    sendMessage(session.ws, {
+      type: 'AUDIO_CHUNK',
+      data: base64,
+      sequence,
+      isComplete: true, // This is a complete audio segment
+    });
+
+    console.log('[ElevenLabs] TTS complete for sequence:', sequence, 'size:', completeAudio.length);
   } catch (error: any) {
     if (error.name === 'AbortError') {
       console.log('[ElevenLabs] TTS aborted');

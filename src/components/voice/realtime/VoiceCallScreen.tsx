@@ -115,15 +115,15 @@ export function VoiceCallScreen({
         {/* Transcript */}
         <div className="w-full max-w-md space-y-4 text-center">
           {state.currentTranscript && (
-            <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl border border-white/10">
-              <p className="text-sm text-gray-300 mb-1">You</p>
-              <p className="text-white">{state.currentTranscript}</p>
+            <div className="p-4 bg-black/70 backdrop-blur-md rounded-xl border border-white/20">
+              <p className="text-sm text-gray-400 mb-1">You</p>
+              <p className="text-white font-medium">{state.currentTranscript}</p>
             </div>
           )}
           {state.currentAIText && (
-            <div className="p-3 bg-purple-500/30 backdrop-blur-sm rounded-xl border border-purple-500/20">
+            <div className="p-4 bg-purple-900/80 backdrop-blur-md rounded-xl border border-purple-400/30">
               <p className="text-sm text-purple-300 mb-1">{personalityName}</p>
-              <p className="text-white">{state.currentAIText}</p>
+              <p className="text-white font-medium">{state.currentAIText}</p>
             </div>
           )}
         </div>
