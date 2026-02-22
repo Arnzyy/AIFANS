@@ -211,10 +211,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate JWT token (use actual personality.id)
+    // NOTE: creatorId must be creator.user_id (auth ID) for memory system compatibility
     const token = generateVoiceToken({
       sessionId: session.id,
       userId: user.id,
-      creatorId: creator.id,
+      creatorId: creator.user_id, // Use auth user ID for memory/conversation lookup
       personalityId: personality.id,
       mode,
     });
