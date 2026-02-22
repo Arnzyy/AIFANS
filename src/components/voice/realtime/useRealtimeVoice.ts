@@ -117,33 +117,31 @@ export function useRealtimeVoice(
       if (!base64Audio) continue;
 
       try {
-        // Decode base64 to array buffer
-        const binaryString = atob(base64Audio);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-
-        // Use HTML5 Audio - most reliable across all platforms
-        const blob = new Blob([bytes], { type: 'audio/mpeg' });
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
+        // Use data URL directly - works better on iOS Safari than blob URLs
+        const dataUrl = `data:audio/mpeg;base64,${base64Audio}`;
+        const audio = new Audio();
         audio.setAttribute('playsinline', 'true');
+        audio.setAttribute('webkit-playsinline', 'true');
+        audio.preload = 'auto';
+        audio.src = dataUrl;
 
         await new Promise<void>((resolve) => {
-          audio.onended = () => {
-            URL.revokeObjectURL(url);
+          audio.onended = () => resolve();
+          audio.onerror = (e) => {
+            console.warn('[Voice] Audio error:', e);
             resolve();
           };
-          audio.onerror = () => {
-            URL.revokeObjectURL(url);
-            console.warn('[Voice] Audio error, skipping segment');
-            resolve();
-          };
-          audio.play().catch(() => {
-            URL.revokeObjectURL(url);
-            resolve();
-          });
+
+          // iOS requires load() before play() for programmatic audio
+          audio.load();
+
+          const playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((e) => {
+              console.warn('[Voice] Play failed:', e);
+              resolve();
+            });
+          }
         });
       } catch (error) {
         console.warn('[Voice] Audio playback error:', error);
