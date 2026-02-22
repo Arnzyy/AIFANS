@@ -134,49 +134,62 @@ export function useRealtimeVoice(
         // Use HTML5 Audio - most reliable across all platforms
         const blob = new Blob([bytes], { type: 'audio/mpeg' });
         const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.setAttribute('playsinline', 'true');
 
-        // Check audio element properties
-        console.log('[Voice] Audio element created, blob size:', blob.size, 'url:', url);
+        console.log('[Voice] Audio blob created, size:', blob.size);
 
         await new Promise<void>((resolve) => {
-          // Set up event listeners BEFORE setting src
-          audio.onloadedmetadata = () => {
-            console.log('[Voice] Audio metadata loaded, duration:', audio.duration, 'readyState:', audio.readyState);
+          // Create audio element WITHOUT src first
+          const audio = new Audio();
+          audio.setAttribute('playsinline', 'true');
+          audio.preload = 'auto';
+
+          let resolved = false;
+          const cleanup = () => {
+            if (!resolved) {
+              resolved = true;
+              URL.revokeObjectURL(url);
+              resolve();
+            }
           };
 
-          audio.oncanplay = () => {
-            console.log('[Voice] Audio can play, duration:', audio.duration);
+          // Timeout fallback - if nothing happens in 10 seconds, move on
+          const timeout = setTimeout(() => {
+            console.warn('[Voice] Audio timeout - no events fired in 10s');
+            cleanup();
+          }, 10000);
+
+          // Set up ALL event listeners BEFORE setting src
+          audio.onloadedmetadata = () => {
+            console.log('[Voice] Metadata loaded, duration:', audio.duration);
+          };
+
+          audio.oncanplaythrough = () => {
+            console.log('[Voice] Can play through, starting playback');
+            audio.play().then(() => {
+              console.log('[Voice] Play started successfully');
+            }).catch((e) => {
+              console.error('[Voice] Play failed:', e.message);
+              clearTimeout(timeout);
+              cleanup();
+            });
           };
 
           audio.onended = () => {
-            console.log('[Voice] Audio ended successfully, currentTime:', audio.currentTime);
-            URL.revokeObjectURL(url);
-            resolve();
+            console.log('[Voice] Audio ended, duration was:', audio.duration);
+            clearTimeout(timeout);
+            cleanup();
           };
 
-          audio.onerror = (e) => {
-            console.error('[Voice] Audio error event:', audio.error?.code, audio.error?.message);
-            URL.revokeObjectURL(url);
-            resolve();
+          audio.onerror = () => {
+            console.error('[Voice] Audio error:', audio.error?.code, audio.error?.message);
+            clearTimeout(timeout);
+            cleanup();
           };
 
-          // Now try to play
-          console.log('[Voice] Calling audio.play()...');
-          const playPromise = audio.play();
-
-          if (playPromise !== undefined) {
-            playPromise.then(() => {
-              console.log('[Voice] play() resolved, duration:', audio.duration, 'paused:', audio.paused);
-            }).catch((e) => {
-              console.error('[Voice] play() rejected:', e.name, e.message);
-              URL.revokeObjectURL(url);
-              resolve();
-            });
-          } else {
-            console.warn('[Voice] play() returned undefined (old browser?)');
-          }
+          // NOW set the src to trigger loading
+          console.log('[Voice] Setting audio src...');
+          audio.src = url;
+          audio.load();
         });
       } catch (error) {
         console.warn('[Voice] Audio playback error:', error);
