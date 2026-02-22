@@ -137,26 +137,46 @@ export function useRealtimeVoice(
         const audio = new Audio(url);
         audio.setAttribute('playsinline', 'true');
 
-        console.log('[Voice] Created audio element, calling play()');
+        // Check audio element properties
+        console.log('[Voice] Audio element created, blob size:', blob.size, 'url:', url);
 
         await new Promise<void>((resolve) => {
+          // Set up event listeners BEFORE setting src
+          audio.onloadedmetadata = () => {
+            console.log('[Voice] Audio metadata loaded, duration:', audio.duration, 'readyState:', audio.readyState);
+          };
+
+          audio.oncanplay = () => {
+            console.log('[Voice] Audio can play, duration:', audio.duration);
+          };
+
           audio.onended = () => {
-            console.log('[Voice] Audio ended successfully');
+            console.log('[Voice] Audio ended successfully, currentTime:', audio.currentTime);
             URL.revokeObjectURL(url);
             resolve();
           };
+
           audio.onerror = (e) => {
+            console.error('[Voice] Audio error event:', audio.error?.code, audio.error?.message);
             URL.revokeObjectURL(url);
-            console.warn('[Voice] Audio error:', e);
             resolve();
           };
-          audio.play().then(() => {
-            console.log('[Voice] Audio play() succeeded');
-          }).catch((e) => {
-            console.warn('[Voice] Audio play() failed:', e);
-            URL.revokeObjectURL(url);
-            resolve();
-          });
+
+          // Now try to play
+          console.log('[Voice] Calling audio.play()...');
+          const playPromise = audio.play();
+
+          if (playPromise !== undefined) {
+            playPromise.then(() => {
+              console.log('[Voice] play() resolved, duration:', audio.duration, 'paused:', audio.paused);
+            }).catch((e) => {
+              console.error('[Voice] play() rejected:', e.name, e.message);
+              URL.revokeObjectURL(url);
+              resolve();
+            });
+          } else {
+            console.warn('[Voice] play() returned undefined (old browser?)');
+          }
         });
       } catch (error) {
         console.warn('[Voice] Audio playback error:', error);
