@@ -28,7 +28,8 @@
       "Bash(npx supabase sql:*)",
       "Bash(npx supabase:*)",
       "Bash(git status:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(curl:*)"
     ]
   }
 }

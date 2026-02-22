@@ -306,7 +306,12 @@ export function ChatInterface({
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
               placeholder={`Message ${creator.persona_name}...`}
               className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-full focus:outline-none focus:border-purple-500 text-white placeholder-gray-500 text-base"
               disabled={isLoading}
