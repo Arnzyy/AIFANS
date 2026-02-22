@@ -108,22 +108,15 @@ export function useRealtimeVoice(
   // ===========================================
 
   const playAudioQueue = useCallback(async () => {
-    console.log('[Voice] playAudioQueue called, isPlaying:', isPlayingRef.current, 'queueLength:', audioQueueRef.current.length);
-    if (isPlayingRef.current || audioQueueRef.current.length === 0) {
-      console.log('[Voice] Skipping playAudioQueue - already playing or empty queue');
-      return;
-    }
+    if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
 
     isPlayingRef.current = true;
-    console.log('[Voice] Starting audio playback loop');
 
     while (audioQueueRef.current.length > 0) {
       const base64Audio = audioQueueRef.current.shift();
       if (!base64Audio) continue;
 
       try {
-        console.log('[Voice] Playing audio chunk, base64 length:', base64Audio.length);
-
         // Decode base64 to array buffer
         const binaryString = atob(base64Audio);
         const bytes = new Uint8Array(binaryString.length);
@@ -131,65 +124,32 @@ export function useRealtimeVoice(
           bytes[i] = binaryString.charCodeAt(i);
         }
 
-        // Use HTML5 Audio - most reliable across all platforms
+        // Use HTML5 Audio - EXACT working code from last night
         const blob = new Blob([bytes], { type: 'audio/mpeg' });
         const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.setAttribute('playsinline', 'true');
 
-        console.log('[Voice] Audio blob created, size:', blob.size);
+        console.log('[Voice] Playing audio, blob size:', blob.size);
 
         await new Promise<void>((resolve) => {
-          // Create audio element WITHOUT src first
-          const audio = new Audio();
-          audio.setAttribute('playsinline', 'true');
-          audio.preload = 'auto';
-
-          let resolved = false;
-          const cleanup = () => {
-            if (!resolved) {
-              resolved = true;
-              URL.revokeObjectURL(url);
-              resolve();
-            }
-          };
-
-          // Timeout fallback - if nothing happens in 10 seconds, move on
-          const timeout = setTimeout(() => {
-            console.warn('[Voice] Audio timeout - no events fired in 10s');
-            cleanup();
-          }, 10000);
-
-          // Set up ALL event listeners BEFORE setting src
-          audio.onloadedmetadata = () => {
-            console.log('[Voice] Metadata loaded, duration:', audio.duration);
-          };
-
-          audio.oncanplaythrough = () => {
-            console.log('[Voice] Can play through, starting playback');
-            audio.play().then(() => {
-              console.log('[Voice] Play started successfully');
-            }).catch((e) => {
-              console.error('[Voice] Play failed:', e.message);
-              clearTimeout(timeout);
-              cleanup();
-            });
-          };
-
           audio.onended = () => {
-            console.log('[Voice] Audio ended, duration was:', audio.duration);
-            clearTimeout(timeout);
-            cleanup();
+            console.log('[Voice] Audio ended');
+            URL.revokeObjectURL(url);
+            resolve();
           };
-
           audio.onerror = () => {
-            console.error('[Voice] Audio error:', audio.error?.code, audio.error?.message);
-            clearTimeout(timeout);
-            cleanup();
+            console.warn('[Voice] Audio error');
+            URL.revokeObjectURL(url);
+            resolve();
           };
-
-          // NOW set the src to trigger loading
-          console.log('[Voice] Setting audio src...');
-          audio.src = url;
-          audio.load();
+          audio.play().then(() => {
+            console.log('[Voice] play() started, duration:', audio.duration);
+          }).catch((err) => {
+            console.warn('[Voice] play() failed:', err.message);
+            URL.revokeObjectURL(url);
+            resolve();
+          });
         });
       } catch (error) {
         console.warn('[Voice] Audio playback error:', error);
@@ -197,7 +157,6 @@ export function useRealtimeVoice(
     }
 
     isPlayingRef.current = false;
-    console.log('[Voice] Audio queue empty, playback loop done');
   }, []);
 
   // ===========================================
