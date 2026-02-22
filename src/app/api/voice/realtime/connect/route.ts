@@ -184,9 +184,9 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (existingSession) {
-      // Auto-cleanup stale sessions older than 5 minutes
+      // Auto-cleanup stale sessions older than 1 minute (aggressive for mobile)
       const sessionAge = Date.now() - new Date(existingSession.created_at).getTime();
-      const STALE_SESSION_MS = 5 * 60 * 1000; // 5 minutes
+      const STALE_SESSION_MS = 60 * 1000; // 1 minute
 
       if (sessionAge > STALE_SESSION_MS) {
         // Close the stale session
