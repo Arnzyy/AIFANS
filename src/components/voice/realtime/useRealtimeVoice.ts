@@ -142,23 +142,44 @@ export function useRealtimeVoice(
 
         console.log('[Voice] Playing audio, blob size:', blob.size);
 
+        // Resume playback context if it got suspended (iOS can suspend it)
+        if (playbackContextRef.current?.state === 'suspended') {
+          await playbackContextRef.current.resume();
+          console.log('[Voice] Resumed suspended playback context');
+        }
+
         await new Promise<void>((resolve) => {
+          let resolved = false;
+          const cleanup = () => {
+            if (!resolved) {
+              resolved = true;
+              URL.revokeObjectURL(url);
+              resolve();
+            }
+          };
+
+          // Timeout - don't let audio hang forever (max 30s per chunk)
+          const timeout = setTimeout(() => {
+            console.warn('[Voice] Audio timeout, moving to next');
+            cleanup();
+          }, 30000);
+
           audio.onended = () => {
             console.log('[Voice] Audio ended');
-            URL.revokeObjectURL(url);
-            resolve();
+            clearTimeout(timeout);
+            cleanup();
           };
           audio.onerror = () => {
             console.warn('[Voice] Audio error');
-            URL.revokeObjectURL(url);
-            resolve();
+            clearTimeout(timeout);
+            cleanup();
           };
           audio.play().then(() => {
             console.log('[Voice] play() started, duration:', audio.duration);
           }).catch((err) => {
             console.warn('[Voice] play() failed:', err.message);
-            URL.revokeObjectURL(url);
-            resolve();
+            clearTimeout(timeout);
+            cleanup();
           });
         });
       } catch (error) {
