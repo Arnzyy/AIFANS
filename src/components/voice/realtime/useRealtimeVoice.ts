@@ -111,74 +111,39 @@ export function useRealtimeVoice(
     if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
 
     isPlayingRef.current = true;
-    console.log('[Voice] Starting audio playback, queue size:', audioQueueRef.current.length);
 
     while (audioQueueRef.current.length > 0) {
       const base64Audio = audioQueueRef.current.shift();
       if (!base64Audio) continue;
 
       try {
-        console.log('[Voice] Playing audio chunk, size:', base64Audio.length);
-
-        // Create blob from base64 (more reliable than data URLs for large audio)
+        // Decode base64 to array buffer
         const binaryString = atob(base64Audio);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i);
         }
-        const blob = new Blob([bytes], { type: 'audio/mpeg' });
-        const blobUrl = URL.createObjectURL(blob);
 
-        const audio = new Audio();
+        // Use HTML5 Audio - most reliable across all platforms
+        const blob = new Blob([bytes], { type: 'audio/mpeg' });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
         audio.setAttribute('playsinline', 'true');
-        audio.setAttribute('webkit-playsinline', 'true');
-        audio.preload = 'auto';
-        audio.volume = 1.0;
 
         await new Promise<void>((resolve) => {
-          let resolved = false;
-          const cleanup = () => {
-            if (!resolved) {
-              resolved = true;
-              URL.revokeObjectURL(blobUrl);
-              resolve();
-            }
-          };
-
-          // Timeout fallback - don't hang forever
-          const timeout = setTimeout(() => {
-            console.warn('[Voice] Audio playback timeout');
-            cleanup();
-          }, 30000);
-
           audio.onended = () => {
-            console.log('[Voice] Audio chunk finished');
-            clearTimeout(timeout);
-            cleanup();
+            URL.revokeObjectURL(url);
+            resolve();
           };
-
-          audio.onerror = (e) => {
-            console.warn('[Voice] Audio error:', e);
-            clearTimeout(timeout);
-            cleanup();
+          audio.onerror = () => {
+            URL.revokeObjectURL(url);
+            console.warn('[Voice] Audio error, skipping segment');
+            resolve();
           };
-
-          // Wait for audio to be ready before playing
-          audio.oncanplaythrough = () => {
-            console.log('[Voice] Audio ready, playing...');
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-              playPromise.catch((e) => {
-                console.warn('[Voice] Play failed:', e);
-                clearTimeout(timeout);
-                cleanup();
-              });
-            }
-          };
-
-          // Set src and load
-          audio.src = blobUrl;
-          audio.load();
+          audio.play().catch(() => {
+            URL.revokeObjectURL(url);
+            resolve();
+          });
         });
       } catch (error) {
         console.warn('[Voice] Audio playback error:', error);
@@ -186,7 +151,6 @@ export function useRealtimeVoice(
     }
 
     isPlayingRef.current = false;
-    console.log('[Voice] Audio queue empty');
   }, []);
 
   // ===========================================
