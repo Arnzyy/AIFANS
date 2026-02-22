@@ -96,6 +96,7 @@ export function useRealtimeVoice(
   // Refs
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const playbackContextRef = useRef<AudioContext | null>(null); // Separate context for playback
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<AudioWorkletNode | ScriptProcessorNode | null>(null);
   const audioQueueRef = useRef<string[]>([]);
@@ -274,19 +275,24 @@ export function useRealtimeVoice(
 
   const startAudioCapture = useCallback(async () => {
     try {
-      // iOS audio unlock - play silent audio to enable speaker output
-      // This must happen during a user gesture
-      const unlockAudio = new Audio();
-      unlockAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAbD/////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+M4wAAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
-      unlockAudio.volume = 0.01;
-      unlockAudio.muted = false;
-      unlockAudio.setAttribute('playsinline', 'true');
-      try {
-        await unlockAudio.play();
-        console.log('[Voice] iOS audio unlocked');
-      } catch {
-        console.log('[Voice] iOS audio unlock not needed');
+      // Create playback AudioContext during user gesture (required for iOS)
+      // This context will be used for all audio playback
+      const playbackContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      playbackContextRef.current = playbackContext;
+
+      // Resume if suspended
+      if (playbackContext.state === 'suspended') {
+        await playbackContext.resume();
       }
+
+      // Play a tiny silent buffer to fully unlock audio on iOS
+      const silentBuffer = playbackContext.createBuffer(1, 1, 22050);
+      const source = playbackContext.createBufferSource();
+      source.buffer = silentBuffer;
+      source.connect(playbackContext.destination);
+      source.start(0);
+
+      console.log('[Voice] iOS audio context unlocked, state:', playbackContext.state);
 
       // Get microphone access
       const stream = await navigator.mediaDevices.getUserMedia(AUDIO_CONSTRAINTS);
@@ -366,10 +372,14 @@ export function useRealtimeVoice(
       mediaStreamRef.current = null;
     }
 
-    // Close audio context
+    // Close audio contexts
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       audioContextRef.current.close();
       audioContextRef.current = null;
+    }
+    if (playbackContextRef.current && playbackContextRef.current.state !== 'closed') {
+      playbackContextRef.current.close();
+      playbackContextRef.current = null;
     }
 
     console.log('[Voice] Audio capture stopped');
