@@ -211,11 +211,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate JWT token (use actual personality.id)
-    // NOTE: creatorId must be creator.user_id (auth ID) for memory system compatibility
+    // NOTE: creatorId must match what chat page uses for conversations
+    // For model chats, chat page uses model.id (creator_models.id) which is passed as personalityId
     const token = generateVoiceToken({
       sessionId: session.id,
       userId: user.id,
-      creatorId: creator.user_id, // Use auth user ID for memory/conversation lookup
+      creatorId: personalityId, // Use the same ID that chat page uses for conversations
       personalityId: personality.id,
       mode,
     });
