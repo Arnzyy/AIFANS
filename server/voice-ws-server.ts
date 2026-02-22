@@ -54,7 +54,7 @@ type ClientWSMessage =
 
 type ServerWSMessage =
   | { type: 'SESSION_READY'; sessionId: string; config: SessionConfig }
-  | { type: 'AUDIO_CHUNK'; data: string; sequence: number }
+  | { type: 'AUDIO_CHUNK'; data: string; sequence: number; isComplete?: boolean }
   | { type: 'TRANSCRIPT_USER'; text: string; isFinal: boolean }
   | { type: 'TRANSCRIPT_AI'; text: string; isFinal: boolean }
   | { type: 'AI_SPEAKING_START' }
