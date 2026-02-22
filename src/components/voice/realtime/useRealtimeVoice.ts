@@ -124,11 +124,20 @@ export function useRealtimeVoice(
           bytes[i] = binaryString.charCodeAt(i);
         }
 
-        // Use HTML5 Audio - EXACT working code from last night
+        // Use HTML5 Audio with iOS-specific settings
         const blob = new Blob([bytes], { type: 'audio/mpeg' });
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
+
+        // iOS-specific attributes for loudspeaker playback
         audio.setAttribute('playsinline', 'true');
+        audio.setAttribute('webkit-playsinline', 'true');
+        audio.volume = 1.0;
+        audio.muted = false;
+
+        // Force speaker output on iOS by setting these properties
+        (audio as any).mozAudioChannelType = 'content';
+        (audio as any).webkitAudioDecodedByteCount = 0;
 
         console.log('[Voice] Playing audio, blob size:', blob.size);
 
@@ -265,6 +274,20 @@ export function useRealtimeVoice(
 
   const startAudioCapture = useCallback(async () => {
     try {
+      // iOS audio unlock - play silent audio to enable speaker output
+      // This must happen during a user gesture
+      const unlockAudio = new Audio();
+      unlockAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAbD/////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+M4wAAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+      unlockAudio.volume = 0.01;
+      unlockAudio.muted = false;
+      unlockAudio.setAttribute('playsinline', 'true');
+      try {
+        await unlockAudio.play();
+        console.log('[Voice] iOS audio unlocked');
+      } catch {
+        console.log('[Voice] iOS audio unlock not needed');
+      }
+
       // Get microphone access
       const stream = await navigator.mediaDevices.getUserMedia(AUDIO_CONSTRAINTS);
       mediaStreamRef.current = stream;
