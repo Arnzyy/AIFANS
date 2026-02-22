@@ -287,10 +287,10 @@ export function useRealtimeVoice(
 
       // Play a tiny silent buffer to fully unlock audio on iOS
       const silentBuffer = playbackContext.createBuffer(1, 1, 22050);
-      const source = playbackContext.createBufferSource();
-      source.buffer = silentBuffer;
-      source.connect(playbackContext.destination);
-      source.start(0);
+      const silentSource = playbackContext.createBufferSource();
+      silentSource.buffer = silentBuffer;
+      silentSource.connect(playbackContext.destination);
+      silentSource.start(0);
 
       console.log('[Voice] iOS audio context unlocked, state:', playbackContext.state);
 
