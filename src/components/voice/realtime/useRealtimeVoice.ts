@@ -111,37 +111,74 @@ export function useRealtimeVoice(
     if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
 
     isPlayingRef.current = true;
+    console.log('[Voice] Starting audio playback, queue size:', audioQueueRef.current.length);
 
     while (audioQueueRef.current.length > 0) {
       const base64Audio = audioQueueRef.current.shift();
       if (!base64Audio) continue;
 
       try {
-        // Use data URL directly - works better on iOS Safari than blob URLs
-        const dataUrl = `data:audio/mpeg;base64,${base64Audio}`;
+        console.log('[Voice] Playing audio chunk, size:', base64Audio.length);
+
+        // Create blob from base64 (more reliable than data URLs for large audio)
+        const binaryString = atob(base64Audio);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: 'audio/mpeg' });
+        const blobUrl = URL.createObjectURL(blob);
+
         const audio = new Audio();
         audio.setAttribute('playsinline', 'true');
         audio.setAttribute('webkit-playsinline', 'true');
         audio.preload = 'auto';
-        audio.src = dataUrl;
+        audio.volume = 1.0;
 
         await new Promise<void>((resolve) => {
-          audio.onended = () => resolve();
-          audio.onerror = (e) => {
-            console.warn('[Voice] Audio error:', e);
-            resolve();
+          let resolved = false;
+          const cleanup = () => {
+            if (!resolved) {
+              resolved = true;
+              URL.revokeObjectURL(blobUrl);
+              resolve();
+            }
           };
 
-          // iOS requires load() before play() for programmatic audio
-          audio.load();
+          // Timeout fallback - don't hang forever
+          const timeout = setTimeout(() => {
+            console.warn('[Voice] Audio playback timeout');
+            cleanup();
+          }, 30000);
 
-          const playPromise = audio.play();
-          if (playPromise !== undefined) {
-            playPromise.catch((e) => {
-              console.warn('[Voice] Play failed:', e);
-              resolve();
-            });
-          }
+          audio.onended = () => {
+            console.log('[Voice] Audio chunk finished');
+            clearTimeout(timeout);
+            cleanup();
+          };
+
+          audio.onerror = (e) => {
+            console.warn('[Voice] Audio error:', e);
+            clearTimeout(timeout);
+            cleanup();
+          };
+
+          // Wait for audio to be ready before playing
+          audio.oncanplaythrough = () => {
+            console.log('[Voice] Audio ready, playing...');
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+              playPromise.catch((e) => {
+                console.warn('[Voice] Play failed:', e);
+                clearTimeout(timeout);
+                cleanup();
+              });
+            }
+          };
+
+          // Set src and load
+          audio.src = blobUrl;
+          audio.load();
         });
       } catch (error) {
         console.warn('[Voice] Audio playback error:', error);
@@ -149,6 +186,7 @@ export function useRealtimeVoice(
     }
 
     isPlayingRef.current = false;
+    console.log('[Voice] Audio queue empty');
   }, []);
 
   // ===========================================
