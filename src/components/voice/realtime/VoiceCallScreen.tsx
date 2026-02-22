@@ -61,9 +61,9 @@ export function VoiceCallScreen({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-gradient-to-b from-gray-900 via-purple-900/20 to-gray-900 flex flex-col">
+    <div className="fixed inset-0 z-50 bg-gradient-to-b from-gray-900 via-purple-900/20 to-gray-900 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between p-4">
+      <div className="flex-shrink-0 flex items-center justify-between p-4">
         <div className="text-sm text-gray-400">
           {formatDuration(state.durationSeconds)}
         </div>
@@ -72,10 +72,10 @@ export function VoiceCallScreen({
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6">
+      {/* Main content - scrollable */}
+      <div className="flex-1 flex flex-col items-center px-6 overflow-y-auto min-h-0">
         {/* Avatar */}
-        <div className="relative mb-6">
+        <div className="relative mb-6 flex-shrink-0 mt-4">
           <div className="w-32 h-32 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center overflow-hidden">
             {personalityAvatar ? (
               <img
@@ -97,23 +97,23 @@ export function VoiceCallScreen({
         </div>
 
         {/* Name */}
-        <h2 className="text-2xl font-bold text-white mb-2">{personalityName}</h2>
+        <h2 className="text-2xl font-bold text-white mb-2 flex-shrink-0">{personalityName}</h2>
 
         {/* Status */}
-        <div className="text-gray-400 mb-8">
+        <div className="text-gray-400 mb-4 flex-shrink-0">
           <CallStatus status={state.status} isAISpeaking={state.isAISpeaking} />
         </div>
 
         {/* Visualizer */}
-        <div className="mb-8">
+        <div className="mb-4 flex-shrink-0">
           <VoiceVisualizer
             isUserSpeaking={state.isUserSpeaking}
             isAISpeaking={state.isAISpeaking}
           />
         </div>
 
-        {/* Transcript */}
-        <div className="w-full max-w-md space-y-4 text-center">
+        {/* Transcript - scrollable area */}
+        <div className="w-full max-w-md space-y-4 text-center pb-4">
           {state.currentTranscript && (
             <div className="p-4 bg-black/70 backdrop-blur-md rounded-xl border border-white/20">
               <p className="text-sm text-gray-400 mb-1">You</p>
@@ -130,14 +130,14 @@ export function VoiceCallScreen({
 
         {/* Error */}
         {state.error && (
-          <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-center">
+          <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-center flex-shrink-0">
             {state.error}
           </div>
         )}
       </div>
 
-      {/* Controls */}
-      <div className="p-6">
+      {/* Controls - fixed at bottom */}
+      <div className="flex-shrink-0 p-6 pb-safe">
         <VoiceCallControls
           isMuted={state.isMuted}
           isSpeakerOn={state.isSpeakerOn}
