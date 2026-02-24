@@ -61,6 +61,7 @@ type ServerWSMessage =
   | { type: 'AI_SPEAKING_END' }
   | { type: 'BARGE_IN_ACK' }
   | { type: 'ERROR'; message: string; code: string }
+  | { type: 'STATUS'; status: string; message: string }
   | { type: 'USAGE_UPDATE'; minutesUsed: number; minutesLimit: number }
   | { type: 'SESSION_ENDED'; reason: string; duration: number }
   | { type: 'PONG' };
@@ -78,8 +79,10 @@ interface ActiveSession {
   startTime: number;
   lastActivity: number;
   isProcessing: boolean;
+  isEnding: boolean;
   // Voice pipeline state
   deepgramConnection: any | null;
+  deepgramKeepaliveInterval: NodeJS.Timeout | null;
   personality: PersonalityData | null;
   voiceSettings: VoiceSettingsData | null;
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
@@ -419,8 +422,10 @@ wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
     startTime: Date.now(),
     lastActivity: Date.now(),
     isProcessing: false,
+    isEnding: false,
     // Voice pipeline state
     deepgramConnection: null,
+    deepgramKeepaliveInterval: null,
     personality: personalityResult,
     voiceSettings: voiceSettingsResult,
     conversationHistory: preloadedHistory,
@@ -762,11 +767,57 @@ async function initializeDeepgram(session: ActiveSession): Promise<void> {
       });
     });
 
-    connection.on(LiveTranscriptionEvents.Close, () => {
+    connection.on(LiveTranscriptionEvents.Close, async () => {
       console.log('[Deepgram] Connection closed for session:', session.payload.sessionId);
+
+      // If session is still active, try to reconnect
+      if (session.ws.readyState === WebSocket.OPEN && !session.isEnding) {
+        console.log('[Deepgram] Attempting to reconnect...');
+        session.deepgramConnection = null;
+
+        // Wait a bit before reconnecting
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Check again if session is still active
+        if (session.ws.readyState === WebSocket.OPEN && !session.isEnding) {
+          try {
+            await initializeDeepgram(session);
+            console.log('[Deepgram] Reconnected successfully');
+            sendMessage(session.ws, {
+              type: 'STATUS',
+              status: 'reconnected',
+              message: 'Speech recognition reconnected',
+            });
+          } catch (reconnectError) {
+            console.error('[Deepgram] Reconnection failed:', reconnectError);
+            sendMessage(session.ws, {
+              type: 'ERROR',
+              message: 'Speech recognition disconnected',
+              code: 'STT_DISCONNECTED',
+            });
+          }
+        }
+      }
     });
 
     session.deepgramConnection = connection;
+
+    // Clear any existing keepalive interval
+    if (session.deepgramKeepaliveInterval) {
+      clearInterval(session.deepgramKeepaliveInterval);
+    }
+
+    // Start Deepgram keepalive to prevent idle timeout (every 10 seconds)
+    session.deepgramKeepaliveInterval = setInterval(() => {
+      if (session.deepgramConnection && session.ws.readyState === WebSocket.OPEN && !session.isEnding) {
+        try {
+          session.deepgramConnection.keepAlive();
+        } catch (err) {
+          console.warn('[Deepgram] Keepalive failed:', err);
+        }
+      }
+    }, 10000);
+
     console.log('[VoiceWS] Deepgram initialized successfully');
   } catch (error) {
     console.error('[VoiceWS] Deepgram init error:', error);
@@ -1111,6 +1162,7 @@ function handleVADEnd(session: ActiveSession): void {
 }
 
 async function endSession(session: ActiveSession, reason: string): Promise<void> {
+  session.isEnding = true;
   const duration = Math.floor((Date.now() - session.startTime) / 1000);
 
   console.log('[VoiceWS] Ending session:', {
@@ -1138,6 +1190,12 @@ async function cleanupSession(session: ActiveSession, reason: string): Promise<v
   // Abort any ongoing AI processing
   if (session.abortController) {
     session.abortController.abort();
+  }
+
+  // Clear Deepgram keepalive interval
+  if (session.deepgramKeepaliveInterval) {
+    clearInterval(session.deepgramKeepaliveInterval);
+    session.deepgramKeepaliveInterval = null;
   }
 
   // Close Deepgram connection
